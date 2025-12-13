@@ -1,0 +1,207 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '../providers'
+import { supabase, Product, ProductCategory } from '@/lib/supabase'
+import Navbar from '@/components/Navbar'
+import ProductCard from '@/components/ProductCard'
+import Link from 'next/link'
+import { FiFilter } from 'react-icons/fi'
+
+export default function ProductsPage() {
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [categorySection, setCategorySection] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [cityFilter, setCityFilter] = useState('')
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([])
+  const [showFilters, setShowFilters] = useState(false)
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/')
+    }
+  }, [user, authLoading, router])
+
+  useEffect(() => {
+    if (user) {
+      fetchCategories()
+      fetchProducts()
+    }
+  }, [user, searchQuery, categorySection, categoryId, cityFilter])
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('product_categories')
+        .select('*')
+        .order('name', { ascending: true })
+      if (error) throw error
+      setProductCategories((data as ProductCategory[]) || [])
+    } catch (error) {
+      console.error('Error fetching product categories:', error)
+      setProductCategories([])
+    }
+  }
+
+  const fetchProducts = async () => {
+    try {
+      let query = supabase
+        .from('products')
+        .select(`
+          *,
+          seller:profiles(id, full_name, avatar_url, city, phone),
+          category_ref:product_categories(id, name, section, slug)
+        `)
+        .eq('in_stock', true)
+        .order('created_at', { ascending: false })
+
+      if (categorySection) {
+        query = query.eq('category_ref.section', categorySection)
+      }
+
+      if (categoryId) {
+        query = query.eq('category_id', categoryId)
+      }
+
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
+      }
+
+      const { data, error } = await query
+
+      if (error) throw error
+
+      // Filter by city on client side (since we can't filter joined tables directly in Supabase)
+      let filteredData = (data || []) as Product[]
+      if (cityFilter && cityFilter.trim()) {
+        filteredData = filteredData.filter((product: any) => {
+          const seller = product.seller
+          return seller?.city && seller.city.toLowerCase().includes(cityFilter.toLowerCase())
+        })
+      }
+
+      setProducts(filteredData)
+    } catch (error) {
+      console.error('Error fetching products:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Загрузка...</div>
+      </div>
+    )
+  }
+
+  if (!user) return null
+
+  return (
+    <div className="min-h-screen bg-white pb-20">
+      <Navbar />
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Каталог товаров</h1>
+          {user && (
+            <Link 
+              href="/products/new" 
+              className="px-4 py-2 bg-black text-white text-sm font-medium border border-black hover:bg-gray-800 transition-colors rounded"
+            >
+              Добавить товар
+            </Link>
+          )}
+        </div>
+
+        {/* Search */}
+        <div className="mb-4 relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Поиск товаров..."
+            className="w-full input pr-12"
+          />
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
+              showFilters ? 'bg-black text-white' : 'text-gray-500 hover:text-black hover:bg-gray-50'
+            }`}
+            title="Фильтры"
+          >
+            <FiFilter size={18} />
+          </button>
+        </div>
+
+        {/* Filters - Collapsible */}
+        {showFilters && (
+          <div className="card mb-6 animate-fade-in">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <input
+                  type="text"
+                  value={cityFilter}
+                  onChange={(e) => setCityFilter(e.target.value)}
+                  placeholder="Город продавца"
+                  className="input md:w-48"
+                />
+                <select
+                  value={categorySection}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setCategorySection(val)
+                    setCategoryId('')
+                  }}
+                  className="input md:w-56"
+                >
+                  <option value="">Все разделы</option>
+                  <option value="instruments">Инструменты</option>
+                  <option value="autoparts">Автозапчасти</option>
+                  <option value="materials">Стройматериалы</option>
+                </select>
+
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="input md:w-64"
+                  disabled={!categorySection}
+                >
+                  <option value="">
+                    {categorySection ? 'Все категории' : 'Сначала выберите раздел'}
+                  </option>
+                  {productCategories
+                    .filter((cat) => !categorySection || cat.section === categorySection)
+                    .map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Products Grid */}
+        {products.length === 0 ? (
+          <div className="card text-center text-gray-500 py-12">
+            Товары не найдены
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:gap-6">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} currentUser={user} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
