@@ -17,6 +17,7 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -31,8 +32,9 @@ export default function ChatPage() {
     }
 
     return () => {
-      if (params.id) {
-        supabase.removeChannel(`chat:${params.id}`)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
       }
     }
   }, [user, params.id])
@@ -132,9 +134,7 @@ export default function ChatPage() {
       )
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    channelRef.current = channel
   }
 
   const sendMessage = async (e: React.FormEvent) => {
