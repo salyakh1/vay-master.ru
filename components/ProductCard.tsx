@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { Product, User, supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { FiMessageCircle, FiUser } from 'react-icons/fi'
@@ -10,7 +11,7 @@ interface ProductCardProps {
   currentUser: User
 }
 
-export default function ProductCard({ product, currentUser }: ProductCardProps) {
+function ProductCard({ product, currentUser }: ProductCardProps) {
   const router = useRouter()
   const seller = product.seller as any
 
@@ -45,9 +46,9 @@ export default function ProductCard({ product, currentUser }: ProductCardProps) 
   }
 
   return (
-    <div className="bg-white border border-gray-200 overflow-hidden transition-all hover:shadow-lg group">
+    <div className="bg-bg-primary overflow-hidden transition-all hover:shadow-card-hover group card">
       <Link href={`/products/${product.id}`}>
-        <div className="aspect-square bg-gray-50 relative overflow-hidden border-b border-gray-200">
+        <div className="aspect-square bg-bg-secondary relative overflow-hidden rounded-lg mb-3">
           {product.images && product.images.length > 0 ? (
             <img
               src={product.images[0]}
@@ -55,75 +56,77 @@ export default function ProductCard({ product, currentUser }: ProductCardProps) 
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-300 text-5xl">
+            <div className="w-full h-full flex items-center justify-center text-text-secondary text-5xl">
               🛒
             </div>
           )}
           {!product.in_stock && (
-            <div className="absolute top-2 right-2 bg-black/90 text-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider rounded">
+            <div className="absolute top-2 right-2 bg-text-primary/90 text-white px-2.5 py-1 text-xs font-medium rounded">
               Нет в наличии
             </div>
           )}
         </div>
       </Link>
 
-      <div className="p-3 flex flex-col">
+      <div className="flex flex-col">
         <Link href={`/products/${product.id}`}>
-          <h3 className="font-bold text-sm mb-1.5 hover:text-black cursor-pointer line-clamp-2 text-black leading-tight">
+          <h3 className="font-semibold text-base mb-2 hover:text-brand-accent cursor-pointer line-clamp-2 text-text-primary leading-tight">
             {product.name}
           </h3>
         </Link>
         
-        <p className="text-[11px] text-gray-500 mb-3 line-clamp-2 leading-relaxed min-h-[2.5rem]">
+        <p className="text-sm text-text-secondary mb-3 line-clamp-2 leading-relaxed min-h-[2.5rem]">
           {product.description}
         </p>
 
         <div className="flex items-baseline justify-between mb-2">
-          <div className="text-xl font-bold text-black">
+          <div className="text-xl font-semibold text-text-primary">
             {product.price.toLocaleString('ru-RU')} ₽
           </div>
           {product.stock_count !== null && product.stock_count !== undefined && product.stock_count > 0 && (
-            <div className="text-[10px] text-gray-400 bg-gray-50 border border-gray-200 px-2 py-0.5 font-medium uppercase tracking-wide rounded">
+            <div className="text-xs text-text-secondary bg-bg-secondary px-2 py-1 font-normal rounded">
               {product.stock_count} шт
             </div>
           )}
         </div>
 
         {product.category_ref && (
-          <div className="text-[10px] text-gray-400 mb-2.5 line-clamp-1">
+          <div className="text-xs text-text-secondary mb-2.5 line-clamp-1">
             {product.category_ref.name}
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 mb-3 text-[10px] text-gray-400">
+        <div className="flex items-center gap-1.5 mb-3 text-xs text-text-secondary">
           <Link
             href={`/profile/${seller?.id}`}
-            className="hover:text-black transition-colors font-medium line-clamp-1"
+            className="hover:text-text-primary transition-colors font-normal line-clamp-1"
           >
             {seller?.full_name || 'Продавец'}
           </Link>
-          {seller?.city && <span className="text-gray-300">•</span>}
+          {seller?.city && <span className="text-border-color">•</span>}
           {seller?.city && <span className="line-clamp-1">{seller.city}</span>}
         </div>
 
         <div className="flex gap-2 mt-auto">
           <Link
             href={`/profile/${seller?.id}`}
-            className="flex-1 h-9 border border-gray-200 hover:border-black hover:bg-black hover:text-white transition-all flex items-center justify-center rounded"
+            className="flex-1 h-10 border border-border-color hover:border-brand-accent hover:text-brand-accent transition-all flex items-center justify-center rounded-lg"
             title="Профиль продавца"
           >
-            <FiUser size={16} />
+            <FiUser size={18} />
           </Link>
           <button
             onClick={handleContact}
-            className="flex-1 h-9 border border-gray-200 hover:border-black hover:bg-black hover:text-white transition-all flex items-center justify-center rounded"
+            className="flex-1 h-10 border border-border-color hover:border-brand-accent hover:text-brand-accent transition-all flex items-center justify-center rounded-lg"
             title="Написать продавцу"
           >
-            <FiMessageCircle size={16} />
+            <FiMessageCircle size={18} />
           </button>
         </div>
       </div>
     </div>
   )
 }
+
+export default memo(ProductCard)
 

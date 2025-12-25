@@ -32,6 +32,7 @@ export interface User {
   email: string
   full_name: string
   avatar_url?: string
+  cover_photo_url?: string
   role: UserRole
   phone?: string
   city?: string
@@ -96,12 +97,35 @@ export interface ProductCategory {
   created_at: string
 }
 
+export interface AdBanner {
+  id: string
+  title: string
+  description?: string
+  image_url: string
+  type: 'image' | 'image_text' | 'image_button' | 'master_promo' | 'product_promo' | 'category_promo'
+  target_type?: 'master' | 'product' | 'category' | 'order' | 'external_url' | null
+  target_id?: string
+  external_url?: string
+  pages: string[]
+  priority: number
+  is_active: boolean
+  start_date?: string
+  end_date?: string
+  duration?: number // Длительность показа в секундах
+  views: number
+  clicks: number
+  created_by?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Chat {
   id: string
   user1_id: string
   user2_id: string
   created_at: string
   updated_at: string
+  deleted_by_user_ids?: string[]
 }
 
 export interface Message {
@@ -109,6 +133,7 @@ export interface Message {
   chat_id: string
   sender_id: string
   content: string
+  image_url?: string
   created_at: string
   read: boolean
 }
@@ -174,5 +199,22 @@ export interface PortfolioComment {
   content: string
   created_at: string
   user?: User
+}
+
+export type ComplaintStatus = 'new' | 'in_progress' | 'resolved' | 'rejected'
+
+export interface Complaint {
+  id: string
+  complainer_id: string
+  reported_user_id: string
+  chat_id?: string
+  comment: string
+  status: ComplaintStatus
+  created_at: string
+  updated_at?: string
+  admin_notes?: string
+  complainer?: User
+  reported_user?: User
+  chat?: Chat
 }
 

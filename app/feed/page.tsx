@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '../providers'
 import { supabase, PortfolioItem } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
+import AdBannerSlider from '@/components/AdBannerSlider'
 import { FiGlobe } from 'react-icons/fi'
 
 export default function FeedPage() {
@@ -71,23 +72,28 @@ export default function FeedPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-bg-primary pb-20">
       <Navbar />
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-6">
         <div className="max-w-2xl mx-auto">
+          {/* Баннеры */}
+          <div className="mb-6">
+            <AdBannerSlider page="feed" />
+          </div>
+
           <div className="flex justify-end mb-4">
             <button
               onClick={() => router.push('/feed/publications')}
-              className="p-2 border border-gray-200 rounded hover:bg-gray-50"
+              className="p-2 border border-border-color rounded-lg hover:bg-bg-secondary transition-colors"
               title="Все работы"
             >
-              <FiGlobe size={18} />
+              <FiGlobe size={20} />
             </button>
           </div>
 
           <div className="space-y-6 mt-4">
             {items.length === 0 ? (
-              <div className="card text-center text-gray-500 py-12 animate-fade-in">
+              <div className="card text-center text-text-secondary py-12 animate-fade-in">
                 <div className="text-6xl mb-4">📝</div>
                 <p className="text-lg font-medium">Пока нет работ от ваших подписок.</p>
               </div>
@@ -95,22 +101,22 @@ export default function FeedPage() {
               items.map((item) => (
                 <div key={item.id} className="card">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 bg-black text-white flex items-center justify-center text-sm font-bold">
+                    <div className="w-12 h-12 bg-text-primary text-white flex items-center justify-center text-sm font-semibold rounded-full">
                       {item.master?.avatar_url ? (
-                        <img src={item.master.avatar_url} alt={item.master.full_name} className="w-full h-full object-cover" />
+                        <img src={item.master.avatar_url} alt={item.master.full_name} className="w-full h-full object-cover rounded-full" />
                       ) : (
                         item.master?.full_name?.[0]?.toUpperCase() || 'M'
                       )}
                     </div>
                     <div>
-                      <div className="font-semibold text-sm text-black">{item.master?.full_name || 'Мастер'}</div>
-                      <div className="text-xs text-gray-500">{item.master?.city}</div>
+                      <div className="font-semibold text-base text-text-primary">{item.master?.full_name || 'Мастер'}</div>
+                      <div className="text-sm text-text-secondary">{item.master?.city}</div>
                     </div>
                   </div>
                   <div className="mb-2">
-                    <div className="font-semibold text-base text-black">{item.title}</div>
+                    <div className="font-semibold text-lg text-text-primary">{item.title}</div>
                     {item.description && (
-                      <p className="text-sm text-gray-600 mt-1 line-clamp-3">{item.description}</p>
+                      <p className="text-base text-text-secondary mt-1 line-clamp-3 leading-relaxed">{item.description}</p>
                     )}
                   </div>
                   {item.images && item.images.length > 0 ? (
@@ -120,13 +126,13 @@ export default function FeedPage() {
                           key={idx}
                           src={img}
                           alt={item.title}
-                          className="w-full h-32 object-cover border border-gray-200"
+                          className="w-full h-32 object-cover border border-border-color rounded-lg"
                         />
                       ))}
                     </div>
                   ) : item.videos && item.videos.length > 0 ? (
                     <div className="mt-3">
-                      <video src={item.videos[0]} controls className="w-full rounded border border-gray-200" />
+                      <video src={item.videos[0]} controls className="w-full rounded-lg border border-border-color" />
                     </div>
                   ) : null}
                 </div>

@@ -39,30 +39,60 @@ export default function ChatsPage() {
 
       if (error) throw error
 
-      const chatsWithUsers = await Promise.all(
-        (data || []).map(async (chat) => {
-          const otherUserId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id
-          const { data: otherUser } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', otherUserId)
-            .single()
+      // Фильтруем чаты, которые были удалены пользователем
+      const filteredChats = (data || []).filter((chat) => {
+        const deletedByUserIds = (chat.deleted_by_user_ids || []) as string[]
+        return !deletedByUserIds.includes(user.id)
+      })
 
-          const { data: messages } = await supabase
-            .from('messages')
-            .select('*')
-            .eq('chat_id', chat.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-
-          return {
-            ...chat,
-            otherUser: otherUser as User,
-            lastMessage: messages as Message | undefined,
-          }
-        })
+      // Оптимизация: получаем все данные параллельно
+      const chatIds = filteredChats.map((chat) => chat.id)
+      const otherUserIds = filteredChats.map((chat) =>
+        chat.user1_id === user.id ? chat.user2_id : chat.user1_id
       )
+
+      // Получаем всех пользователей одним запросом
+      const { data: allUsers } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', otherUserIds)
+
+      // Получаем последние сообщения для всех чатов
+      // Используем отдельные запросы для каждого чата, но выполняем их параллельно
+      const messagesPromises = chatIds.map(async (chatId) => {
+        const { data } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('chat_id', chatId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        return { chatId, message: data }
+      })
+      
+      const messagesResults = await Promise.all(messagesPromises)
+      const messagesByChat = new Map<string, Message>()
+      messagesResults.forEach(({ chatId, message }) => {
+        if (message) {
+          messagesByChat.set(chatId, message as Message)
+        }
+      })
+
+      // Создаем map пользователей для быстрого доступа
+      const usersMap = new Map<string, User>()
+      allUsers?.forEach((u) => {
+        usersMap.set(u.id, u as User)
+      })
+
+      // Формируем результат
+      const chatsWithUsers = filteredChats.map((chat) => {
+        const otherUserId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id
+        return {
+          ...chat,
+          otherUser: usersMap.get(otherUserId) as User,
+          lastMessage: messagesByChat.get(chat.id),
+        }
+      })
 
       setChats(chatsWithUsers)
     } catch (error) {

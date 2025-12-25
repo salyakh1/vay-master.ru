@@ -1,0 +1,148 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { type AdminRole } from '@/lib/admin'
+import {
+  FiHome,
+  FiUsers,
+  FiBriefcase,
+  FiShoppingBag,
+  FiAlertCircle,
+  FiShield,
+  FiBarChart2,
+  FiSettings,
+  FiTag,
+  FiFileText,
+  FiImage,
+  FiMessageSquare,
+} from 'react-icons/fi'
+
+interface AdminSidebarProps {
+  role: AdminRole
+  currentPath: string
+}
+
+export default function AdminSidebar({ role, currentPath }: AdminSidebarProps) {
+  const menuItems = [
+    {
+      title: 'Дашборд',
+      href: '/admin',
+      icon: FiHome,
+      roles: ['super_admin', 'moderator', 'support'],
+    },
+    {
+      title: 'Пользователи',
+      href: '/admin/users',
+      icon: FiUsers,
+      roles: ['super_admin', 'moderator', 'support'],
+    },
+    {
+      title: 'Мастера',
+      href: '/admin/masters',
+      icon: FiBriefcase,
+      roles: ['super_admin', 'moderator'],
+    },
+    {
+      title: 'Заказы',
+      href: '/admin/orders',
+      icon: FiFileText,
+      roles: ['super_admin', 'moderator', 'support'],
+    },
+    {
+      title: 'Жалобы',
+      href: '/admin/complaints',
+      icon: FiAlertCircle,
+      roles: ['super_admin', 'moderator', 'support'],
+    },
+    {
+      title: 'Писать пользователям',
+      href: '/admin/messages',
+      icon: FiMessageSquare,
+      roles: ['super_admin', 'moderator'],
+    },
+    {
+      title: 'Модерация',
+      href: '/admin/moderation',
+      icon: FiShield,
+      roles: ['super_admin', 'moderator'],
+    },
+    {
+      title: 'Реклама',
+      href: '/admin/advertisements',
+      icon: FiTag,
+      roles: ['super_admin'],
+    },
+    {
+      title: 'Баннеры',
+      href: '/admin/banners',
+      icon: FiImage,
+      roles: ['super_admin', 'moderator'],
+    },
+    {
+      title: 'Безопасность',
+      href: '/admin/security',
+      icon: FiShield,
+      roles: ['super_admin', 'moderator'],
+    },
+    {
+      title: 'Аналитика',
+      href: '/admin/analytics',
+      icon: FiBarChart2,
+      roles: ['super_admin', 'moderator'],
+    },
+    {
+      title: 'Настройки',
+      href: '/admin/settings',
+      icon: FiSettings,
+      roles: ['super_admin'],
+    },
+  ]
+
+  const filteredItems = menuItems.filter((item) => item.roles.includes(role))
+
+  return (
+    <aside className="w-64 bg-bg-primary border-r border-border-color flex flex-col">
+      <div className="p-6 border-b border-border-color">
+        <h1 className="text-xl font-semibold text-text-primary">VAY-MASTER</h1>
+        <p className="text-xs text-text-secondary mt-1">Админ-панель</p>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto p-4">
+        <ul className="space-y-1">
+          {filteredItems.map((item) => {
+            const Icon = item.icon
+            const isActive = currentPath === item.href || currentPath.startsWith(item.href + '/')
+
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                    isActive
+                      ? 'bg-brand-accent text-white'
+                      : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <Icon size={20} />
+                  <span className="font-medium">{item.title}</span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
+
+      <div className="p-4 border-t border-border-color">
+        <Link
+          href="/"
+          className="flex items-center gap-3 px-4 py-3 text-text-secondary hover:bg-bg-secondary hover:text-text-primary rounded-lg transition-colors"
+        >
+          <FiHome size={20} />
+          <span className="font-medium">На сайт</span>
+        </Link>
+      </div>
+    </aside>
+  )
+}
+

@@ -6,6 +6,7 @@ import { useAuth } from '../providers'
 import { supabase, Order } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import OrderCard from '@/components/OrderCard'
+import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
 import { FiSearch, FiPlus, FiFilter, FiList, FiMap } from 'react-icons/fi'
 
@@ -116,6 +117,11 @@ export default function OrdersPage() {
       <Navbar />
       <div className="container mx-auto px-4 py-6">
         <div className="max-w-6xl mx-auto">
+          {/* Баннеры */}
+          <div className="mb-6">
+            <AdBannerSlider page="orders" />
+          </div>
+
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -246,4 +252,3 @@ export default function OrdersPage() {
     </div>
   )
 }
-

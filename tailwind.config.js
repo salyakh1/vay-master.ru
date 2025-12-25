@@ -8,35 +8,50 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#EEF2FF',
-          100: '#E0E7FF',
-          500: '#6366F1',
-          600: '#4F46E5',
-          700: '#4338CA',
+        // Фирменная цветовая система VAY-MASTER
+        brand: {
+          accent: '#C7362F', // Приглушённый красный из логотипа
         },
-        secondary: {
-          50: '#ECFDF5',
-          100: '#D1FAE5',
-          500: '#10B981',
-          600: '#059669',
+        text: {
+          primary: '#111111',   // Основной текст
+          secondary: '#6B7280', // Вторичный текст
         },
-        accent: {
-          500: '#F59E0B',
-          600: '#D97706',
+        bg: {
+          primary: '#FFFFFF',   // Основной фон
+          secondary: '#F5F6F7', // Альтернативный фон
         },
+      },
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+      },
+      fontSize: {
+        'xs': ['12px', { lineHeight: '1.5' }],
+        'sm': ['14px', { lineHeight: '1.6' }],
+        'base': ['16px', { lineHeight: '1.6' }],
+        'lg': ['18px', { lineHeight: '1.6' }],
+        'xl': ['20px', { lineHeight: '1.5' }],
+        '2xl': ['24px', { lineHeight: '1.4' }],
+        '3xl': ['28px', { lineHeight: '1.3' }],
+        '4xl': ['32px', { lineHeight: '1.2' }],
+      },
+      fontWeight: {
+        normal: '400',
+        medium: '500',
+        semibold: '600',
       },
       borderRadius: {
-        'xl': '16px',
-        '2xl': '20px',
-        '3xl': '24px',
+        'DEFAULT': '10px',
+        'sm': '8px',
+        'md': '10px',
+        'lg': '12px',
       },
       boxShadow: {
-        'glow': '0 0 20px rgba(99, 102, 241, 0.3)',
-        'glow-lg': '0 0 40px rgba(99, 102, 241, 0.4)',
+        'card': '0 8px 24px rgba(0, 0, 0, 0.04)',
+        'card-hover': '0 12px 32px rgba(0, 0, 0, 0.08)',
       },
-      backdropBlur: {
-        xs: '2px',
+      spacing: {
+        '18': '4.5rem',
+        '22': '5.5rem',
       },
     },
   },

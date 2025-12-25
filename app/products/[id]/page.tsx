@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiMessageCircle, FiShoppingCart, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import { FiMessageCircle, FiShoppingCart, FiChevronLeft, FiChevronRight, FiArrowLeft } from 'react-icons/fi'
 import Link from 'next/link'
 
 export default function ProductPage() {
@@ -122,12 +122,17 @@ export default function ProductPage() {
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX
+    if (e.touches && e.touches.length > 0) {
+      touchStartX.current = e.touches[0].clientX
+    }
   }
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    touchEndX.current = e.changedTouches[0].clientX
-    handleSwipe()
+    // В touchEnd используем changedTouches, так как touches уже пуст
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      touchEndX.current = e.changedTouches[0].clientX
+      handleSwipe()
+    }
   }
 
   const handleSwipe = () => {
@@ -165,6 +170,15 @@ export default function ProductPage() {
       <Navbar />
       <div className="container mx-auto px-4 py-4">
         <div className="max-w-6xl mx-auto">
+          {/* Back Button */}
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary mb-6 transition-colors"
+          >
+            <FiArrowLeft size={20} />
+            <span>Назад к товарам</span>
+          </Link>
+
           <div className="grid md:grid-cols-2 gap-8">
             {/* Product Images */}
             <div>

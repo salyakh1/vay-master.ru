@@ -18,10 +18,10 @@ const statusLabels: Record<string, string> = {
 }
 
 const statusColors: Record<string, string> = {
-  new: 'bg-white text-black border-black',
-  in_progress: 'bg-black text-white border-black',
-  completed: 'bg-white text-gray-500 border-gray-300',
-  cancelled: 'bg-white text-gray-400 border-gray-300',
+  new: 'bg-bg-primary text-text-primary border-border-color',
+  in_progress: 'bg-brand-accent text-white border-brand-accent',
+  completed: 'bg-bg-primary text-text-secondary border-border-color',
+  cancelled: 'bg-bg-primary text-text-secondary border-border-color',
 }
 
 export default function OrderCard({ order }: OrderCardProps) {
@@ -41,20 +41,20 @@ export default function OrderCard({ order }: OrderCardProps) {
       <div className="card">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-black mb-2 line-clamp-2">
+            <h3 className="text-lg font-semibold text-text-primary mb-2 line-clamp-2">
               {order.title}
             </h3>
-            <div className="flex items-center gap-2 text-xs text-gray-500 mb-2 uppercase tracking-wide">
-              <FiClock size={12} />
+            <div className="flex items-center gap-2 text-sm text-text-secondary mb-2">
+              <FiClock size={14} />
               <span>{timeDisplay}</span>
             </div>
           </div>
-          <span className={`px-2 py-1 text-xs font-medium uppercase tracking-wide border ${statusColors[order.status]}`}>
+          <span className={`px-3 py-1 text-xs font-medium border rounded-lg ${statusColors[order.status]}`}>
             {statusLabels[order.status]}
           </span>
         </div>
 
-        <p className="text-black mb-4 line-clamp-3 leading-relaxed text-sm">
+        <p className="text-text-primary mb-4 line-clamp-3 leading-relaxed text-base">
           {order.description}
         </p>
 
@@ -65,47 +65,47 @@ export default function OrderCard({ order }: OrderCardProps) {
                 key={idx}
                 src={img}
                 alt={`Order image ${idx + 1}`}
-                className="w-full h-24 object-cover border border-gray-200"
+                className="w-full h-24 object-cover border border-border-color rounded-lg"
               />
             ))}
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600 mb-4">
+        <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary mb-4">
           {order.location && (
             <div className="flex items-center gap-1">
-              <FiMapPin size={14} className="text-black" />
-              <span className="font-medium">{order.location}</span>
+              <FiMapPin size={16} className="text-text-primary" />
+              <span className="font-normal">{order.location}</span>
             </div>
           )}
           {order.budget && (
             <div className="flex items-center gap-1">
-              <FiDollarSign size={14} className="text-black" />
-              <span className="font-semibold text-black">
+              <FiDollarSign size={16} className="text-text-primary" />
+              <span className="font-semibold text-text-primary">
                 {order.budget.toLocaleString('ru-RU')} ₽
               </span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between pt-4 border-t border-border-color">
           <div className="flex items-center gap-2">
             {order.client?.avatar_url ? (
               <img
                 src={order.client.avatar_url}
                 alt={order.client.full_name}
-                className="w-8 h-8 object-cover border border-gray-200"
+                className="w-8 h-8 object-cover border border-border-color rounded-full"
               />
             ) : (
-              <div className="w-8 h-8 bg-black flex items-center justify-center text-white text-xs font-bold border border-gray-200">
+              <div className="w-8 h-8 bg-text-primary flex items-center justify-center text-white text-xs font-semibold border border-border-color rounded-full">
                 {order.client?.full_name?.[0]?.toUpperCase() || '?'}
               </div>
             )}
-            <span className="text-xs font-medium text-black">
+            <span className="text-sm font-normal text-text-primary">
               {order.client?.full_name || 'Клиент'}
             </span>
           </div>
-          <span className="px-2 py-1 border border-gray-200 text-xs font-medium uppercase tracking-wide">
+          <span className="px-3 py-1 border border-border-color text-xs font-normal rounded-lg bg-bg-secondary">
             {order.category}
           </span>
         </div>

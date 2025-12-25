@@ -8,7 +8,7 @@ import { supabase, User, PortfolioItem, Specialization, Service, Product } from 
 import Navbar from '@/components/Navbar'
 import PortfolioGrid from '@/components/PortfolioGrid'
 import PortfolioGallery from '@/components/PortfolioGallery'
-import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome } from 'react-icons/fi'
+import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock } from 'react-icons/fi'
 
 export default function ProfilePage() {
   const params = useParams()
@@ -28,6 +28,10 @@ export default function ProfilePage() {
   const [profileServices, setProfileServices] = useState<Service[]>([])
   const [isFollowing, setIsFollowing] = useState<boolean>(false)
   const [followLoading, setFollowLoading] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const [showAvatarModal, setShowAvatarModal] = useState(false)
+  const [showCoverModal, setShowCoverModal] = useState(false)
   
   // Settings form state - common
   const [fullName, setFullName] = useState('')
@@ -35,6 +39,14 @@ export default function ProfilePage() {
   const [city, setCity] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
+  
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
   
   // Master fields
   const [servicesText, setServicesText] = useState('')
@@ -58,14 +70,16 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (params.id) {
+      // Сначала загружаем профиль, потом остальные данные
       fetchProfile()
+      if (currentUser) {
     checkFollowing()
-      fetchPortfolio()
-      fetchSellerProducts()
     }
-  }, [params.id])
+    }
+  }, [params.id, currentUser])
 
   useEffect(() => {
+    // Загружаем справочные данные только один раз
     fetchReferenceData()
   }, [])
 
@@ -98,12 +112,14 @@ export default function ProfilePage() {
       setDeliveryZones(userData.delivery_zones || '')
       setProductCategories(userData.product_categories || '')
 
+      // Загружаем связанные данные последовательно, чтобы не перегружать сервер
       await fetchSelections()
+      
+      // Загружаем данные в зависимости от роли
       if (userData.role === 'master') {
-        fetchPortfolio()
-      }
-      if (userData.role === 'seller') {
-        fetchSellerProducts()
+        await fetchPortfolio()
+      } else if (userData.role === 'seller') {
+        await fetchSellerProducts()
       }
     } catch (error) {
       console.error('Error fetching profile:', error)
@@ -254,6 +270,40 @@ export default function ProfilePage() {
     }
   }
 
+  const handleStartChat = async () => {
+    if (!currentUser || !profile) return
+
+    try {
+      // Check if chat already exists
+      const { data: existingChat } = await supabase
+        .from('chats')
+        .select('id')
+        .or(`and(user1_id.eq.${currentUser.id},user2_id.eq.${profile.id}),and(user1_id.eq.${profile.id},user2_id.eq.${currentUser.id})`)
+        .maybeSingle()
+
+      if (existingChat) {
+        router.push(`/chats/${existingChat.id}`)
+        return
+      }
+
+      // Create new chat
+      const { data, error } = await supabase
+        .from('chats')
+        .insert({
+          user1_id: currentUser.id,
+          user2_id: profile.id,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      router.push(`/chats/${data.id}`)
+    } catch (error) {
+      console.error('Error starting chat:', error)
+    }
+  }
+
 
   const fetchPortfolio = async () => {
     if (!params.id) return
@@ -290,14 +340,143 @@ export default function ProfilePage() {
     }
   }
 
-  useEffect(() => {
-    if (profile?.role === 'master' && params.id) {
-      fetchPortfolio()
+  // Удален дублирующий useEffect - данные загружаются внутри fetchProfile()
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!currentUser || !e.target.files || e.target.files.length === 0) return
+
+    const file = e.target.files[0]
+    if (!file.type.startsWith('image/')) {
+      alert('Пожалуйста, выберите изображение')
+      return
     }
-    if (profile?.role === 'seller' && params.id) {
-      fetchSellerProducts()
+
+    setUploadingAvatar(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${currentUser.id}/avatar-${Date.now()}.${fileExt}`
+
+      // Загружаем в product-images bucket (можно создать отдельный bucket для профилей)
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file, { cacheControl: '3600', upsert: false })
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        alert(`Ошибка при загрузке: ${uploadError.message}`)
+        return
+      }
+
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName)
+      const avatarUrl = urlData.publicUrl
+
+      // Обновляем профиль
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', currentUser.id)
+
+      if (updateError) throw updateError
+
+      // Обновляем локальное состояние
+      setProfile({ ...profile, avatar_url: avatarUrl } as User)
+      alert('Аватарка успешно обновлена!')
+    } catch (error) {
+      console.error('Error uploading avatar:', error)
+      alert('Ошибка при загрузке аватарки')
+    } finally {
+      setUploadingAvatar(false)
+      e.target.value = '' // Сбрасываем input
     }
-  }, [profile?.role, params.id])
+  }
+
+  const handleCoverPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!currentUser || !e.target.files || e.target.files.length === 0) return
+
+    const file = e.target.files[0]
+    if (!file.type.startsWith('image/')) {
+      alert('Пожалуйста, выберите изображение')
+      return
+    }
+
+    setUploadingCover(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${currentUser.id}/cover-${Date.now()}.${fileExt}`
+
+      // Загружаем в product-images bucket
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file, { cacheControl: '3600', upsert: false })
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        alert(`Ошибка при загрузке: ${uploadError.message}`)
+        return
+      }
+
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName)
+      const coverUrl = urlData.publicUrl
+
+      // Обновляем профиль
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ cover_photo_url: coverUrl })
+        .eq('id', currentUser.id)
+
+      if (updateError) throw updateError
+
+      // Обновляем локальное состояние
+      setProfile({ ...profile, cover_photo_url: coverUrl } as User)
+      alert('Фоновая картинка успешно обновлена!')
+    } catch (error) {
+      console.error('Error uploading cover photo:', error)
+      alert('Ошибка при загрузке фоновой картинки')
+    } finally {
+      setUploadingCover(false)
+      e.target.value = '' // Сбрасываем input
+    }
+  }
+
+  const handleDeleteAvatar = async () => {
+    if (!currentUser || !profile || !profile.avatar_url) return
+    if (!confirm('Вы уверены, что хотите удалить аватарку?')) return
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: null })
+        .eq('id', currentUser.id)
+
+      if (error) throw error
+
+      setProfile({ ...profile, avatar_url: undefined } as User)
+      alert('Аватарка успешно удалена!')
+    } catch (error) {
+      console.error('Error deleting avatar:', error)
+      alert('Ошибка при удалении аватарки')
+    }
+  }
+
+  const handleDeleteCoverPhoto = async () => {
+    if (!currentUser || !profile || !profile.cover_photo_url) return
+    if (!confirm('Вы уверены, что хотите удалить фоновую картинку?')) return
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ cover_photo_url: null })
+        .eq('id', currentUser.id)
+
+      if (error) throw error
+
+      setProfile({ ...profile, cover_photo_url: undefined } as User)
+      alert('Фоновая картинка успешно удалена!')
+    } catch (error) {
+      console.error('Error deleting cover photo:', error)
+      alert('Ошибка при удалении фоновой картинки')
+    }
+  }
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -350,6 +529,69 @@ export default function ProfilePage() {
     }
   }
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!currentUser) return
+
+    setPasswordError('')
+    setPasswordSuccess('')
+
+    // Валидация
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Все поля обязательны для заполнения')
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError('Новый пароль должен содержать минимум 6 символов')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Новые пароли не совпадают')
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      // Проверяем текущий пароль, пытаясь войти с ним
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: currentUser.email,
+        password: currentPassword,
+      })
+
+      if (signInError) {
+        setPasswordError('Текущий пароль неверен')
+        setChangingPassword(false)
+        return
+      }
+
+      // Обновляем пароль
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
+
+      if (updateError) {
+        throw updateError
+      }
+
+      setPasswordSuccess('Пароль успешно изменен!')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      
+      // Очищаем сообщение об успехе через 3 секунды
+      setTimeout(() => {
+        setPasswordSuccess('')
+      }, 3000)
+    } catch (error: any) {
+      console.error('Error changing password:', error)
+      setPasswordError(error.message || 'Ошибка при изменении пароля')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -378,18 +620,18 @@ export default function ProfilePage() {
   )
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-bg-primary pb-20">
       <Navbar />
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-6">
         <div className="max-w-4xl mx-auto">
           {/* Tabs */}
-          <div className="flex gap-2 mb-6 border-b border-gray-200">
+          <div className="flex gap-2 mb-6 border-b border-border-color">
             <button
               onClick={() => setActiveTab('profile')}
-              className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+              className={`px-4 py-2 font-medium text-base transition-colors border-b-2 ${
                 activeTab === 'profile'
-                  ? 'border-black text-black'
-                  : 'border-transparent text-gray-500 hover:text-black'
+                  ? 'border-brand-accent text-text-primary'
+                  : 'border-transparent text-text-secondary hover:text-text-primary'
               }`}
             >
               Профиль
@@ -397,10 +639,10 @@ export default function ProfilePage() {
             {isOwnProfile && (
               <button
                 onClick={() => setActiveTab('settings')}
-                className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                className={`px-4 py-2 font-medium text-base transition-colors border-b-2 ${
                   activeTab === 'settings'
-                    ? 'border-black text-black'
-                    : 'border-transparent text-gray-500 hover:text-black'
+                    ? 'border-brand-accent text-text-primary'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'
                 }`}
               >
                 Настройки
@@ -411,45 +653,73 @@ export default function ProfilePage() {
           {/* Profile Tab Content */}
           {activeTab === 'profile' && (
             <>
-              {/* Profile Header */}
-              <div className="card mb-6">
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="w-24 h-24 bg-black border-2 border-gray-200 flex items-center justify-center text-white text-2xl font-bold flex-shrink-0">
+              {/* Cover Photo and Avatar */}
+              <div className="relative mb-6 rounded-lg overflow-hidden" style={{ height: '250px' }}>
+                {profile.cover_photo_url ? (
+                  <img
+                    src={profile.cover_photo_url}
+                    alt="Cover"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
+                )}
+                
+                {/* Avatar positioned on cover photo */}
+                <div className="absolute bottom-4 left-6">
+                  <div className="w-32 h-32 bg-text-primary border-4 border-white flex items-center justify-center text-white text-4xl font-semibold rounded-full shadow-lg">
                     {profile.avatar_url ? (
                       <img
                         src={profile.avatar_url}
                         alt={profile.full_name}
-                        className="w-full h-full object-cover border border-gray-200"
+                        className="w-full h-full object-cover rounded-full"
                       />
                     ) : (
                       profile.full_name[0]?.toUpperCase() || '?'
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Profile Info Card */}
+              <div className="card mb-6 mt-20">
+                <div className="flex flex-col md:flex-row gap-6">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-3">
-                      <h1 className="text-2xl font-bold">{profile.full_name}</h1>
+                    <div className="flex items-center gap-2 mb-3 flex-wrap">
+                      <h1 className="text-2xl font-semibold text-text-primary">{profile.full_name}</h1>
                       <span className="text-xl">
                         {roleEmoji[profile.role as keyof typeof roleEmoji]}
                       </span>
-                      <span className="px-2 py-0.5 border border-gray-200 text-black text-xs font-medium uppercase tracking-wide">
+                      <span className="px-3 py-1 border border-border-color text-text-primary text-xs font-normal rounded-lg bg-bg-secondary">
                         {roleLabels[profile.role as keyof typeof roleLabels]}
                       </span>
-                      {!isOwnProfile && profile.role !== 'client' && (
-                        <button
-                          onClick={toggleFollow}
-                          disabled={followLoading}
-                          className={`ml-2 px-3 py-1 text-xs border ${
-                            isFollowing ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-200'
-                          }`}
-                        >
-                          {followLoading ? '...' : isFollowing ? 'Отписаться' : 'Подписаться'}
-                        </button>
+                      {!isOwnProfile && (
+                        <>
+                          {profile.role !== 'client' && (
+                            <button
+                              onClick={toggleFollow}
+                              disabled={followLoading}
+                              className={`ml-2 px-4 py-1.5 text-sm border rounded-lg transition-colors ${
+                                isFollowing ? 'bg-brand-accent text-white border-brand-accent' : 'bg-bg-primary text-text-primary border-border-color hover:border-brand-accent'
+                              }`}
+                            >
+                              {followLoading ? '...' : isFollowing ? 'Отписаться' : 'Подписаться'}
+                            </button>
+                          )}
+                          <button
+                            onClick={handleStartChat}
+                            className="ml-2 px-4 py-1.5 text-sm border border-brand-accent text-brand-accent rounded-lg transition-colors hover:bg-brand-accent hover:text-white flex items-center gap-1.5"
+                          >
+                            <FiMessageCircle size={14} />
+                            Написать
+                          </button>
+                        </>
                       )}
                     </div>
                     {profile.description && (
-                      <p className="text-gray-600 mb-4 text-sm">{profile.description}</p>
+                      <p className="text-text-secondary mb-4 text-base leading-relaxed">{profile.description}</p>
                     )}
-                    <div className="flex flex-wrap gap-3 text-sm text-gray-500">
+                    <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
                       {profile.city && (
                         <div className="flex items-center gap-1">
                           <FiMapPin size={14} />
@@ -472,18 +742,18 @@ export default function ProfilePage() {
 
                 {/* Master-specific information */}
                 {profile.role === 'master' && (
-                  <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="mt-6 pt-6 border-t border-border-color">
                     {profileSpecializations.length > 0 && (
                       <div className="mb-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                          <FiBriefcase size={14} />
+                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                          <FiBriefcase size={16} />
                           <span>Специализации</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {profileSpecializations.map((spec) => (
                             <span
                               key={spec.id}
-                              className="px-2.5 py-1 bg-gray-100 border border-gray-200 text-xs font-medium text-gray-700 rounded"
+                              className="px-3 py-1 bg-bg-secondary border border-border-color text-xs font-normal text-text-primary rounded-lg"
                             >
                               {spec.name}
                             </span>
@@ -495,20 +765,20 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {profile.services && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                            <FiBriefcase size={14} />
+                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                            <FiBriefcase size={16} />
                             <span>Описание услуг</span>
                           </div>
-                          <p className="text-sm text-gray-600">{profile.services}</p>
+                          <p className="text-sm text-text-secondary leading-relaxed">{profile.services}</p>
                         </div>
                       )}
                       {profile.service_location && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                            <FiHome size={14} />
+                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                            <FiHome size={16} />
                             <span>Место обслуживания</span>
                           </div>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-text-secondary">
                             {profile.service_location === 'home' && 'Выезд на дом'}
                             {profile.service_location === 'workshop' && 'В мастерской'}
                             {profile.service_location === 'both' && 'Выезд и в мастерской'}
@@ -517,35 +787,35 @@ export default function ProfilePage() {
                       )}
                       {profile.experience_years && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                            <FiBriefcase size={14} />
+                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                            <FiBriefcase size={16} />
                             <span>Опыт работы</span>
                           </div>
-                          <p className="text-sm text-gray-600">{profile.experience_years} {profile.experience_years === 1 ? 'год' : profile.experience_years < 5 ? 'года' : 'лет'}</p>
+                          <p className="text-sm text-text-secondary">{profile.experience_years} {profile.experience_years === 1 ? 'год' : profile.experience_years < 5 ? 'года' : 'лет'}</p>
                         </div>
                       )}
                       {profile.work_schedule && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                            <FiClock size={14} />
+                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                            <FiClock size={16} />
                             <span>График работы</span>
                           </div>
-                          <p className="text-sm text-gray-600">{profile.work_schedule}</p>
+                          <p className="text-sm text-text-secondary">{profile.work_schedule}</p>
                         </div>
                       )}
                     </div>
 
                     {profileServices.length > 0 && (
                       <div className="mt-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                          <FiBriefcase size={14} />
+                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                          <FiBriefcase size={16} />
                           <span>Выбранные услуги</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {profileServices.map((svc) => (
                             <span
                               key={svc.id}
-                              className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-xs text-gray-700 rounded"
+                              className="px-3 py-1 bg-bg-secondary border border-border-color text-xs font-normal text-text-primary rounded-lg"
                             >
                               {svc.name}
                             </span>
@@ -556,15 +826,15 @@ export default function ProfilePage() {
 
                     {profileSpecializations.length === 0 && profile.specialization && (
                       <div className="mt-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-medium text-gray-700">
-                          <FiBriefcase size={14} />
+                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                          <FiBriefcase size={16} />
                           <span>Специализация</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {profile.specialization.split(',').map((spec, index) => (
                             <span
                               key={index}
-                              className="px-2.5 py-1 bg-gray-100 border border-gray-200 text-xs font-medium text-gray-700 rounded"
+                              className="px-3 py-1 bg-bg-secondary border border-border-color text-xs font-normal text-text-primary rounded-lg"
                             >
                               {spec.trim()}
                             </span>
@@ -580,31 +850,31 @@ export default function ProfilePage() {
               {profile.role === 'seller' && (
                 <div className="mb-8">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold">Товары продавца</h2>
+                    <h2 className="text-xl font-semibold text-text-primary">Товары продавца</h2>
                     {isOwnProfile && (
                       <Link
                         href="/products/new"
-                        className="px-3 py-1.5 text-xs font-medium bg-black text-white border border-black hover:bg-gray-800 transition-colors"
+                        className="btn btn-primary text-sm"
                       >
                         Добавить товар
                       </Link>
                     )}
                   </div>
                   {products.length === 0 ? (
-                    <div className="card text-center text-gray-500 py-10">
+                    <div className="card text-center text-text-secondary py-10">
                       Пока нет товаров
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {products.map((product) => {
                         const thumb = product.images && product.images.length > 0 ? product.images[0] : ''
                         return (
                           <Link
                             key={product.id}
                             href={`/products/${product.id}`}
-                            className="card hover:bg-gray-50 transition flex gap-4 items-center"
+                            className="card hover:shadow-card-hover transition flex gap-4 items-center"
                           >
-                            <div className="w-20 h-20 bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden">
+                            <div className="w-20 h-20 bg-bg-secondary border border-border-color flex items-center justify-center overflow-hidden rounded-lg">
                               {thumb ? (
                                 <img src={thumb} alt={product.name} className="w-full h-full object-cover" />
                               ) : (
@@ -612,13 +882,13 @@ export default function ProfilePage() {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-base font-semibold text-black line-clamp-1">
+                              <div className="text-base font-semibold text-text-primary line-clamp-1">
                                 {product.name}
                               </div>
-                              <div className="text-xl font-bold text-blue-600 mt-1">
+                              <div className="text-xl font-semibold text-brand-accent mt-1">
                                 {product.price.toLocaleString('ru-RU')} ₽
                               </div>
-                              <div className="text-sm text-gray-600 line-clamp-2 mt-1">
+                              <div className="text-sm text-text-secondary line-clamp-2 mt-1">
                                 {product.category || 'Категория не указана'}
                               </div>
                             </div>
@@ -634,14 +904,14 @@ export default function ProfilePage() {
               {profile.role === 'master' && (
                 <div className="mb-8">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold">Портфолио</h2>
+                    <h2 className="text-xl font-semibold text-text-primary">Портфолио</h2>
                     <div className="flex items-center gap-2">
                       {isOwnProfile && (
                         <Link
                           href="/portfolio/new"
-                          className="px-3 py-1.5 text-xs font-medium bg-black text-white border border-black hover:bg-gray-800 transition-colors flex items-center gap-1.5"
+                          className="btn btn-primary text-sm flex items-center gap-1.5"
                         >
-                          <FiPlus size={12} />
+                          <FiPlus size={14} />
                           Добавить работу
                         </Link>
                       )}
@@ -668,7 +938,156 @@ export default function ProfilePage() {
           {/* Settings Tab Content */}
           {activeTab === 'settings' && isOwnProfile && (
             <div className="card">
-              <h1 className="text-xl font-bold mb-6">Настройки</h1>
+              <h1 className="text-xl font-semibold mb-6 text-text-primary">Настройки</h1>
+
+              {/* Image Upload Section */}
+              <div className="mb-8 pb-8 border-b border-border-color">
+                <h2 className="text-lg font-semibold mb-4 text-text-primary">Изображения профиля</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Avatar Upload */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-text-primary">
+                      Аватарка
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-20 h-20 bg-text-primary border-2 border-border-color flex items-center justify-center text-white text-xl font-semibold rounded-full flex-shrink-0">
+                        {profile.avatar_url ? (
+                          <img
+                            src={profile.avatar_url}
+                            alt={profile.full_name}
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        ) : (
+                          profile.full_name[0]?.toUpperCase() || '?'
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowAvatarModal(true)}
+                          disabled={uploadingAvatar}
+                          className="btn btn-primary inline-flex items-center gap-2"
+                        >
+                          <FiCamera size={16} />
+                          <span>{uploadingAvatar ? 'Загрузка...' : 'Изменить'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cover Photo Upload */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-text-primary">
+                      Фоновая картинка
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-20 h-12 bg-bg-secondary border border-border-color rounded overflow-hidden flex-shrink-0">
+                        {profile.cover_photo_url ? (
+                          <img
+                            src={profile.cover_photo_url}
+                            alt="Cover"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                            <FiCamera size={16} className="text-text-secondary" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowCoverModal(true)}
+                          disabled={uploadingCover}
+                          className="btn btn-primary inline-flex items-center gap-2"
+                        >
+                          <FiCamera size={16} />
+                          <span>{uploadingCover ? 'Загрузка...' : 'Изменить'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Password Change Section */}
+              <div className="mb-8 pb-8 border-b border-border-color">
+                <h2 className="text-lg font-semibold mb-4 text-text-primary">Изменение пароля</h2>
+                <p className="text-sm text-text-secondary mb-4">
+                  Пароль хранится в зашифрованном виде и не может быть просмотрен. Вы можете изменить его, указав текущий пароль.
+                </p>
+                
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-text-primary">
+                      Текущий пароль *
+                    </label>
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="input w-full"
+                      placeholder="Введите текущий пароль"
+                      disabled={changingPassword}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-text-primary">
+                      Новый пароль *
+                    </label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="input w-full"
+                      placeholder="Минимум 6 символов"
+                      disabled={changingPassword}
+                      required
+                      minLength={6}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-text-primary">
+                      Подтвердите новый пароль *
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="input w-full"
+                      placeholder="Повторите новый пароль"
+                      disabled={changingPassword}
+                      required
+                      minLength={6}
+                    />
+                  </div>
+
+                  {passwordError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                      {passwordError}
+                    </div>
+                  )}
+
+                  {passwordSuccess && (
+                    <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+                      {passwordSuccess}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                    className="btn btn-primary flex items-center gap-2"
+                  >
+                    <FiLock size={16} />
+                    <span>{changingPassword ? 'Изменение...' : 'Изменить пароль'}</span>
+                  </button>
+                </form>
+              </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-4">
                 <div>
@@ -946,6 +1365,110 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* Avatar Modal */}
+      {showAvatarModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 animate-fade-in"
+          onClick={() => setShowAvatarModal(false)}
+        >
+          <div
+            className="bg-bg-primary border border-border-color rounded-lg shadow-card p-6 w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-4 text-text-primary">Аватарка</h3>
+            <div className="flex flex-col gap-3">
+              <label className="btn btn-primary cursor-pointer inline-flex items-center justify-center gap-2">
+                <FiCamera size={16} />
+                <span>{uploadingAvatar ? 'Загрузка...' : 'Изменить'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    handleAvatarUpload(e)
+                    setShowAvatarModal(false)
+                  }}
+                  disabled={uploadingAvatar}
+                  className="hidden"
+                />
+              </label>
+              {profile?.avatar_url && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDeleteAvatar()
+                    setShowAvatarModal(false)
+                  }}
+                  disabled={uploadingAvatar}
+                  className="btn bg-red-500 hover:bg-red-600 text-white border-red-500 inline-flex items-center justify-center gap-2"
+                >
+                  <FiX size={16} />
+                  <span>Удалить</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowAvatarModal(false)}
+                className="btn bg-bg-secondary hover:bg-bg-primary text-text-primary border border-border-color"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cover Photo Modal */}
+      {showCoverModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 animate-fade-in"
+          onClick={() => setShowCoverModal(false)}
+        >
+          <div
+            className="bg-bg-primary border border-border-color rounded-lg shadow-card p-6 w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-4 text-text-primary">Фоновая картинка</h3>
+            <div className="flex flex-col gap-3">
+              <label className="btn btn-primary cursor-pointer inline-flex items-center justify-center gap-2">
+                <FiCamera size={16} />
+                <span>{uploadingCover ? 'Загрузка...' : 'Изменить'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    handleCoverPhotoUpload(e)
+                    setShowCoverModal(false)
+                  }}
+                  disabled={uploadingCover}
+                  className="hidden"
+                />
+              </label>
+              {profile?.cover_photo_url && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDeleteCoverPhoto()
+                    setShowCoverModal(false)
+                  }}
+                  disabled={uploadingCover}
+                  className="btn bg-red-500 hover:bg-red-600 text-white border-red-500 inline-flex items-center justify-center gap-2"
+                >
+                  <FiX size={16} />
+                  <span>Удалить</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowCoverModal(false)}
+                className="btn bg-bg-secondary hover:bg-bg-primary text-text-primary border border-border-color"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

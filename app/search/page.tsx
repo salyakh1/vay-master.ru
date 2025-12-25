@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../providers'
 import { supabase, User, Specialization, Service } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
+import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
 import { FiSearch, FiUser, FiFilter } from 'react-icons/fi'
 
@@ -51,14 +52,22 @@ function SearchContent() {
     if (user) {
       performSearch()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, cityFilter, selectedSpec, selectedService, user])
 
   useEffect(() => {
     if (user) {
+      // Сначала загружаем город пользователя, потом мастеров из этого города
       fetchUserCity()
-      fetchRandomProfiles()
     }
   }, [user])
+
+  // Загружаем мастеров из города пользователя после того, как город загружен
+  useEffect(() => {
+    if (user && userCity) {
+      fetchRandomProfiles()
+    }
+  }, [user, userCity])
 
   const performSearch = async () => {
     const hasFilters =
@@ -87,7 +96,8 @@ function SearchContent() {
 
   const fetchRandomProfiles = async () => {
     try {
-      const { data, error } = await supabase
+      // Если город пользователя не указан, показываем всех мастеров
+      let query = supabase
         .from('profiles')
         .select(`
           *,
@@ -99,11 +109,17 @@ function SearchContent() {
           )
         `)
         .eq('role', 'master')
-        .ilike('city', userCity || '')
-        .limit(20)
+
+      // Фильтруем по городу пользователя, если он указан
+      if (userCity && userCity.trim()) {
+        query = query.ilike('city', `%${userCity.trim()}%`)
+      }
+
+      const { data, error } = await query.limit(20)
 
       if (error) throw error
       const list = (data as any[]) || []
+      // Перемешиваем список для случайного порядка
       for (let i = list.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1))
         ;[list[i], list[j]] = [list[j], list[i]]
@@ -232,17 +248,22 @@ function SearchContent() {
     !!cityFilter
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-bg-primary pb-20">
       <Navbar />
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6">Мастера</h1>
+          {/* Баннеры */}
+          <div className="mb-6">
+            <AdBannerSlider page="search" />
+          </div>
+
+          <h1 className="text-2xl font-semibold mb-6 text-text-primary">Мастера</h1>
 
           {/* Search Form */}
           <form onSubmit={handleSearch} className="card mb-6">
             <div className="flex gap-2">
               <div className="flex-1 relative">
-                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
                 <input
                   type="text"
                   value={query}
@@ -253,11 +274,14 @@ function SearchContent() {
                 <button
                   type="button"
                   onClick={() => setShowFilters(!showFilters)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-black transition-colors"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
                 >
                   <FiFilter size={20} />
                 </button>
               </div>
+              <button type="submit" className="btn btn-primary">
+                Найти
+              </button>
             </div>
 
             {/* Filters */}
@@ -304,47 +328,47 @@ function SearchContent() {
 
           {/* Results */}
           {loading ? (
-            <div className="text-center py-12 text-gray-500">Поиск...</div>
+            <div className="text-center py-12 text-text-secondary">Поиск...</div>
           ) : !hasFilters ? (
             <>
               {randomProfiles.length > 0 ? (
                 <div className="space-y-4">
-                  <h2 className="text-xl font-semibold">
+                  <h2 className="text-xl font-semibold text-text-primary">
                     Мастера вашего города
                   </h2>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-4">
                     {randomProfiles.map((master) => (
                       <Link
                         key={master.id}
                         href={`/profile/${master.id}`}
-                        className="card hover:bg-gray-50 transition"
+                        className="card hover:shadow-card-hover transition"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-black border border-gray-200 flex items-center justify-center text-white text-base font-bold">
+                          <div className="w-12 h-12 bg-text-primary border border-border-color flex items-center justify-center text-white text-base font-semibold rounded-full">
                             {master.avatar_url ? (
                               <img
                                 src={master.avatar_url}
                                 alt={master.full_name}
-                                className="w-full h-full object-cover border border-gray-200"
+                                className="w-full h-full object-cover rounded-full"
                               />
                             ) : (
                               master.full_name[0]?.toUpperCase() || '?'
                             )}
                           </div>
                           <div className="flex-1">
-                            <div className="font-semibold text-sm">
+                            <div className="font-semibold text-base text-text-primary">
                               {master.full_name}{' '}
-                              <span className="text-sm">
+                              <span className="text-base">
                                 {roleEmoji[master.role as keyof typeof roleEmoji]}
                               </span>
                             </div>
                             {master.city && (
-                              <div className="text-xs text-gray-500">{master.city}</div>
+                              <div className="text-sm text-text-secondary">{master.city}</div>
                             )}
                           </div>
                         </div>
                         {master.description && (
-                          <div className="text-xs text-gray-600 mt-2 line-clamp-2">
+                          <div className="text-sm text-text-secondary mt-2 line-clamp-2">
                             {master.description}
                           </div>
                         )}
@@ -353,7 +377,7 @@ function SearchContent() {
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 text-text-secondary">
                   Введите запрос или выберите фильтры
                 </div>
               )}
@@ -361,47 +385,47 @@ function SearchContent() {
           ) : (
             <div className="space-y-6">
               <div>
-                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-text-primary">
                   <FiUser />
                   Мастера ({masters.length})
                 </h2>
                 {masters.length === 0 ? (
-                  <div className="card text-center text-gray-500 py-8">
+                  <div className="card text-center text-text-secondary py-8">
                     Мастера не найдены
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {masters.map((master) => (
                       <Link
                         key={master.id}
                         href={`/profile/${master.id}`}
-                        className="card hover:bg-gray-50 transition"
+                        className="card hover:shadow-card-hover transition"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-black border border-gray-200 flex items-center justify-center text-white text-lg font-bold">
+                          <div className="w-16 h-16 bg-text-primary border border-border-color flex items-center justify-center text-white text-lg font-semibold rounded-full">
                             {master.avatar_url ? (
                               <img
                                 src={master.avatar_url}
                                 alt={master.full_name}
-                                className="w-full h-full object-cover border border-gray-200"
+                                className="w-full h-full object-cover rounded-full"
                               />
                             ) : (
                               master.full_name[0]?.toUpperCase() || '?'
                             )}
                           </div>
                           <div className="flex-1">
-                            <div className="font-semibold text-lg">
+                            <div className="font-semibold text-lg text-text-primary">
                               {master.full_name}{' '}
                               <span className="text-lg">
                                 {roleEmoji[master.role as keyof typeof roleEmoji]}
                               </span>
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-text-secondary">
                               {roleLabels[master.role as keyof typeof roleLabels]}
                               {master.city && ` • ${master.city}`}
                             </div>
                             {master.description && (
-                              <div className="text-sm text-gray-600 mt-1 line-clamp-2">
+                              <div className="text-sm text-text-secondary mt-1 line-clamp-2">
                                 {master.description}
                               </div>
                             )}
@@ -410,7 +434,7 @@ function SearchContent() {
                                 {(master as any).profile_specializations.map((item: any) => (
                                   <span
                                     key={item.specialization?.id || item.specialization_id}
-                                    className="px-2 py-1 bg-gray-100 border border-gray-200 text-xs text-gray-700 rounded"
+                                    className="px-2 py-1 bg-bg-secondary border border-border-color text-xs text-text-primary rounded-lg"
                                   >
                                     {item.specialization?.name}
                                   </span>

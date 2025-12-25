@@ -6,6 +6,7 @@ import { useAuth } from '../providers'
 import { supabase, Product, ProductCategory } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import ProductCard from '@/components/ProductCard'
+import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
 import { FiFilter } from 'react-icons/fi'
 
@@ -27,9 +28,16 @@ export default function ProductsPage() {
     }
   }, [user, authLoading, router])
 
+  // Загружаем категории только один раз
   useEffect(() => {
     if (user) {
       fetchCategories()
+    }
+  }, [user])
+
+  // Загружаем товары при изменении фильтров
+  useEffect(() => {
+    if (user) {
       fetchProducts()
     }
   }, [user, searchQuery, categorySection, categoryId, cityFilter])
@@ -104,15 +112,20 @@ export default function ProductsPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-bg-primary pb-20">
       <Navbar />
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-6">
+        {/* Баннеры */}
+        <div className="mb-6">
+          <AdBannerSlider page="products" />
+        </div>
+
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Каталог товаров</h1>
+          <h1 className="text-2xl font-semibold text-text-primary">Каталог товаров</h1>
           {user && (
             <Link 
               href="/products/new" 
-              className="px-4 py-2 bg-black text-white text-sm font-medium border border-black hover:bg-gray-800 transition-colors rounded"
+              className="btn btn-primary"
             >
               Добавить товар
             </Link>
@@ -130,8 +143,8 @@ export default function ProductsPage() {
           />
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
-              showFilters ? 'bg-black text-white' : 'text-gray-500 hover:text-black hover:bg-gray-50'
+            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors ${
+              showFilters ? 'bg-brand-accent text-white' : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
             }`}
             title="Фильтры"
           >
@@ -190,11 +203,11 @@ export default function ProductsPage() {
 
         {/* Products Grid */}
         {products.length === 0 ? (
-          <div className="card text-center text-gray-500 py-12">
+          <div className="card text-center text-text-secondary py-12">
             Товары не найдены
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:gap-6">
+          <div className="grid grid-cols-2 gap-4 lg:gap-6">
             {products.map((product) => (
               <ProductCard key={product.id} product={product} currentUser={user} />
             ))}
