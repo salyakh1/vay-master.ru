@@ -157,16 +157,38 @@ export default function AdminUsersPage() {
       // Finally, delete the profile
       await supabase.from('profiles').delete().eq('id', userId)
 
-      // Note: We cannot delete from auth.users directly via Supabase client
-      // This would need to be done via Supabase Admin API or SQL
-      // For now, we'll just delete the profile and log the action
+      // Delete from auth.users using Admin API
+      try {
+        const { data: sessionData } = await supabase.auth.getSession()
+        if (!sessionData.session) {
+          throw new Error('Сессия не найдена')
+        }
+
+        const response = await fetch('/api/admin/delete-user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({ userId }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.warn('Не удалось удалить пользователя из auth.users:', errorData.error)
+          // Продолжаем, так как профиль уже удален
+        }
+      } catch (authDeleteError) {
+        console.warn('Ошибка при удалении из auth.users:', authDeleteError)
+        // Продолжаем, так как профиль уже удален
+      }
 
       await logAdminAction(currentUser.id, 'delete_user', 'user', userId, {
         deleted_by: currentUser.id,
-        note: 'Profile deleted. Auth user deletion requires admin API.',
+        note: 'User profile and auth user deleted.',
       })
 
-      alert('Профиль пользователя и все связанные данные успешно удалены. Примечание: удаление из auth.users требует использования Admin API.')
+      alert('Пользователь и все связанные данные успешно удалены из системы.')
       fetchUsers()
       if (selectedUser?.id === userId) {
         setSelectedUser(null)

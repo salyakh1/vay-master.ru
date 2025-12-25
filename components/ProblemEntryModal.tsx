@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useAuth } from '@/app/providers'
 import { FiX, FiUser, FiShoppingBag } from 'react-icons/fi'
 import AutocompleteInput from './AutocompleteInput'
 
@@ -18,6 +19,7 @@ export default function ProblemEntryModal() {
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const pathname = usePathname()
+  const { user, loading: authLoading } = useAuth()
 
   // Убеждаемся, что компонент монтирован на клиенте
   useEffect(() => {
@@ -64,6 +66,14 @@ export default function ProblemEntryModal() {
   }
 
   const handleSelectType = (type: 'master' | 'product') => {
+    // Если пользователь не авторизован, перенаправляем на страницу входа
+    if (!authLoading && !user) {
+      handleClose()
+      router.push('/auth/login')
+      return
+    }
+    
+    // Если авторизован, продолжаем как обычно
     setSearchType(type)
   }
 

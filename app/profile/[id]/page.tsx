@@ -946,10 +946,10 @@ export default function ProfilePage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Avatar Upload */}
-                  <div>
+                <div>
                     <label className="block text-sm font-medium mb-2 text-text-primary">
                       Аватарка
-                    </label>
+                  </label>
                     <div className="flex items-center gap-4">
                       <div className="w-20 h-20 bg-text-primary border-2 border-border-color flex items-center justify-center text-white text-xl font-semibold rounded-full flex-shrink-0">
                         {profile.avatar_url ? (
@@ -957,11 +957,11 @@ export default function ProfilePage() {
                             src={profile.avatar_url}
                             alt={profile.full_name}
                             className="w-full h-full object-cover rounded-full"
-                          />
+                  />
                         ) : (
                           profile.full_name[0]?.toUpperCase() || '?'
                         )}
-                      </div>
+                </div>
                       <div className="flex-1">
                         <button
                           type="button"
@@ -972,15 +972,15 @@ export default function ProfilePage() {
                           <FiCamera size={16} />
                           <span>{uploadingAvatar ? 'Загрузка...' : 'Изменить'}</span>
                         </button>
-                      </div>
+                </div>
                     </div>
-                  </div>
+                </div>
 
                   {/* Cover Photo Upload */}
-                  <div>
+                      <div>
                     <label className="block text-sm font-medium mb-2 text-text-primary">
                       Фоновая картинка
-                    </label>
+                        </label>
                     <div className="flex items-center gap-4">
                       <div className="w-20 h-12 bg-bg-secondary border border-border-color rounded overflow-hidden flex-shrink-0">
                         {profile.cover_photo_url ? (
@@ -992,7 +992,7 @@ export default function ProfilePage() {
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
                             <FiCamera size={16} className="text-text-secondary" />
-                          </div>
+                      </div>
                         )}
                       </div>
                       <div className="flex-1">
@@ -1006,10 +1006,10 @@ export default function ProfilePage() {
                           <span>{uploadingCover ? 'Загрузка...' : 'Изменить'}</span>
                         </button>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                        </div>
+                      </div>
+                        </div>
+                      </div>
 
               {/* Password Change Section */}
               <div className="mb-8 pb-8 border-b border-border-color">
@@ -1017,13 +1017,13 @@ export default function ProfilePage() {
                 <p className="text-sm text-text-secondary mb-4">
                   Пароль хранится в зашифрованном виде и не может быть просмотрен. Вы можете изменить его, указав текущий пароль.
                 </p>
-                
+
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-2 text-text-primary">
                       Текущий пароль *
-                    </label>
-                    <input
+                        </label>
+                        <input
                       type="password"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
@@ -1031,14 +1031,14 @@ export default function ProfilePage() {
                       placeholder="Введите текущий пароль"
                       disabled={changingPassword}
                       required
-                    />
-                  </div>
-
-                  <div>
+                        />
+                      </div>
+                      
+                      <div>
                     <label className="block text-sm font-medium mb-2 text-text-primary">
                       Новый пароль *
-                    </label>
-                    <input
+                        </label>
+                        <input
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -1047,14 +1047,14 @@ export default function ProfilePage() {
                       disabled={changingPassword}
                       required
                       minLength={6}
-                    />
-                  </div>
+                        />
+                      </div>
 
                   <div>
                     <label className="block text-sm font-medium mb-2 text-text-primary">
                       Подтвердите новый пароль *
-                    </label>
-                    <input
+                        </label>
+                        <input
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
@@ -1063,20 +1063,20 @@ export default function ProfilePage() {
                       disabled={changingPassword}
                       required
                       minLength={6}
-                    />
-                  </div>
+                        />
+                      </div>
 
                   {passwordError && (
                     <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                       {passwordError}
-                    </div>
-                  )}
+                        </div>
+                      )}
 
                   {passwordSuccess && (
                     <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
                       {passwordSuccess}
-                    </div>
-                  )}
+                      </div>
+                )}
 
                   <button
                     type="submit"
@@ -1086,8 +1086,8 @@ export default function ProfilePage() {
                     <FiLock size={16} />
                     <span>{changingPassword ? 'Изменение...' : 'Изменить пароль'}</span>
                   </button>
-                </form>
-              </div>
+              </form>
+            </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-4">
                 <div>

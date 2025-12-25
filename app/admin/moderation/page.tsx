@@ -244,29 +244,58 @@ export default function AdminModerationPage() {
 
     try {
       const selectedItem = content.find((item) => item.id === contentId)
-      if (!selectedItem) return
+      if (!selectedItem) {
+        alert('Контент не найден')
+        return
+      }
+
+      let deleteError: any = null
 
       // Delete based on content type
       if (contentType === 'portfolio_item') {
         // Delete portfolio item and related data
-        await supabase.from('portfolio_likes').delete().eq('item_id', contentId)
-        await supabase.from('portfolio_comments').delete().eq('item_id', contentId)
-        await supabase.from('portfolio_items').delete().eq('id', contentId)
+        const { error: likesError } = await supabase.from('portfolio_likes').delete().eq('item_id', contentId)
+        if (likesError) console.warn('Error deleting likes:', likesError)
+        
+        const { error: commentsError } = await supabase.from('portfolio_comments').delete().eq('item_id', contentId)
+        if (commentsError) console.warn('Error deleting comments:', commentsError)
+        
+        const { error: itemError } = await supabase.from('portfolio_items').delete().eq('id', contentId)
+        if (itemError) {
+          deleteError = itemError
+          throw new Error(`Ошибка удаления работы мастера: ${itemError.message}`)
+        }
       } else if (contentType === 'product') {
         // Delete product
-        await supabase.from('products').delete().eq('id', contentId)
+        const { error: productError } = await supabase.from('products').delete().eq('id', contentId)
+        if (productError) {
+          deleteError = productError
+          throw new Error(`Ошибка удаления товара: ${productError.message}`)
+        }
       } else if (contentType === 'order') {
         // Delete order and related data
-        await supabase.from('order_responses').delete().eq('order_id', contentId)
-        await supabase.from('orders').delete().eq('id', contentId)
+        const { error: responsesError } = await supabase.from('order_responses').delete().eq('order_id', contentId)
+        if (responsesError) console.warn('Error deleting order responses:', responsesError)
+        
+        const { error: orderError } = await supabase.from('orders').delete().eq('id', contentId)
+        if (orderError) {
+          deleteError = orderError
+          throw new Error(`Ошибка удаления заказа: ${orderError.message}`)
+        }
+      } else {
+        throw new Error(`Неподдерживаемый тип контента: ${contentType}`)
       }
 
-      // Delete moderation records
-      await supabase
+      // Delete moderation records (ignore errors here, as main content is already deleted)
+      const { error: moderationError } = await supabase
         .from('content_moderation')
         .delete()
         .eq('content_type', contentType)
         .eq('content_id', contentId)
+      
+      if (moderationError) {
+        console.warn('Error deleting moderation record:', moderationError)
+      }
 
       await logAdminAction(currentUser.id, 'delete_content', contentType, contentId, {
         deleted_by: currentUser.id,
@@ -277,9 +306,10 @@ export default function AdminModerationPage() {
       if (selectedContent?.id === contentId) {
         setSelectedContent(null)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting content:', error)
-      alert('Ошибка при удалении контента')
+      const errorMessage = error?.message || error?.error?.message || 'Неизвестная ошибка при удалении контента'
+      alert(`Ошибка при удалении контента: ${errorMessage}\n\nВозможные причины:\n- Нет прав доступа (RLS политики)\n- Контент уже удален\n- Ошибка базы данных`)
     }
   }
 

@@ -450,7 +450,7 @@ export default function ChatPage() {
                     />
                   )}
                   {message.content && (
-                    <div className={isOwn ? 'text-white' : 'text-text-primary'}>{message.content}</div>
+                  <div className={isOwn ? 'text-white' : 'text-text-primary'}>{message.content}</div>
                   )}
                   <div
                     className={`text-xs mt-1 ${
