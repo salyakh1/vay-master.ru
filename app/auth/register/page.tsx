@@ -89,7 +89,7 @@ export default function RegisterPage() {
         if (role === 'master') {
           router.push('/onboarding/specializations')
         } else if (role === 'seller') {
-          router.push('/products')
+          router.push('/onboarding/seller')
         } else {
           router.push('/feed')
         }
