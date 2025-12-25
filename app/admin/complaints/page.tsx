@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../providers'
-import { supabase, Complaint } from '@/lib/supabase'
+import { supabase, Complaint, ComplaintStatus } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { FiAlertCircle, FiCheck, FiX, FiClock, FiUser, FiMessageCircle } from 'react-icons/fi'
@@ -58,7 +58,7 @@ export default function AdminComplaintsPage() {
     }
   }
 
-  const updateComplaintStatus = async (complaintId: string, status: string, notes?: string) => {
+  const updateComplaintStatus = async (complaintId: string, status: ComplaintStatus, notes?: string) => {
     if (!user) return
 
     setUpdating(true)
@@ -81,7 +81,7 @@ export default function AdminComplaintsPage() {
 
       // Обновляем локальное состояние
       setComplaints((prev) =>
-        prev.map((c) => (c.id === complaintId ? { ...c, status, admin_notes: notes } : c))
+        prev.map((c) => (c.id === complaintId ? { ...c, status: status as ComplaintStatus, admin_notes: notes } : c))
       )
 
       setSelectedComplaint(null)
