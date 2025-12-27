@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '../providers'
 import { supabase, Chat, Message, User } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { formatDistanceToNow } from 'date-fns'
-import { ru } from 'date-fns/locale'
+import { format, isToday, differenceInHours, differenceInDays } from 'date-fns'
 import Link from 'next/link'
 
 export default function ChatsPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
-  const [chats, setChats] = useState<(Chat & { otherUser: User; lastMessage?: Message })[]>([])
+  const [chats, setChats] = useState<(Chat & { otherUser: User; lastMessage?: Message; unreadCount?: number })[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -24,6 +23,68 @@ export default function ChatsPage() {
   useEffect(() => {
     if (user) {
       fetchChats()
+
+      // Подписываемся на изменения сообщений для обновления счетчиков
+      const channel = supabase
+        .channel('chats-list-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'messages',
+          },
+          () => {
+            fetchChats()
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+          },
+          () => {
+            fetchChats()
+          }
+        )
+        .subscribe()
+
+      // Слушаем кастомное событие обновления списка чатов
+      const handleMessagesRead = (event: any) => {
+        console.log('messagesRead event received, chatId:', event.detail?.chatId)
+        // Обновляем список чатов с задержкой для гарантии обновления в базе данных
+        setTimeout(() => {
+          console.log('Refreshing chats list...')
+          fetchChats()
+        }, 500)
+      }
+      window.addEventListener('messagesRead', handleMessagesRead)
+      
+      // Также обновляем при возврате на страницу (когда пользователь выходит из чата)
+      const handleVisibilityChange = () => {
+        if (!document.hidden) {
+          console.log('Page visible, refreshing chats list...')
+          fetchChats()
+        }
+      }
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+      
+      // Обновляем при фокусе на окне
+      const handleFocus = () => {
+        console.log('Window focused, refreshing chats list...')
+        fetchChats()
+      }
+      window.addEventListener('focus', handleFocus)
+      
+      return () => {
+        supabase.removeChannel(channel)
+        window.removeEventListener('messagesRead', handleMessagesRead)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        window.removeEventListener('focus', handleFocus)
+      }
+
     }
   }, [user])
 
@@ -57,25 +118,40 @@ export default function ChatsPage() {
         .select('*')
         .in('id', otherUserIds)
 
-      // Получаем последние сообщения для всех чатов
+      // Получаем последние сообщения и количество непрочитанных для всех чатов
       // Используем отдельные запросы для каждого чата, но выполняем их параллельно
       const messagesPromises = chatIds.map(async (chatId) => {
-        const { data } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('chat_id', chatId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        return { chatId, message: data }
+        const [lastMessageResult, unreadResult] = await Promise.all([
+          supabase
+            .from('messages')
+            .select('*')
+            .eq('chat_id', chatId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('messages')
+            .select('id', { count: 'exact', head: true })
+            .eq('chat_id', chatId)
+            .eq('read', false)
+            .neq('sender_id', user.id)
+        ])
+        
+        return {
+          chatId,
+          message: lastMessageResult.data,
+          unreadCount: (unreadResult.count ?? 0) as number
+        }
       })
       
       const messagesResults = await Promise.all(messagesPromises)
       const messagesByChat = new Map<string, Message>()
-      messagesResults.forEach(({ chatId, message }) => {
+      const unreadCountsByChat = new Map<string, number>()
+      messagesResults.forEach(({ chatId, message, unreadCount }) => {
         if (message) {
           messagesByChat.set(chatId, message as Message)
         }
+        unreadCountsByChat.set(chatId, unreadCount)
       })
 
       // Создаем map пользователей для быстрого доступа
@@ -91,6 +167,7 @@ export default function ChatsPage() {
           ...chat,
           otherUser: usersMap.get(otherUserId) as User,
           lastMessage: messagesByChat.get(chat.id),
+          unreadCount: unreadCountsByChat.get(chat.id) || 0,
         }
       })
 
@@ -100,6 +177,31 @@ export default function ChatsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const formatMessageTime = (date: Date): string => {
+    const now = new Date()
+    const messageDate = new Date(date)
+    
+    // Если сообщение сегодня - показываем точное время
+    if (isToday(messageDate)) {
+      return format(messageDate, 'H:mm')
+    }
+    
+    // Если прошло меньше 24 часов (но не сегодня)
+    const hoursDiff = differenceInHours(now, messageDate)
+    if (hoursDiff < 24) {
+      return `${hoursDiff} ч`
+    }
+    
+    // Если прошло больше 24 часов - показываем дни
+    const daysDiff = differenceInDays(now, messageDate)
+    if (daysDiff < 30) {
+      return `${daysDiff} д`
+    }
+    
+    // Если прошло больше месяца - показываем дату
+    return format(messageDate, 'dd.MM.yyyy')
   }
 
   const startChat = async (otherUserId: string) => {
@@ -166,7 +268,7 @@ export default function ChatsPage() {
                   className="card hover:bg-gray-50 transition cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-black border border-gray-200 flex items-center justify-center text-white text-sm font-bold">
+                    <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 relative">
                       {chat.otherUser.avatar_url ? (
                         <img
                           src={chat.otherUser.avatar_url}
@@ -174,25 +276,33 @@ export default function ChatsPage() {
                           className="w-full h-full rounded-full object-cover"
                         />
                       ) : (
-                        chat.otherUser.full_name[0]?.toUpperCase() || '?'
+                        <div className="w-full h-full bg-gray-200 flex items-center justify-center rounded-full text-gray-600 text-sm font-bold">
+                          {chat.otherUser.full_name[0]?.toUpperCase() || '?'}
+                        </div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <div className="font-semibold">{chat.otherUser.full_name}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="font-semibold truncate">{chat.otherUser.full_name}</div>
+                        {(chat.unreadCount ?? 0) > 0 && (
+                          <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                            {chat.unreadCount! > 99 ? '99+' : chat.unreadCount}
+                          </span>
+                        )}
+                      </div>
                       {chat.lastMessage && (
                         <div className="text-sm text-gray-500 truncate">
                           {chat.lastMessage.content}
                         </div>
                       )}
                     </div>
-                    {chat.lastMessage && (
-                      <div className="text-xs text-gray-400">
-                        {formatDistanceToNow(new Date(chat.lastMessage.created_at), {
-                          addSuffix: true,
-                          locale: ru,
-                        })}
-                      </div>
-                    )}
+                    <div className="flex flex-col items-end gap-1">
+                      {chat.lastMessage && (
+                        <div className="text-xs text-gray-400">
+                          {formatMessageTime(new Date(chat.lastMessage.created_at))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </Link>
               ))}

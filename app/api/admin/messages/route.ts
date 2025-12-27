@@ -3,10 +3,11 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
 
 // ID системного пользователя "Администрация VayMaster"
 // Установите это значение в .env.local или используйте значение по умолчанию
-const ADMIN_SYSTEM_USER_ID = process.env.ADMIN_SYSTEM_USER_ID || '65437d30-e3d4-40e2-8678-a8463030a43d'
+const ADMIN_SYSTEM_USER_ID = process.env.ADMIN_SYSTEM_USER_ID || '970f2f4c-b3e2-4b7f-af7b-45a45e50356c'
 
 export async function POST(request: NextRequest) {
   try {
@@ -121,14 +122,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Используем supabaseAdmin для создания чатов и сообщений (обход RLS)
+    if (!supabaseServiceRoleKey) {
+      return NextResponse.json(
+        { error: 'SUPABASE_SERVICE_ROLE_KEY не настроен. Добавьте его в .env.local и перезапустите сервер.' },
+        { status: 500 }
+      )
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl!, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
     // Отправляем сообщения
     let sentCount = 0
     const errors: string[] = []
 
     for (const recipientId of recipientIds) {
       try {
-        // Проверяем, есть ли уже чат с системным пользователем
-        const { data: existingChat } = await supabaseClient
+        // Проверяем, есть ли уже чат с системным пользователем (используем supabaseAdmin)
+        const { data: existingChat } = await supabaseAdmin
           .from('chats')
           .select('id')
           .or(`and(user1_id.eq.${systemUserId},user2_id.eq.${recipientId}),and(user1_id.eq.${recipientId},user2_id.eq.${systemUserId})`)
@@ -139,8 +155,8 @@ export async function POST(request: NextRequest) {
         if (existingChat) {
           chatId = existingChat.id
         } else {
-          // Создаем новый чат
-          const { data: newChat, error: chatError } = await supabaseClient
+          // Создаем новый чат через supabaseAdmin (обход RLS)
+          const { data: newChat, error: chatError } = await supabaseAdmin
             .from('chats')
             .insert({
               user1_id: systemUserId,
@@ -157,8 +173,8 @@ export async function POST(request: NextRequest) {
           chatId = newChat.id
         }
 
-        // Отправляем сообщение
-        const { error: messageError } = await supabaseClient.from('messages').insert({
+        // Отправляем сообщение через supabaseAdmin (обход RLS)
+        const { error: messageError } = await supabaseAdmin.from('messages').insert({
           chat_id: chatId,
           sender_id: systemUserId,
           content: message,

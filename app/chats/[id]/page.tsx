@@ -109,12 +109,38 @@ export default function ChatPage() {
       if (error) throw error
       setMessages((data as any) || [])
 
-      // Mark messages as read
-      await supabase
-        .from('messages')
-        .update({ read: true })
-        .eq('chat_id', params.id)
-        .neq('sender_id', user.id)
+      // Автоматически помечаем все непрочитанные сообщения как прочитанные при загрузке чата
+      // Используем API endpoint для обхода RLS
+      const { data: session } = await supabase.auth.getSession()
+      if (session?.session?.access_token) {
+        try {
+          const response = await fetch('/api/chats/mark-read', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.session.access_token}`,
+            },
+            body: JSON.stringify({ chatId: params.id }),
+          })
+
+          const result = await response.json()
+          if (result.success) {
+            console.log('Messages marked as read:', result.updatedCount)
+            // Отправляем событие несколько раз для гарантии обновления
+            window.dispatchEvent(new CustomEvent('messagesRead', { detail: { chatId: params.id } }))
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('messagesRead', { detail: { chatId: params.id } }))
+            }, 500)
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('messagesRead', { detail: { chatId: params.id } }))
+            }, 1000)
+          } else {
+            console.error('Error marking messages as read:', result.error)
+          }
+        } catch (error) {
+          console.error('Error calling mark-read API:', error)
+        }
+      }
     } catch (error) {
       console.error('Error fetching chat:', error)
     } finally {

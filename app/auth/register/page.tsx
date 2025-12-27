@@ -86,6 +86,28 @@ export default function RegisterPage() {
           await new Promise(resolve => setTimeout(resolve, 300))
         }
 
+        // Отправляем приветственное сообщение от администрации
+        try {
+          const welcomeResponse = await fetch('/api/welcome-message', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userId: authData.user.id,
+              role: role,
+            }),
+          })
+
+          if (!welcomeResponse.ok) {
+            console.error('Failed to send welcome message:', await welcomeResponse.text())
+            // Не прерываем регистрацию, если не удалось отправить приветственное сообщение
+          }
+        } catch (welcomeError) {
+          console.error('Error sending welcome message:', welcomeError)
+          // Не прерываем регистрацию, если не удалось отправить приветственное сообщение
+        }
+
         if (role === 'master') {
           router.push('/onboarding/specializations')
         } else if (role === 'seller') {

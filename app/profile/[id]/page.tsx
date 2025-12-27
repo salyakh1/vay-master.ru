@@ -20,6 +20,7 @@ export default function ProfilePage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile')
+  const [adminRole, setAdminRole] = useState<string | null>(null)
   const [specializations, setSpecializations] = useState<Specialization[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [selectedSpecializationIds, setSelectedSpecializationIds] = useState<string[]>([])
@@ -32,6 +33,11 @@ export default function ProfilePage() {
   const [uploadingCover, setUploadingCover] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [showCoverModal, setShowCoverModal] = useState(false)
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
+  const [deleteEmail, setDeleteEmail] = useState('')
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   
   // Settings form state - common
   const [fullName, setFullName] = useState('')
@@ -94,6 +100,20 @@ export default function ProfilePage() {
       if (error) throw error
       const userData = data as User
       setProfile(userData)
+
+      // Проверяем, есть ли у пользователя админская роль
+      const { data: adminRoleData } = await supabase
+        .from('admin_roles')
+        .select('role')
+        .eq('user_id', params.id)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (adminRoleData) {
+        setAdminRole(adminRoleData.role)
+      } else {
+        setAdminRole(null)
+      }
       // Initialize form with profile data - common
       setFullName(userData.full_name || '')
       setPhone(userData.phone || '')
@@ -606,13 +626,22 @@ export default function ProfilePage() {
     master: 'Мастер',
     seller: 'Продавец',
     client: 'Клиент',
+    super_admin: 'Администратор',
+    moderator: 'Модератор',
+    support: 'Поддержка',
   }
 
   const roleEmoji = {
     master: '🔨',
     seller: '🛒',
     client: '👤',
+    super_admin: '',
+    moderator: '🛡️',
+    support: '💬',
   }
+
+  // Определяем, какую роль показывать: админскую или из профиля
+  const displayRole = adminRole || profile.role
 
   const isOwnProfile = currentUser.id === profile.id
   const filteredServices = services.filter((svc) =>
@@ -687,11 +716,17 @@ export default function ProfilePage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-3 flex-wrap">
                       <h1 className="text-2xl font-semibold text-text-primary">{profile.full_name}</h1>
+                      {roleEmoji[displayRole as keyof typeof roleEmoji] && (
                       <span className="text-xl">
-                        {roleEmoji[profile.role as keyof typeof roleEmoji]}
+                          {roleEmoji[displayRole as keyof typeof roleEmoji]}
                       </span>
-                      <span className="px-3 py-1 border border-border-color text-text-primary text-xs font-normal rounded-lg bg-bg-secondary">
-                        {roleLabels[profile.role as keyof typeof roleLabels]}
+                      )}
+                      <span className={`px-3 py-1 border text-xs font-normal rounded-lg ${
+                        adminRole 
+                          ? 'border-red-500 text-red-600 bg-red-50' 
+                          : 'border-border-color text-text-primary bg-bg-secondary'
+                      }`}>
+                        {roleLabels[displayRole as keyof typeof roleLabels] || roleLabels.client}
                       </span>
                       {!isOwnProfile && (
                         <>
@@ -837,6 +872,30 @@ export default function ProfilePage() {
                               className="px-3 py-1 bg-bg-secondary border border-border-color text-xs font-normal text-text-primary rounded-lg"
                             >
                               {spec.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Seller-specific information */}
+                {profile.role === 'seller' && (
+                  <div className="mt-6 pt-6 border-t border-border-color">
+                    {profile.product_categories && (
+                      <div className="mb-4">
+                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                          <FiBriefcase size={16} />
+                          <span>Категории товаров</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {profile.product_categories.split(',').map((category, index) => (
+                            <span
+                              key={index}
+                              className="px-3 py-1 bg-bg-secondary border border-border-color text-xs font-normal text-text-primary rounded-lg"
+                            >
+                              {category.trim()}
                             </span>
                           ))}
                         </div>
@@ -1087,6 +1146,24 @@ export default function ProfilePage() {
                     <span>{changingPassword ? 'Изменение...' : 'Изменить пароль'}</span>
                   </button>
               </form>
+            </div>
+
+            {/* Delete Account Section */}
+            <div className="mb-8 pb-8 border-b border-red-200">
+              <h2 className="text-lg font-semibold mb-4 text-red-600">Удаление аккаунта</h2>
+              <p className="text-sm text-text-secondary mb-4">
+                Удаление аккаунта необратимо. Все ваши данные будут безвозвратно удалены.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteEmail(currentUser?.email || '')
+                  setShowDeleteAccountModal(true)
+                }}
+                className="btn bg-red-500 hover:bg-red-600 text-white border-red-500"
+              >
+                Удалить аккаунт
+              </button>
             </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-4">
@@ -1393,7 +1470,7 @@ export default function ProfilePage() {
                 />
               </label>
               {profile?.avatar_url && (
-                <button
+                            <button
                   type="button"
                   onClick={() => {
                     handleDeleteAvatar()
@@ -1401,22 +1478,22 @@ export default function ProfilePage() {
                   }}
                   disabled={uploadingAvatar}
                   className="btn bg-red-500 hover:bg-red-600 text-white border-red-500 inline-flex items-center justify-center gap-2"
-                >
+                            >
                   <FiX size={16} />
                   <span>Удалить</span>
-                </button>
-              )}
-              <button
+                            </button>
+                          )}
+                          <button
                 type="button"
                 onClick={() => setShowAvatarModal(false)}
                 className="btn bg-bg-secondary hover:bg-bg-primary text-text-primary border border-border-color"
-              >
+                          >
                 Отмена
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                          </button>
+                    </div>
+                        </div>
+                        </div>
+                      )}
 
       {/* Cover Photo Modal */}
       {showCoverModal && (
@@ -1462,13 +1539,140 @@ export default function ProfilePage() {
                 type="button"
                 onClick={() => setShowCoverModal(false)}
                 className="btn bg-bg-secondary hover:bg-bg-primary text-text-primary border border-border-color"
-              >
+                            >
                 Отмена
               </button>
-            </div>
+                        </div>
+                      </div>
+                  </div>
+                )}
+
+      {/* Delete Account Modal */}
+      {showDeleteAccountModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 animate-fade-in"
+          onClick={() => setShowDeleteAccountModal(false)}
+                          >
+          <div
+            className="bg-bg-primary border border-red-200 rounded-lg shadow-card p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-4 text-red-600">Удаление аккаунта</h3>
+            <p className="text-sm text-text-secondary mb-4">
+              Для подтверждения удаления аккаунта введите ваш email и пароль. Это действие необратимо.
+            </p>
+            
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!currentUser) return
+
+                if (!deleteEmail || !deletePassword) {
+                  setDeleteError('Заполните все поля')
+                  return
+                }
+
+                setDeletingAccount(true)
+                setDeleteError('')
+
+                try {
+                  const token = (await supabase.auth.getSession()).data.session?.access_token
+                  if (!token) {
+                    throw new Error('Не удалось получить токен авторизации')
+                  }
+
+                  const response = await fetch('/api/account/delete', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      email: deleteEmail || currentUser.email,
+                      password: deletePassword,
+                    }),
+                  })
+
+                  const data = await response.json()
+
+                  if (!response.ok) {
+                    throw new Error(data.error || 'Ошибка при удалении аккаунта')
+                  }
+
+                  // Выходим из аккаунта и редиректим на главную
+                  await supabase.auth.signOut()
+                  router.push('/')
+                } catch (error: any) {
+                  console.error('Error deleting account:', error)
+                  setDeleteError(error.message || 'Ошибка при удалении аккаунта')
+                } finally {
+                  setDeletingAccount(false)
+                }
+              }}
+              className="space-y-4"
+            >
+                      <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Email *
+                        </label>
+                              <input
+                  type="email"
+                  value={deleteEmail}
+                  onChange={(e) => setDeleteEmail(e.target.value)}
+                  className="input w-full"
+                  placeholder={currentUser?.email || "Введите ваш email"}
+                  disabled={deletingAccount}
+                  required
+                />
+                      </div>
+                      
+                      <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Пароль *
+                        </label>
+                        <input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  className="input w-full"
+                  placeholder="Введите ваш пароль"
+                  disabled={deletingAccount}
+                  required
+                        />
+                      </div>
+
+              {deleteError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {deleteError}
+                        </div>
+                      )}
+
+              <div className="flex gap-3">
+                  <button
+                    type="submit"
+                  disabled={deletingAccount || !deleteEmail || !deletePassword}
+                  className="btn bg-red-500 hover:bg-red-600 text-white border-red-500 flex-1"
+                  >
+                  {deletingAccount ? 'Удаление...' : 'Подтвердить удаление'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                    setShowDeleteAccountModal(false)
+                    setDeleteEmail(currentUser?.email || '')
+                    setDeletePassword('')
+                    setDeleteError('')
+                  }}
+                  disabled={deletingAccount}
+                  className="btn bg-bg-secondary hover:bg-bg-primary text-text-primary border border-border-color"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </form>
           </div>
-        </div>
-      )}
+            </div>
+          )}
     </div>
   )
 }

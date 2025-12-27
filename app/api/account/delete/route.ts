@@ -3,24 +3,24 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-// Читаем Service Role Key - он должен быть в .env.local
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
 
 export async function POST(request: NextRequest) {
   try {
-    // Проверяем переменные окружения сразу
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    console.log('[DELETE-USER API] Service key check:', {
+    // Проверяем переменные окружения внутри функции
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+    console.log('[DELETE-ACCOUNT API] Service key check:', {
       exists: !!serviceKey,
       length: serviceKey?.length || 0,
-      firstChars: serviceKey?.substring(0, 30) || 'N/A'
+      firstChars: serviceKey?.substring(0, 30) || 'N/A',
+      envKeys: Object.keys(process.env).filter(k => k.includes('SUPABASE'))
     })
 
     const body = await request.json()
-    const { userId } = body
+    const { email, password } = body
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId обязателен' }, { status: 400 })
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Email и пароль обязательны' }, { status: 400 })
     }
 
     const authHeader = request.headers.get('authorization')
@@ -37,54 +37,54 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Проверяем, что пользователь - администратор
+    // Проверяем текущего пользователя
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     if (authError || !user) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
 
-    // Проверяем права администратора
-    const { data: adminRole } = await supabaseClient
-      .from('admin_roles')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .in('role', ['super_admin'])
-      .maybeSingle()
-
-    if (!adminRole) {
-      return NextResponse.json({ error: 'Только супер-администратор может удалять пользователей из auth.users' }, { status: 403 })
+    // Проверяем, что email совпадает
+    if (user.email !== email) {
+      return NextResponse.json({ error: 'Email не совпадает с вашим аккаунтом' }, { status: 400 })
     }
 
-    // Используем Service Role Key для удаления из auth.users
-    console.log('Checking SUPABASE_SERVICE_ROLE_KEY:', {
-      exists: !!supabaseServiceRoleKey,
-      length: supabaseServiceRoleKey?.length || 0,
-      startsWith: supabaseServiceRoleKey?.substring(0, 20) || 'N/A'
+    // Проверяем пароль, пытаясь войти
+    const { error: signInError } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password,
     })
 
-    if (!supabaseServiceRoleKey) {
+    if (signInError) {
+      return NextResponse.json({ error: 'Неверный пароль' }, { status: 401 })
+    }
+
+    // Проверяем Service Role Key (читаем заново внутри функции)
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!serviceRoleKey) {
       console.error('SUPABASE_SERVICE_ROLE_KEY is missing. Available env vars:', {
         hasUrl: !!supabaseUrl,
         hasAnonKey: !!supabaseAnonKey,
-        hasServiceKey: !!supabaseServiceRoleKey,
+        hasServiceKey: !!serviceRoleKey,
         envKeys: Object.keys(process.env).filter(k => k.includes('SUPABASE'))
       })
       return NextResponse.json(
-        { error: 'SUPABASE_SERVICE_ROLE_KEY не настроен. Добавьте его в переменные окружения и перезапустите сервер.' },
+        { error: 'SUPABASE_SERVICE_ROLE_KEY не настроен. Добавьте его в .env.local и перезапустите сервер.' },
         { status: 500 }
       )
     }
 
-    const supabaseAdmin = createClient(supabaseUrl!, supabaseServiceRoleKey, {
+    const supabaseAdmin = createClient(supabaseUrl!, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
     })
 
-    // Удаляем все связанные данные пользователя через supabaseAdmin (обход RLS)
-    console.log('Deleting all related data for user:', userId)
+    // Удаляем все связанные данные пользователя
+    const userId = user.id
+
+    // Используем supabaseAdmin для всех операций удаления, чтобы обойти RLS
 
     // Удаляем portfolio items
     const { data: portfolioItems } = await supabaseAdmin
@@ -161,24 +161,20 @@ export async function POST(request: NextRequest) {
     // Удаляем профиль
     await supabaseAdmin.from('profiles').delete().eq('id', userId)
 
-    console.log('Attempting to delete user from auth.users:', userId)
-    
-    // Удаляем пользователя из auth.users
+    // Удаляем из auth.users через Admin API
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
     
-    console.log('Delete result:', { deleteError: deleteError?.message || 'Success' })
-
     if (deleteError) {
       console.error('Error deleting user from auth.users:', deleteError)
       return NextResponse.json(
-        { error: `Ошибка при удалении пользователя из auth.users: ${deleteError.message}` },
+        { error: `Ошибка при удалении аккаунта: ${deleteError.message}` },
         { status: 500 }
       )
     }
 
-    return NextResponse.json({ success: true, message: 'Пользователь полностью удален из системы' })
+    return NextResponse.json({ success: true, message: 'Аккаунт успешно удален' })
   } catch (error: any) {
-    console.error('Error in delete-user API:', error)
+    console.error('Error in delete account API:', error)
     return NextResponse.json(
       { error: error.message || 'Внутренняя ошибка сервера' },
       { status: 500 }

@@ -97,90 +97,26 @@ export default function AdminUsersPage() {
     if (!confirmDelete) return
 
     try {
-      // Delete all related data first (due to foreign key constraints)
-      // Delete portfolio items
-      const { data: portfolioItems } = await supabase
-        .from('portfolio_items')
-        .select('id')
-        .eq('master_id', userId)
-      
-      if (portfolioItems && portfolioItems.length > 0) {
-        const portfolioIds = portfolioItems.map((item) => item.id)
-        await supabase.from('portfolio_likes').delete().in('item_id', portfolioIds)
-        await supabase.from('portfolio_comments').delete().in('item_id', portfolioIds)
-        await supabase.from('portfolio_items').delete().eq('master_id', userId)
+      // Получаем токен сессии
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (!sessionData.session) {
+        throw new Error('Сессия не найдена')
       }
 
-      // Delete products
-      await supabase.from('products').delete().eq('seller_id', userId)
+      // Используем API endpoint для удаления (он использует supabaseAdmin и обходит RLS)
+      const response = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify({ userId }),
+      })
 
-      // Delete orders and order responses
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('client_id', userId)
-      
-      if (orders && orders.length > 0) {
-        const orderIds = orders.map((order) => order.id)
-        await supabase.from('order_responses').delete().in('order_id', orderIds)
-        await supabase.from('orders').delete().eq('client_id', userId)
-      }
+      const data = await response.json()
 
-      await supabase.from('order_responses').delete().eq('master_id', userId)
-
-      // Delete chats and messages
-      const { data: chats } = await supabase
-        .from('chats')
-        .select('id')
-        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-      
-      if (chats && chats.length > 0) {
-        const chatIds = chats.map((chat) => chat.id)
-        await supabase.from('messages').delete().in('chat_id', chatIds)
-        await supabase.from('chats').delete().or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-      }
-
-      // Delete follows
-      await supabase.from('follows').delete().eq('follower_id', userId)
-      await supabase.from('follows').delete().eq('following_id', userId)
-
-      // Delete profile specializations and services
-      await supabase.from('profile_specializations').delete().eq('profile_id', userId)
-      await supabase.from('profile_services').delete().eq('profile_id', userId)
-
-      // Delete admin roles if any
-      await supabase.from('admin_roles').delete().eq('user_id', userId)
-
-      // Delete user restrictions
-      await supabase.from('user_restrictions').delete().eq('user_id', userId)
-
-      // Finally, delete the profile
-      await supabase.from('profiles').delete().eq('id', userId)
-
-      // Delete from auth.users using Admin API
-      try {
-        const { data: sessionData } = await supabase.auth.getSession()
-        if (!sessionData.session) {
-          throw new Error('Сессия не найдена')
-        }
-
-        const response = await fetch('/api/admin/delete-user', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${sessionData.session.access_token}`,
-          },
-          body: JSON.stringify({ userId }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          console.warn('Не удалось удалить пользователя из auth.users:', errorData.error)
-          // Продолжаем, так как профиль уже удален
-        }
-      } catch (authDeleteError) {
-        console.warn('Ошибка при удалении из auth.users:', authDeleteError)
-        // Продолжаем, так как профиль уже удален
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка при удалении пользователя')
       }
 
       await logAdminAction(currentUser.id, 'delete_user', 'user', userId, {
