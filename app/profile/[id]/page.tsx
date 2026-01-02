@@ -8,7 +8,7 @@ import { supabase, User, PortfolioItem, Specialization, Service, Product } from 
 import Navbar from '@/components/Navbar'
 import PortfolioGrid from '@/components/PortfolioGrid'
 import PortfolioGallery from '@/components/PortfolioGallery'
-import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock, FiArrowLeft } from 'react-icons/fi'
+import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock, FiArrowLeft, FiLogOut, FiUser, FiShield } from 'react-icons/fi'
 
 export default function ProfilePage() {
   const params = useParams()
@@ -21,6 +21,7 @@ export default function ProfilePage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile')
+  const [settingsTab, setSettingsTab] = useState<'edit' | 'specializations' | 'security' | 'account'>('edit')
   const [adminRole, setAdminRole] = useState<string | null>(null)
   const [specializations, setSpecializations] = useState<Specialization[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -654,8 +655,8 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-bg-primary pb-20">
       <Navbar />
-      <div className="container mx-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto">
+      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
+        <div className="w-full max-w-full sm:max-w-2xl md:max-w-4xl mx-auto">
           {/* Back to Responses Button */}
           {returnTo && (
             <div className="mb-4">
@@ -669,10 +670,10 @@ export default function ProfilePage() {
             </div>
           )}
           {/* Tabs */}
-          <div className="flex gap-2 mb-6 border-b border-border-color">
+          <div className="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-border-color overflow-x-auto">
             <button
               onClick={() => setActiveTab('profile')}
-              className={`px-4 py-2 font-medium text-base transition-colors border-b-2 ${
+              className={`px-3 sm:px-4 py-2 font-medium text-sm sm:text-base transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
                 activeTab === 'profile'
                   ? 'border-brand-accent text-graphite-secondary'
                   : 'border-transparent text-text-secondary hover:text-graphite-secondary'
@@ -683,7 +684,7 @@ export default function ProfilePage() {
             {isOwnProfile && (
               <button
                 onClick={() => setActiveTab('settings')}
-                className={`px-4 py-2 font-medium text-base transition-colors border-b-2 ${
+                className={`px-3 sm:px-4 py-2 font-medium text-sm sm:text-base transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
                   activeTab === 'settings'
                     ? 'border-brand-accent text-text-primary'
                     : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -698,7 +699,7 @@ export default function ProfilePage() {
           {activeTab === 'profile' && (
             <>
               {/* Cover Photo and Avatar */}
-              <div className="relative mb-6 rounded-lg overflow-hidden" style={{ height: '250px' }}>
+              <div className="relative mb-4 sm:mb-6 rounded-lg overflow-hidden h-[200px] sm:h-[250px]">
                 {profile.cover_photo_url ? (
                   <img
                     src={profile.cover_photo_url}
@@ -710,8 +711,8 @@ export default function ProfilePage() {
                 )}
                 
                 {/* Avatar positioned on cover photo - Графитовый, строгий */}
-                <div className="absolute bottom-4 left-6">
-                  <div className="w-32 h-32 bg-graphite-primary border-4 border-bg-card flex items-center justify-center text-white text-4xl font-semibold rounded-full shadow-lg">
+                <div className="absolute bottom-2 sm:bottom-4 left-3 sm:left-6">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 bg-graphite-primary border-2 sm:border-4 border-bg-card flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-semibold rounded-full shadow-lg">
                     {profile.avatar_url ? (
                       <img
                         src={profile.avatar_url}
@@ -726,11 +727,11 @@ export default function ProfilePage() {
               </div>
 
               {/* Profile Info Card */}
-              <div className="card mb-6 mt-20">
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-3 flex-wrap">
-                      <h1 className="text-2xl font-semibold text-graphite-secondary tracking-tight">{profile.full_name}</h1>
+              <div className="card mb-4 sm:mb-6 mt-12 sm:mt-16 md:mt-20 w-full">
+                <div className="flex flex-col md:flex-row gap-4 sm:gap-6 w-full">
+                  <div className="flex-1 w-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3 flex-wrap">
+                      <h1 className="text-xl sm:text-2xl font-semibold text-graphite-secondary tracking-tight">{profile.full_name}</h1>
                       <span className={`px-3 py-1 border text-xs font-medium rounded-md ${
                         adminRole 
                           ? 'border-brand-accent text-brand-accent bg-red-50' 
@@ -753,7 +754,7 @@ export default function ProfilePage() {
                           )}
                           <button
                             onClick={handleStartChat}
-                            className="ml-2 px-4 py-1.5 text-sm border border-brand-accent text-brand-accent rounded-md transition-colors hover:bg-brand-accent hover:text-white flex items-center gap-1.5 font-medium"
+                            className="ml-0 sm:ml-2 mt-2 sm:mt-0 px-3 sm:px-4 py-1.5 text-sm border border-brand-accent text-brand-accent rounded-md transition-colors hover:bg-brand-accent hover:text-white flex items-center gap-1.5 font-medium"
                           >
                             <FiMessageCircle size={14} strokeWidth={2} />
                             Написать
@@ -807,7 +808,7 @@ export default function ProfilePage() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {profile.services && (
                         <div>
                           <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
@@ -917,13 +918,13 @@ export default function ProfilePage() {
 
               {/* Products for Sellers */}
               {profile.role === 'seller' && (
-                <div className="mb-8">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-graphite-secondary tracking-tight">Товары продавца</h2>
+                <div className="mb-6 sm:mb-8 w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
+                    <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight">Товары продавца</h2>
                     {isOwnProfile && (
                       <Link
                         href="/products/new"
-                        className="btn btn-primary text-sm"
+                        className="btn btn-primary text-sm w-full sm:w-auto"
                       >
                         Добавить товар
                       </Link>
@@ -971,14 +972,14 @@ export default function ProfilePage() {
 
               {/* Portfolio for Masters */}
               {profile.role === 'master' && (
-                <div className="mb-8">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-graphite-secondary tracking-tight">Портфолио</h2>
+                <div className="mb-6 sm:mb-8 w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
+                    <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight">Портфолио</h2>
                     <div className="flex items-center gap-2">
                       {isOwnProfile && (
                         <Link
                           href="/portfolio/new"
-                          className="btn btn-primary text-sm flex items-center gap-1.5"
+                          className="btn btn-primary text-sm w-full sm:w-auto flex items-center justify-center gap-1.5"
                         >
                           <FiPlus size={14} />
                           Добавить работу
@@ -1006,21 +1007,82 @@ export default function ProfilePage() {
 
           {/* Settings Tab Content */}
           {activeTab === 'settings' && isOwnProfile && (
-            <div className="card">
-              <h1 className="text-xl font-semibold mb-6 text-graphite-secondary tracking-tight">Настройки</h1>
+            <div className="card w-full">
+              <h1 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-graphite-secondary tracking-tight">Настройки</h1>
 
+              {/* Settings Sub-tabs - Vertical List */}
+              <div className="flex flex-col gap-1 sm:gap-2 mb-4 sm:mb-6 w-full">
+                <button
+                  onClick={() => setSettingsTab('edit')}
+                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm transition-colors rounded-md text-left ${
+                    settingsTab === 'edit'
+                      ? 'bg-brand-accent text-white'
+                      : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FiUser size={16} className="flex-shrink-0" />
+                    <span className="truncate">Редактировать профиль</span>
+                  </div>
+                </button>
+                {profile.role === 'master' && (
+                  <button
+                    onClick={() => setSettingsTab('specializations')}
+                    className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm transition-colors rounded-md text-left ${
+                      settingsTab === 'specializations'
+                        ? 'bg-brand-accent text-white'
+                        : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FiBriefcase size={16} className="flex-shrink-0" />
+                      <span className="truncate">Специализации и услуги</span>
+                    </div>
+                  </button>
+                )}
+                <button
+                  onClick={() => setSettingsTab('security')}
+                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm transition-colors rounded-md text-left ${
+                    settingsTab === 'security'
+                      ? 'bg-brand-accent text-white'
+                      : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FiShield size={16} className="flex-shrink-0" />
+                    <span className="truncate">Безопасность</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setSettingsTab('account')}
+                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm transition-colors rounded-md text-left ${
+                    settingsTab === 'account'
+                      ? 'bg-brand-accent text-white'
+                      : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FiLock size={16} className="flex-shrink-0" />
+                    <span className="truncate">Аккаунт</span>
+                  </div>
+                </button>
+              </div>
+
+              {/* Edit Profile Tab */}
+              {settingsTab === 'edit' && (
+                <div className="space-y-4 sm:space-y-6 w-full">
               {/* Image Upload Section */}
-              <div className="mb-8 pb-8 border-b border-border-color">
-                <h2 className="text-lg font-semibold mb-4 text-graphite-secondary tracking-tight">Изображения профиля</h2>
+              <div className="mb-6 sm:mb-8 pb-6 sm:pb-8 border-b border-border-color">
+                <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Изображения профиля</h2>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   {/* Avatar Upload */}
                 <div>
                     <label className="block text-sm font-medium mb-2 text-graphite-secondary">
                       Аватарка
                   </label>
-                    <div className="flex items-center gap-4">
-                      <div className="w-20 h-20 bg-text-primary border-2 border-border-color flex items-center justify-center text-white text-xl font-semibold rounded-full flex-shrink-0">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-text-primary border-2 border-border-color flex items-center justify-center text-white text-lg sm:text-xl font-semibold rounded-full flex-shrink-0">
                         {profile.avatar_url ? (
                           <img
                             src={profile.avatar_url}
@@ -1031,12 +1093,12 @@ export default function ProfilePage() {
                           profile.full_name[0]?.toUpperCase() || '?'
                         )}
                 </div>
-                      <div className="flex-1">
+                      <div className="flex-1 w-full sm:w-auto">
                         <button
                           type="button"
                           onClick={() => setShowAvatarModal(true)}
                           disabled={uploadingAvatar}
-                          className="btn btn-primary inline-flex items-center gap-2"
+                          className="btn btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2"
                         >
                           <FiCamera size={16} />
                           <span>{uploadingAvatar ? 'Загрузка...' : 'Изменить'}</span>
@@ -1050,8 +1112,8 @@ export default function ProfilePage() {
                     <label className="block text-sm font-medium mb-2 text-graphite-secondary">
                       Фоновая картинка
                         </label>
-                    <div className="flex items-center gap-4">
-                      <div className="w-20 h-12 bg-bg-secondary border border-border-color rounded overflow-hidden flex-shrink-0">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                      <div className="w-full sm:w-20 h-12 bg-bg-secondary border border-border-color rounded overflow-hidden flex-shrink-0">
                         {profile.cover_photo_url ? (
                           <img
                             src={profile.cover_photo_url}
@@ -1064,12 +1126,12 @@ export default function ProfilePage() {
                       </div>
                         )}
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 w-full sm:w-auto">
                         <button
                           type="button"
                           onClick={() => setShowCoverModal(true)}
                           disabled={uploadingCover}
-                          className="btn btn-primary inline-flex items-center gap-2"
+                          className="btn btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2"
                         >
                           <FiCamera size={16} />
                           <span>{uploadingCover ? 'Загрузка...' : 'Изменить'}</span>
@@ -1080,104 +1142,9 @@ export default function ProfilePage() {
                         </div>
                       </div>
 
-              {/* Password Change Section */}
-              <div className="mb-8 pb-8 border-b border-border-color">
-                <h2 className="text-lg font-semibold mb-4 text-graphite-secondary tracking-tight">Изменение пароля</h2>
-                <p className="text-sm text-text-secondary mb-4">
-                  Пароль хранится в зашифрованном виде и не может быть просмотрен. Вы можете изменить его, указав текущий пароль.
-                </p>
-
-                <form onSubmit={handleChangePassword} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-graphite-secondary">
-                      Текущий пароль *
-                        </label>
-                        <input
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="input w-full"
-                      placeholder="Введите текущий пароль"
-                      disabled={changingPassword}
-                      required
-                        />
-                      </div>
-                      
-                      <div>
-                    <label className="block text-sm font-medium mb-2 text-graphite-secondary">
-                      Новый пароль *
-                        </label>
-                        <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="input w-full"
-                      placeholder="Минимум 6 символов"
-                      disabled={changingPassword}
-                      required
-                      minLength={6}
-                        />
-                      </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-graphite-secondary">
-                      Подтвердите новый пароль *
-                        </label>
-                        <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="input w-full"
-                      placeholder="Повторите новый пароль"
-                      disabled={changingPassword}
-                      required
-                      minLength={6}
-                        />
-                      </div>
-
-                  {passwordError && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                      {passwordError}
-                        </div>
-                      )}
-
-                  {passwordSuccess && (
-                    <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-                      {passwordSuccess}
-                      </div>
-                )}
-
-                  <button
-                    type="submit"
-                    disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
-                    className="btn btn-primary flex items-center gap-2"
-                  >
-                    <FiLock size={16} />
-                    <span>{changingPassword ? 'Изменение...' : 'Изменить пароль'}</span>
-                  </button>
-              </form>
-            </div>
-
-            {/* Delete Account Section */}
-            <div className="mb-8 pb-8 border-b border-red-200">
-              <h2 className="text-lg font-semibold mb-4 text-red-600">Удаление аккаунта</h2>
-              <p className="text-sm text-text-secondary mb-4">
-                Удаление аккаунта необратимо. Все ваши данные будут безвозвратно удалены.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteEmail(currentUser?.email || '')
-                  setShowDeleteAccountModal(true)
-                }}
-                className="btn bg-red-500 hover:bg-red-600 text-white border-red-500"
-              >
-                Удалить аккаунт
-              </button>
-            </div>
-
-              <form onSubmit={handleSaveSettings} className="space-y-4">
-                <div>
+              {/* Edit Profile Form */}
+              <form onSubmit={handleSaveSettings} className="space-y-4 w-full">
+                <div className="w-full">
                   <label className="block text-sm font-medium mb-2">
                     ФИО *
                   </label>
@@ -1186,11 +1153,11 @@ export default function ProfilePage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
-                    className="input"
+                    className="input w-full"
                   />
                 </div>
 
-                <div>
+                <div className="w-full">
                   <label className="block text-sm font-medium mb-2">
                     Телефон
                   </label>
@@ -1198,11 +1165,11 @@ export default function ProfilePage() {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="input"
+                    className="input w-full"
                   />
                 </div>
 
-                <div>
+                <div className="w-full">
                   <label className="block text-sm font-medium mb-2">
                     Город
                   </label>
@@ -1210,29 +1177,29 @@ export default function ProfilePage() {
                     type="text"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    className="input"
+                    className="input w-full"
                   />
                 </div>
 
-                <div>
+                <div className="w-full">
                   <label className="block text-sm font-medium mb-2">
                     О себе
                   </label>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="textarea"
+                    className="textarea w-full"
                     rows={5}
                   />
                 </div>
 
-                {/* Master-specific fields */}
+                {/* Master-specific fields (only basic info, specializations moved to separate tab) */}
                 {profile.role === 'master' && (
                   <>
-                    <div className="border-t border-gray-200 pt-6 mt-6">
-                      <h3 className="text-base font-bold mb-4">Информация для мастера</h3>
+                    <div className="border-t border-gray-200 pt-4 sm:pt-6 mt-4 sm:mt-6 w-full">
+                      <h3 className="text-sm sm:text-base font-bold mb-3 sm:mb-4">Информация для мастера</h3>
                       
-                      <div>
+                      <div className="w-full">
                         <label className="block text-sm font-medium mb-2">
                           Описание услуг (необязательно)
                         </label>
@@ -1240,19 +1207,19 @@ export default function ProfilePage() {
                           value={servicesText}
                           onChange={(e) => setServicesText(e.target.value)}
                           placeholder="Кратко опишите ваши услуги или особенности работы"
-                          className="textarea"
+                          className="textarea w-full"
                           rows={4}
                         />
                       </div>
 
-                      <div className="mt-4">
+                      <div className="mt-4 w-full">
                         <label className="block text-sm font-medium mb-2">
                           Место обслуживания *
                         </label>
                         <select
                           value={serviceLocation}
                           onChange={(e) => setServiceLocation(e.target.value as 'home' | 'workshop' | 'both')}
-                          className="input"
+                          className="input w-full"
                           required
                         >
                           <option value="home">Выезд на дом</option>
@@ -1261,49 +1228,7 @@ export default function ProfilePage() {
                         </select>
                       </div>
 
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium mb-2">
-                          Специализации (выберите подходящее)
-                        </label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-56 overflow-y-auto border border-gray-200 p-3 rounded">
-                          {specializations.map((spec) => (
-                            <label key={spec.id} className="flex items-center gap-2 text-sm text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={selectedSpecializationIds.includes(spec.id)}
-                                onChange={() => toggleSpecialization(spec.id)}
-                                className="w-4 h-4"
-                              />
-                              <span>{spec.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium mb-2">
-                          Услуги (отфильтрованы по выбранным специализациям)
-                        </label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto border border-gray-200 p-3 rounded">
-                          {filteredServices.length === 0 ? (
-                            <p className="text-sm text-gray-500">Сначала выберите специализации</p>
-                          ) : (
-                            filteredServices.map((svc) => (
-                              <label key={svc.id} className="flex items-center gap-2 text-sm text-gray-700">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedServiceIds.includes(svc.id)}
-                                  onChange={() => toggleService(svc.id)}
-                                  className="w-4 h-4"
-                                />
-                                <span>{svc.name}</span>
-                              </label>
-                            ))
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-4">
+                      <div className="mt-4 w-full">
                         <label className="block text-sm font-medium mb-2">
                           Опыт работы (лет)
                         </label>
@@ -1313,12 +1238,12 @@ export default function ProfilePage() {
                           onChange={(e) => setExperienceYears(e.target.value ? Number(e.target.value) : '')}
                           min="0"
                           max="100"
-                          className="input"
+                          className="input w-full"
                           placeholder="Например: 5"
                         />
                       </div>
 
-                      <div className="mt-4">
+                      <div className="mt-4 w-full">
                         <label className="block text-sm font-medium mb-2">
                           График работы
                         </label>
@@ -1327,7 +1252,7 @@ export default function ProfilePage() {
                           value={workSchedule}
                           onChange={(e) => setWorkSchedule(e.target.value)}
                           placeholder="Например: Пн-Пт 9:00-18:00, Сб 10:00-16:00"
-                          className="input"
+                          className="input w-full"
                         />
                       </div>
                     </div>
@@ -1409,11 +1334,11 @@ export default function ProfilePage() {
                   </>
                 )}
 
-                <div className="flex gap-3 pt-6 border-t border-gray-200 mt-6">
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 sm:pt-6 border-t border-gray-200 mt-4 sm:mt-6 w-full">
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-4 py-2 text-sm font-medium bg-black text-white border border-black hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm font-medium bg-black text-white border border-black hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {saving ? 'Сохранение...' : 'Сохранить'}
                   </button>
@@ -1442,12 +1367,209 @@ export default function ProfilePage() {
                         setProductCategories(profile.product_categories || '')
                       }
                     }}
-                    className="px-4 py-2 text-sm font-medium bg-bg-card text-graphite-secondary border border-border-light hover:bg-bg-secondary transition-colors"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm font-medium bg-bg-card text-graphite-secondary border border-border-light hover:bg-bg-secondary transition-colors"
                   >
                     Отмена
                   </button>
                 </div>
               </form>
+                </div>
+              )}
+
+              {/* Specializations and Services Tab (only for masters) */}
+              {settingsTab === 'specializations' && profile.role === 'master' && (
+                <div className="space-y-4 sm:space-y-6 w-full">
+                  <div className="w-full">
+                    <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Специализации</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto border border-border-color p-3 sm:p-4 rounded-md">
+                      {specializations.map((spec) => (
+                        <label key={spec.id} className="flex items-center gap-2 text-sm text-text-primary">
+                          <input
+                            type="checkbox"
+                            checked={selectedSpecializationIds.includes(spec.id)}
+                            onChange={() => toggleSpecialization(spec.id)}
+                            className="w-4 h-4"
+                          />
+                          <span>{spec.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="w-full">
+                    <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Услуги</h2>
+                    <p className="text-sm text-text-secondary mb-3 sm:mb-4">
+                      Услуги отфильтрованы по выбранным специализациям
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto border border-border-color p-3 sm:p-4 rounded-md">
+                      {filteredServices.length === 0 ? (
+                        <p className="text-sm text-text-secondary col-span-2">Сначала выберите специализации</p>
+                      ) : (
+                        filteredServices.map((svc) => (
+                          <label key={svc.id} className="flex items-center gap-2 text-sm text-text-primary">
+                            <input
+                              type="checkbox"
+                              checked={selectedServiceIds.includes(svc.id)}
+                              onChange={() => toggleService(svc.id)}
+                              className="w-4 h-4"
+                            />
+                            <span>{svc.name}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border-color w-full">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!currentUser) return
+                        await syncSelections(currentUser.id)
+                        await fetchSelections()
+                        alert('Специализации и услуги сохранены!')
+                      }}
+                      className="btn btn-primary w-full sm:w-auto"
+                    >
+                      Сохранить
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSpecializationIds(profileSpecializations.map((s) => s.id))
+                        setSelectedServiceIds(profileServices.map((s) => s.id))
+                      }}
+                      className="btn btn-secondary w-full sm:w-auto"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Security Tab */}
+              {settingsTab === 'security' && (
+                <div className="w-full">
+                  <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Изменение пароля</h2>
+                  <p className="text-sm text-text-secondary mb-3 sm:mb-4">
+                    Пароль хранится в зашифрованном виде и не может быть просмотрен. Вы можете изменить его, указав текущий пароль.
+                  </p>
+
+                  <form onSubmit={handleChangePassword} className="space-y-4 w-full">
+                    <div className="w-full">
+                      <label className="block text-sm font-medium mb-2 text-graphite-secondary">
+                        Текущий пароль *
+                      </label>
+                      <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="input w-full"
+                        placeholder="Введите текущий пароль"
+                        disabled={changingPassword}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="w-full">
+                      <label className="block text-sm font-medium mb-2 text-graphite-secondary">
+                        Новый пароль *
+                      </label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="input w-full"
+                        placeholder="Минимум 6 символов"
+                        disabled={changingPassword}
+                        required
+                        minLength={6}
+                      />
+                    </div>
+
+                    <div className="w-full">
+                      <label className="block text-sm font-medium mb-2 text-graphite-secondary">
+                        Подтвердите новый пароль *
+                      </label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="input w-full"
+                        placeholder="Повторите новый пароль"
+                        disabled={changingPassword}
+                        required
+                        minLength={6}
+                      />
+                    </div>
+
+                    {passwordError && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                        {passwordError}
+                      </div>
+                    )}
+
+                    {passwordSuccess && (
+                      <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+                        {passwordSuccess}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                      className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
+                    >
+                      <FiLock size={16} />
+                      <span>{changingPassword ? 'Изменение...' : 'Изменить пароль'}</span>
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* Account Tab */}
+              {settingsTab === 'account' && (
+                <div className="space-y-4 sm:space-y-6 w-full">
+                  {/* Sign Out Section */}
+                  <div className="pb-4 sm:pb-6 border-b border-border-color w-full">
+                    <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Выход из аккаунта</h2>
+                    <p className="text-sm text-text-secondary mb-3 sm:mb-4">
+                      Вы можете выйти из аккаунта в любой момент. Для повторного входа потребуется ввести email и пароль.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (confirm('Вы уверены, что хотите выйти из аккаунта?')) {
+                          await supabase.auth.signOut()
+                          router.push('/')
+                        }
+                      }}
+                      className="btn btn-secondary w-full sm:w-auto flex items-center justify-center gap-2"
+                    >
+                      <FiLogOut size={16} />
+                      <span>Выйти из аккаунта</span>
+                    </button>
+                  </div>
+
+                  {/* Delete Account Section */}
+                  <div className="w-full">
+                    <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-red-600">Удаление аккаунта</h2>
+                    <p className="text-sm text-text-secondary mb-3 sm:mb-4">
+                      Удаление аккаунта необратимо. Все ваши данные будут безвозвратно удалены.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteEmail(currentUser?.email || '')
+                        setShowDeleteAccountModal(true)
+                      }}
+                      className="btn bg-red-500 hover:bg-red-600 text-white border-red-500 w-full sm:w-auto"
+                    >
+                      Удалить аккаунт
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

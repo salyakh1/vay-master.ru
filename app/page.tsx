@@ -139,9 +139,9 @@ export default function Home() {
               <div className="mb-6">
                 <p className="text-xl md:text-2xl font-medium text-text-secondary mb-6">
                   Добро пожаловать, {user.full_name || 'Пользователь'}! 👋
-                </p>
-              </div>
-              
+          </p>
+        </div>
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
                 {user.role === 'client' && (
                   <>
@@ -241,7 +241,7 @@ export default function Home() {
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-16 h-16 bg-brand-accent/10 rounded-lg flex items-center justify-center">
                   <FiBriefcase size={32} className="text-brand-accent" strokeWidth={2} />
-                </div>
+            </div>
                 <h3 className="text-2xl font-semibold text-graphite-secondary tracking-tight">
                   Для мастеров
                 </h3>
@@ -522,9 +522,9 @@ export default function Home() {
                     <FiEye size={18} strokeWidth={2.5} />
                   </div>
                 </div>
-              </div>
             </div>
-
+          </div>
+          
             <div className="card hover:shadow-card-hover transition-all border-l-4 border-brand-accent">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0 w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center">
@@ -626,7 +626,7 @@ export default function Home() {
           <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-semibold text-graphite-secondary mb-4 tracking-tight">
               VAY-MASTER в цифрах
-            </h2>
+          </h2>
             <p className="text-lg text-text-secondary">
               Растущее сообщество профессионалов
             </p>
@@ -683,8 +683,8 @@ export default function Home() {
               <span className="text-base font-semibold text-graphite-secondary">
                 Платформа растёт каждый день
               </span>
-            </div>
           </div>
+        </div>
         </section>
 
         {/* 7. БЛОК ПРИЗЫВА К ДЕЙСТВИЮ */}
@@ -707,20 +707,20 @@ export default function Home() {
                   <FiSearch size={22} strokeWidth={2.5} />
                   Найти мастера
                 </Link>
-                <Link
-                  href="/auth/register"
+              <Link
+                href="/auth/register"
                   className="btn btn-outline px-10 py-4 text-lg font-semibold flex items-center justify-center gap-2"
-                >
+              >
                   <FiUser size={22} strokeWidth={2.5} />
                   Зарегистрироваться
-                </Link>
-                <Link
+              </Link>
+              <Link
                   href="/products"
                   className="btn btn-outline px-10 py-4 text-lg font-semibold flex items-center justify-center gap-2"
-                >
+              >
                   <FiShoppingBag size={22} strokeWidth={2.5} />
                   Разместить товар
-                </Link>
+              </Link>
               </div>
               <div className="flex flex-wrap justify-center gap-6 text-sm text-text-muted">
                 <div className="flex items-center gap-2">

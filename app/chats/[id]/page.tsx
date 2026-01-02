@@ -7,7 +7,7 @@ import { supabase, Message, User } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { FiPlus, FiImage, FiMoreVertical, FiTrash2, FiAlertCircle } from 'react-icons/fi'
+import { FiPlus, FiImage, FiMoreVertical, FiTrash2, FiAlertCircle, FiSend } from 'react-icons/fi'
 import CalculatorModal from '@/components/CalculatorModal'
 import ComplaintModal from '@/components/ComplaintModal'
 
@@ -382,7 +382,25 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
         {/* Chat Header */}
         <div className="bg-bg-primary border-b border-border-color px-4 py-3 relative">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-12 h-12 bg-text-primary border border-border-color flex items-center justify-center text-white text-sm font-semibold rounded-full">
+                {otherUser.avatar_url ? (
+                  <img
+                    src={otherUser.avatar_url}
+                    alt={otherUser.full_name}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  otherUser.full_name[0]?.toUpperCase() || '?'
+                )}
+              </div>
+              <div>
+                <div className="font-semibold text-graphite-secondary tracking-tight">{otherUser.full_name}</div>
+                <div className="text-sm text-text-secondary">{otherUser.city || ''}</div>
+              </div>
+            </div>
+
             {/* Menu Button */}
             <div className="relative" ref={chatMenuRef}>
               <button
@@ -393,7 +411,7 @@ export default function ChatPage() {
                 <FiMoreVertical size={20} className="text-graphite-secondary" strokeWidth={2} />
               </button>
               {showChatMenu && (
-                <div className="absolute left-0 top-full mt-2 bg-bg-card border border-border-light rounded-md shadow-card min-w-[200px] z-50">
+                <div className="absolute right-0 top-full mt-2 bg-bg-card border border-border-light rounded-md shadow-card min-w-[200px] z-50">
                   <button
                     type="button"
                     onClick={() => {
@@ -429,22 +447,6 @@ export default function ChatPage() {
                   </button>
                 </div>
               )}
-            </div>
-
-            <div className="w-12 h-12 bg-text-primary border border-border-color flex items-center justify-center text-white text-sm font-semibold rounded-full">
-              {otherUser.avatar_url ? (
-                <img
-                  src={otherUser.avatar_url}
-                  alt={otherUser.full_name}
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                otherUser.full_name[0]?.toUpperCase() || '?'
-              )}
-            </div>
-            <div>
-              <div className="font-semibold text-graphite-secondary tracking-tight">{otherUser.full_name}</div>
-              <div className="text-sm text-text-secondary">{otherUser.city || ''}</div>
             </div>
           </div>
         </div>
@@ -528,22 +530,32 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={() => setShowMenu(!showMenu)}
-              className="btn bg-bg-secondary hover:bg-bg-primary text-graphite-secondary border border-border-light flex items-center justify-center"
+              className="h-10 w-10 flex items-center justify-center bg-bg-secondary hover:bg-bg-primary text-graphite-secondary border border-border-light rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
               disabled={uploadingImage}
             >
               <FiPlus size={20} />
             </button>
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Написать сообщение..."
-              className="flex-1 input"
-              onFocus={() => setShowMenu(false)}
-            />
-            <button type="submit" className="btn btn-primary" disabled={uploadingImage}>
-              {uploadingImage ? 'Загрузка...' : 'Отправить'}
-            </button>
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Написать сообщение..."
+                className="input h-10 text-sm pr-10 w-full"
+                onFocus={() => setShowMenu(false)}
+              />
+              <button
+                type="submit"
+                disabled={uploadingImage || !newMessage.trim()}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-brand-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploadingImage ? (
+                  <span className="text-xs">Загрузка...</span>
+                ) : (
+                  <FiSend size={18} />
+                )}
+              </button>
+            </div>
           </form>
 
           <input
