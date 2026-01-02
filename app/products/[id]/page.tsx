@@ -7,6 +7,7 @@ import { supabase, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { FiMessageCircle, FiShoppingCart, FiChevronLeft, FiChevronRight, FiArrowLeft, FiUser } from 'react-icons/fi'
 import Link from 'next/link'
+import AuthRequiredModal from '@/components/AuthRequiredModal'
 
 export default function ProductPage() {
   const params = useParams()
@@ -19,11 +20,13 @@ export default function ProductPage() {
   const touchStartX = useRef<number>(0)
   const touchEndX = useRef<number>(0)
 
+  const [showAuthModal, setShowAuthModal] = useState(false)
+
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/')
+      setShowAuthModal(true)
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading])
 
   useEffect(() => {
     if (params.id) {
@@ -363,6 +366,13 @@ export default function ProductPage() {
           </div>
         </div>
       </div>
+
+      {/* Auth Required Modal */}
+      <AuthRequiredModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        type="product"
+      />
     </div>
   )
 }

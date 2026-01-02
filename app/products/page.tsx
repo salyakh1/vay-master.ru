@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../providers'
 import { supabase, Product, ProductCategory } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -9,38 +9,34 @@ import ProductCard from '@/components/ProductCard'
 import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
 import { FiFilter } from 'react-icons/fi'
+import AuthRequiredModal from '@/components/AuthRequiredModal'
 
-export default function ProductsPage() {
+function ProductsContent() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
   const [categorySection, setCategorySection] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [cityFilter, setCityFilter] = useState('')
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([])
   const [showFilters, setShowFilters] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/')
-    }
-  }, [user, authLoading, router])
+  // Убираем редирект для неавторизованных - они могут видеть карточки товаров
 
   // Загружаем категории только один раз
   useEffect(() => {
-    if (user) {
-      fetchCategories()
-    }
-  }, [user])
+    fetchCategories()
+  }, [])
 
   // Загружаем товары при изменении фильтров
   useEffect(() => {
-    if (user) {
-      fetchProducts()
-    }
-  }, [user, searchQuery, categorySection, categoryId, cityFilter])
+    fetchProducts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, categorySection, categoryId, cityFilter])
 
   const fetchCategories = async () => {
     try {
@@ -109,11 +105,9 @@ export default function ProductsPage() {
     )
   }
 
-  if (!user) return null
-
   return (
     <div className="min-h-screen bg-bg-primary pb-20">
-      <Navbar />
+      {user && <Navbar />}
       <div className="container mx-auto px-4 py-6">
         {/* Баннеры */}
         <div className="mb-6">
@@ -214,7 +208,26 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+
+      {/* Auth Required Modal */}
+      <AuthRequiredModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        type="product"
+      />
     </div>
+  )
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Загрузка...</div>
+      </div>
+    }>
+      <ProductsContent />
+    </Suspense>
   )
 }
 

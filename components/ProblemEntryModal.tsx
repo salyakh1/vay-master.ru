@@ -66,14 +66,7 @@ export default function ProblemEntryModal() {
   }
 
   const handleSelectType = (type: 'master' | 'product') => {
-    // Если пользователь не авторизован, перенаправляем на страницу входа
-    if (!authLoading && !user) {
-      handleClose()
-      router.push('/auth/login')
-      return
-    }
-    
-    // Если авторизован, продолжаем как обычно
+    // Для всех пользователей (включая неавторизованных) показываем поле для ввода проблемы
     setSearchType(type)
   }
 
@@ -89,7 +82,19 @@ export default function ProblemEntryModal() {
     setIsSubmitting(true)
     
     try {
-      // Отправляем проблему на сервер для обработки
+      // Для неавторизованных пользователей просто перенаправляем на страницу поиска с запросом
+      if (!authLoading && !user) {
+        handleClose()
+        if (searchType === 'master') {
+          router.push(`/search?q=${encodeURIComponent(problemText.trim())}`)
+        } else {
+          router.push(`/products?q=${encodeURIComponent(problemText.trim())}`)
+        }
+        setIsSubmitting(false)
+        return
+      }
+
+      // Для авторизованных пользователей используем API для обработки проблемы
       const response = await fetch('/api/problem-search', {
         method: 'POST',
         headers: {

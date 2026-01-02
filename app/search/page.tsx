@@ -8,6 +8,7 @@ import Navbar from '@/components/Navbar'
 import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
 import { FiSearch, FiUser, FiFilter, FiMapPin, FiBriefcase, FiStar, FiCheckCircle } from 'react-icons/fi'
+import AuthRequiredModal from '@/components/AuthRequiredModal'
 
 function SearchContent() {
   const router = useRouter()
@@ -25,12 +26,9 @@ function SearchContent() {
   const [selectedSpec, setSelectedSpec] = useState<string>('')
   const [selectedService, setSelectedService] = useState<string>('')
   const [showFilters, setShowFilters] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/')
-    }
-  }, [user, authLoading, router])
+  // Убираем редирект для неавторизованных - они могут видеть карточки мастеров
 
   useEffect(() => {
     const fetchReference = async () => {
@@ -49,16 +47,17 @@ function SearchContent() {
   }, [])
 
   useEffect(() => {
-    if (user) {
-      performSearch()
-    }
+    performSearch()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, cityFilter, selectedSpec, selectedService, user])
+  }, [query, cityFilter, selectedSpec, selectedService])
 
   useEffect(() => {
     if (user) {
       // Сначала загружаем город пользователя, потом мастеров из этого города
       fetchUserCity()
+    } else {
+      // Для неавторизованных загружаем случайных мастеров
+      fetchRandomProfiles()
     }
   }, [user])
 
@@ -289,13 +288,7 @@ function SearchContent() {
     performSearch()
   }
 
-  if (authLoading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Загрузка...</div>
-      </div>
-    )
-  }
+  // Убираем проверку авторизации - неавторизованные могут видеть карточки мастеров
 
   const roleLabels = {
     master: 'Мастер',
@@ -312,6 +305,7 @@ function SearchContent() {
   const filteredServicesForFilter = selectedSpec
     ? services.filter((svc) => svc.specialization_id === selectedSpec)
     : services
+  
   const hasFilters =
     query.trim().length > 0 ||
     !!selectedSpec ||
@@ -320,7 +314,7 @@ function SearchContent() {
 
   return (
     <div className="min-h-screen bg-bg-primary pb-20">
-      <Navbar />
+      {user && <Navbar />}
       <div className="container mx-auto px-4 py-6">
         <div className="max-w-4xl mx-auto">
           {/* Баннеры */}
@@ -408,65 +402,73 @@ function SearchContent() {
                     Мастера вашего города
                   </h2>
                   <div className="grid grid-cols-2 gap-4">
-                    {randomProfiles.map((master) => (
-                      <Link
-                        key={master.id}
-                        href={`/profile/${master.id}`}
-                        className="card hover:shadow-card-hover transition-all h-[400px] flex flex-col !p-0 overflow-hidden"
-                      >
-                        {/* Квадратный аватар на всю ширину */}
-                        <div className="w-full h-[200px] bg-graphite-primary flex items-center justify-center text-white text-2xl font-semibold rounded-t-md flex-shrink-0 overflow-hidden">
-                          {master.avatar_url ? (
-                            <img
-                              src={master.avatar_url}
-                              alt={master.full_name}
-                              className="w-full h-[200px] object-cover"
-                            />
-                          ) : (
-                            master.full_name[0]?.toUpperCase() || '?'
-                          )}
-                        </div>
+                    {randomProfiles.map((master) => {
+                      const MasterCard = (
+                        <div className="card hover:shadow-card-hover transition-all h-[400px] flex flex-col !p-0 overflow-hidden">
+                          {/* Квадратный аватар на всю ширину */}
+                          <div className="w-full h-[200px] bg-graphite-primary flex items-center justify-center text-white text-2xl font-semibold rounded-t-md flex-shrink-0 overflow-hidden">
+                            {master.avatar_url ? (
+                              <img
+                                src={master.avatar_url}
+                                alt={master.full_name}
+                                className="w-full h-[200px] object-cover"
+                              />
+                            ) : (
+                              master.full_name[0]?.toUpperCase() || '?'
+                            )}
+                          </div>
 
-                        {/* Основная информация */}
-                        <div className="flex flex-col items-center text-center p-4">
-                          <h3 className="font-semibold text-base text-graphite-secondary mb-1 line-clamp-2 leading-tight">
-                            {master.full_name}
-                          </h3>
-                          {master.city && (
-                            <div className="flex items-center gap-1 text-xs text-text-secondary mb-2">
-                              <FiMapPin size={12} strokeWidth={2} />
-                              <span>{master.city}</span>
+                          {/* Основная информация */}
+                          <div className="flex flex-col items-center text-center p-4">
+                            <h3 className="font-semibold text-base text-graphite-secondary mb-1 line-clamp-2 leading-tight">
+                              {master.full_name}
+                            </h3>
+                            {master.city && (
+                              <div className="flex items-center gap-1 text-xs text-text-secondary mb-2">
+                                <FiMapPin size={12} strokeWidth={2} />
+                                <span>{master.city}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Описание */}
+                          {master.description && (
+                            <p className="text-xs text-text-secondary mb-3 line-clamp-2 leading-relaxed flex-1 px-4">
+                              {master.description}
+                            </p>
+                          )}
+
+                          {/* Специализации */}
+                          {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-border-light px-4 pb-4">
+                              {(master as any).profile_specializations.slice(0, 2).map((item: any) => (
+                                <span
+                                  key={item.specialization?.id || item.specialization_id}
+                                  className="px-2 py-0.5 bg-brand-accent/10 text-brand-accent text-[10px] font-medium rounded-md border border-brand-accent/20"
+                                >
+                                  {item.specialization?.name}
+                                </span>
+                              ))}
+                              {(master as any).profile_specializations.length > 2 && (
+                                <span className="px-2 py-0.5 text-text-muted text-[10px] font-medium">
+                                  +{(master as any).profile_specializations.length - 2}
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>
+                      )
 
-                        {/* Описание */}
-                        {master.description && (
-                          <p className="text-xs text-text-secondary mb-3 line-clamp-2 leading-relaxed flex-1 px-4">
-                            {master.description}
-                          </p>
-                        )}
-
-                        {/* Специализации */}
-                        {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-border-light px-4 pb-4">
-                            {(master as any).profile_specializations.slice(0, 2).map((item: any) => (
-                              <span
-                                key={item.specialization?.id || item.specialization_id}
-                                className="px-2 py-0.5 bg-brand-accent/10 text-brand-accent text-[10px] font-medium rounded-md border border-brand-accent/20"
-                              >
-                                {item.specialization?.name}
-                              </span>
-                            ))}
-                            {(master as any).profile_specializations.length > 2 && (
-                              <span className="px-2 py-0.5 text-text-muted text-[10px] font-medium">
-                                +{(master as any).profile_specializations.length - 2}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </Link>
-                    ))}
+                      return user ? (
+                        <Link key={master.id} href={`/profile/${master.id}`}>
+                          {MasterCard}
+                        </Link>
+                      ) : (
+                        <div key={master.id} onClick={() => setShowAuthModal(true)} className="cursor-pointer">
+                          {MasterCard}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               ) : (
@@ -488,12 +490,9 @@ function SearchContent() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {masters.map((master) => (
-                      <Link
-                        key={master.id}
-                        href={`/profile/${master.id}`}
-                        className="card hover:shadow-card-hover transition-all"
-                      >
+                    {masters.map((master) => {
+                      const MasterCardContent = (
+                        <div className="card hover:shadow-card-hover transition-all">
                         <div className="flex items-start gap-4">
                           {/* Аватар */}
                           <div className="w-20 h-20 bg-graphite-primary border-2 border-border-light flex items-center justify-center text-white text-xl font-semibold rounded-full flex-shrink-0">
@@ -555,8 +554,19 @@ function SearchContent() {
                             )}
                           </div>
                         </div>
-                      </Link>
-                    ))}
+                        </div>
+                      )
+
+                      return user ? (
+                        <Link key={master.id} href={`/profile/${master.id}`}>
+                          {MasterCardContent}
+                        </Link>
+                      ) : (
+                        <div key={master.id} onClick={() => setShowAuthModal(true)} className="cursor-pointer">
+                          {MasterCardContent}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -564,6 +574,13 @@ function SearchContent() {
           )}
         </div>
       </div>
+
+      {/* Auth Required Modal */}
+      <AuthRequiredModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        type="master"
+      />
     </div>
   )
 }

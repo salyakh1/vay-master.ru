@@ -9,6 +9,7 @@ import Navbar from '@/components/Navbar'
 import PortfolioGrid from '@/components/PortfolioGrid'
 import PortfolioGallery from '@/components/PortfolioGallery'
 import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock, FiArrowLeft, FiLogOut, FiUser, FiShield } from 'react-icons/fi'
+import AuthRequiredModal from '@/components/AuthRequiredModal'
 
 export default function ProfilePage() {
   const params = useParams()
@@ -40,6 +41,7 @@ export default function ProfilePage() {
   const [deletePassword, setDeletePassword] = useState('')
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [showAuthModal, setShowAuthModal] = useState(false)
   
   // Settings form state - common
   const [fullName, setFullName] = useState('')
@@ -622,7 +624,31 @@ export default function ProfilePage() {
     )
   }
 
-  if (!profile || !currentUser) return null
+  // Для неавторизованных показываем модальное окно
+  useEffect(() => {
+    if (!authLoading && !currentUser && profile) {
+      setShowAuthModal(true)
+    }
+  }, [authLoading, currentUser, profile])
+
+  if (!profile) {
+    if (!authLoading && !currentUser) {
+      return (
+        <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+          <AuthRequiredModal 
+            isOpen={true} 
+            onClose={() => router.push('/')} 
+            type="master"
+          />
+        </div>
+      )
+    }
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Загрузка...</div>
+      </div>
+    )
+  }
 
   const roleLabels = {
     master: 'Мастер',
@@ -654,7 +680,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-bg-primary pb-20">
-      <Navbar />
+      {currentUser && <Navbar />}
       <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
         <div className="w-full max-w-full sm:max-w-2xl md:max-w-4xl mx-auto">
           {/* Back to Responses Button */}
@@ -1373,8 +1399,8 @@ export default function ProfilePage() {
                   </button>
                 </div>
               </form>
-                </div>
-              )}
+            </div>
+          )}
 
               {/* Specializations and Services Tab (only for masters) */}
               {settingsTab === 'specializations' && profile.role === 'master' && (
@@ -1393,8 +1419,8 @@ export default function ProfilePage() {
                           <span>{spec.name}</span>
                         </label>
                       ))}
-                    </div>
-                  </div>
+      </div>
+          </div>
 
                   <div className="w-full">
                     <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Услуги</h2>
@@ -1416,12 +1442,12 @@ export default function ProfilePage() {
                             <span>{svc.name}</span>
                           </label>
                         ))
-                      )}
-                    </div>
+                    )}
+                  </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border-color w-full">
-                    <button
+                            <button
                       type="button"
                       onClick={async () => {
                         if (!currentUser) return
@@ -1432,8 +1458,8 @@ export default function ProfilePage() {
                       className="btn btn-primary w-full sm:w-auto"
                     >
                       Сохранить
-                    </button>
-                    <button
+                            </button>
+                          <button
                       type="button"
                       onClick={() => {
                         setSelectedSpecializationIds(profileSpecializations.map((s) => s.id))
@@ -1442,10 +1468,10 @@ export default function ProfilePage() {
                       className="btn btn-secondary w-full sm:w-auto"
                     >
                       Отмена
-                    </button>
-                  </div>
-                </div>
-              )}
+                          </button>
+                    </div>
+                        </div>
+                      )}
 
               {/* Security Tab */}
               {settingsTab === 'security' && (
@@ -1469,7 +1495,7 @@ export default function ProfilePage() {
                         disabled={changingPassword}
                         required
                       />
-                    </div>
+                        </div>
                     
                     <div className="w-full">
                       <label className="block text-sm font-medium mb-2 text-graphite-secondary">
@@ -1485,7 +1511,7 @@ export default function ProfilePage() {
                         required
                         minLength={6}
                       />
-                    </div>
+                      </div>
 
                     <div className="w-full">
                       <label className="block text-sm font-medium mb-2 text-graphite-secondary">
@@ -1501,7 +1527,7 @@ export default function ProfilePage() {
                         required
                         minLength={6}
                       />
-                    </div>
+                </div>
 
                     {passwordError && (
                       <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -1512,8 +1538,8 @@ export default function ProfilePage() {
                     {passwordSuccess && (
                       <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
                         {passwordSuccess}
-                      </div>
-                    )}
+                        </div>
+                      )}
 
                     <button
                       type="submit"
@@ -1524,8 +1550,8 @@ export default function ProfilePage() {
                       <span>{changingPassword ? 'Изменение...' : 'Изменить пароль'}</span>
                     </button>
                   </form>
-                </div>
-              )}
+                      </div>
+                    )}
 
               {/* Account Tab */}
               {settingsTab === 'account' && (
@@ -1549,7 +1575,7 @@ export default function ProfilePage() {
                       <FiLogOut size={16} />
                       <span>Выйти из аккаунта</span>
                     </button>
-                  </div>
+                        </div>
 
                   {/* Delete Account Section */}
                   <div className="w-full">
@@ -1567,13 +1593,13 @@ export default function ProfilePage() {
                     >
                       Удалить аккаунт
                     </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
         </div>
-      </div>
+              </div>
 
       {/* Avatar Modal */}
       {showAvatarModal && (
@@ -1622,10 +1648,10 @@ export default function ProfilePage() {
                           >
                 Отмена
                           </button>
-                    </div>
-                        </div>
-                        </div>
-                      )}
+                            </div>
+                              </div>
+                </div>
+              )}
 
       {/* Cover Photo Modal */}
       {showCoverModal && (
@@ -1674,9 +1700,9 @@ export default function ProfilePage() {
                             >
                 Отмена
               </button>
-                        </div>
-                      </div>
+                    </div>
                   </div>
+                </div>
                 )}
 
       {/* Delete Account Modal */}
@@ -1804,6 +1830,18 @@ export default function ProfilePage() {
               </form>
           </div>
             </div>
+          )}
+
+          {/* Auth Required Modal */}
+          {!currentUser && (
+            <AuthRequiredModal 
+              isOpen={showAuthModal} 
+              onClose={() => {
+                setShowAuthModal(false)
+                router.push('/')
+              }} 
+              type="master"
+            />
           )}
     </div>
   )

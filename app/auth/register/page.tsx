@@ -123,13 +123,8 @@ export default function RegisterPage() {
           // Не прерываем регистрацию, если не удалось отправить приветственное сообщение
         }
 
-        if (role === 'master') {
-          router.push('/onboarding/specializations')
-        } else if (role === 'seller') {
-          router.push('/onboarding/seller')
-        } else {
-          router.push('/feed')
-        }
+        // После регистрации все пользователи перенаправляются на главную страницу
+        router.push('/')
       }
     } catch (error: any) {
       setError(error.message || 'Ошибка при регистрации')

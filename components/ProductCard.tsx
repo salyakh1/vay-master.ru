@@ -1,20 +1,21 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { Product, User } from '@/lib/supabase'
 import { FiShoppingBag } from 'react-icons/fi'
 import Link from 'next/link'
+import AuthRequiredModal from './AuthRequiredModal'
 
 interface ProductCardProps {
   product: Product
-  currentUser: User
+  currentUser: User | null
 }
 
 function ProductCard({ product, currentUser }: ProductCardProps) {
   const seller = product.seller as any
+  const [showAuthModal, setShowAuthModal] = useState(false)
 
-  return (
-    <Link href={`/products/${product.id}`}>
+  const ProductCardContent = (
       <div className="bg-bg-card overflow-hidden transition-all hover:shadow-card-hover group card cursor-pointer h-[400px] flex flex-col !p-0">
         {/* Изображение товара */}
         <div className="w-full h-[200px] bg-bg-secondary relative overflow-hidden rounded-t-md flex-shrink-0">
@@ -78,7 +79,27 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
           </div>
         </div>
       </div>
-    </Link>
+  )
+
+  if (currentUser) {
+    return (
+      <Link href={`/products/${product.id}`}>
+        {ProductCardContent}
+      </Link>
+    )
+  }
+
+  return (
+    <>
+      <div onClick={() => setShowAuthModal(true)} className="cursor-pointer">
+        {ProductCardContent}
+      </div>
+      <AuthRequiredModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        type="product"
+      />
+    </>
   )
 }
 

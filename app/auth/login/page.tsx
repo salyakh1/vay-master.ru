@@ -34,7 +34,8 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        router.push('/feed')
+        // После авторизации все пользователи перенаправляются на главную страницу
+        router.push('/')
       }
     } catch (error: any) {
       setError(error.message || 'Ошибка при входе')
