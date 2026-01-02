@@ -70,7 +70,7 @@ export default function NewPortfolioPage() {
     }
     
     const newFiles = [...videoFiles, ...filesToAdd]
-    const newPreviews = [...videoFiles, ...filesToAdd.map((f) => URL.createObjectURL(f))]
+    const newPreviews = [...videoPreviews, ...filesToAdd.map((f) => URL.createObjectURL(f))]
     
     setVideoFiles(newFiles)
     setVideoPreviews(newPreviews)
