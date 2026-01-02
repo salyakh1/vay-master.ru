@@ -177,6 +177,11 @@ async function sendNotificationToMaster(
     }
   }
 
+  // Проверяем, что chat точно не null
+  if (!chat) {
+    return
+  }
+
   // Отправляем сообщение от клиента мастеру
   const message = `Ваш отклик на заказ принят!\n\nКлиент ${client.full_name || 'Клиент'} выбрал вас в качестве исполнителя.\n\nПерейти к заказу: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://vay-master.ru'}/orders/${orderId}`
 
