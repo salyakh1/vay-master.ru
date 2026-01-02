@@ -25,6 +25,7 @@ const categories = [
 
 const statuses = [
   'Все статусы',
+  'Открыт',
   'Новый',
   'В работе',
   'Выполнен',
@@ -32,6 +33,7 @@ const statuses = [
 ]
 
 const statusMap: Record<string, string> = {
+  'Открыт': 'open',
   'Новый': 'new',
   'В работе': 'in_progress',
   'Выполнен': 'completed',
@@ -102,8 +104,8 @@ export default function OrdersPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-28 flex items-center justify-center">
-        <div className="text-lg text-gray-600">Загрузка...</div>
+      <div className="min-h-screen bg-bg-primary pb-28 flex items-center justify-center">
+        <div className="text-lg text-text-secondary">Загрузка...</div>
       </div>
     )
   }
@@ -113,7 +115,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-bg-primary pb-20">
       <Navbar />
       <div className="container mx-auto px-4 py-6">
         <div className="max-w-6xl mx-auto">
@@ -125,8 +127,8 @@ export default function OrdersPage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">Заказы</h1>
-              <p className="text-gray-600">Найдите подходящий заказ или создайте свой</p>
+              <h1 className="text-3xl font-semibold text-graphite-secondary mb-2 tracking-tight">Заказы</h1>
+              <p className="text-text-secondary">Найдите подходящий заказ или создайте свой</p>
             </div>
             <Link
               href="/orders/new"
@@ -139,15 +141,15 @@ export default function OrdersPage() {
 
           {/* Search and Filters */}
           <div className="card mb-6 animate-fade-in">
-            <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <div className="flex flex-col md:flex-row gap-3 mb-4">
               <div className="relative flex-1">
-                <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-indigo-500" size={20} />
+                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={16} strokeWidth={2} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Какой заказ ищете?"
-                  className="input pl-12"
+                  className="input pl-10 h-10 text-sm"
                 />
               </div>
               <input
@@ -155,7 +157,7 @@ export default function OrdersPage() {
                 value={selectedCity}
                 onChange={(e) => setSelectedCity(e.target.value)}
                 placeholder="Город"
-                className="input md:w-48"
+                className="input md:w-48 h-10 text-sm"
               />
             </div>
 
@@ -163,7 +165,7 @@ export default function OrdersPage() {
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="input md:w-48"
+                className="input md:w-48 h-10 text-sm"
               >
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>
@@ -174,7 +176,7 @@ export default function OrdersPage() {
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="input md:w-48"
+                className="input md:w-48 h-10 text-sm"
               >
                 {statuses.map((status) => (
                   <option key={status} value={status}>
@@ -186,7 +188,7 @@ export default function OrdersPage() {
           </div>
 
           {/* View Mode Tabs */}
-          <div className="flex gap-2 mb-6 bg-white/50 backdrop-blur-lg rounded-2xl p-2 border border-gray-200/50 w-fit">
+          <div className="flex gap-2 mb-6 bg-bg-card rounded-md p-2 border border-border-light w-fit">
             <button
               onClick={() => setViewMode('list')}
               className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 ${
@@ -216,8 +218,7 @@ export default function OrdersPage() {
             <div className="space-y-4">
               {orders.length === 0 ? (
                 <div className="card text-center py-12">
-                  <div className="text-4xl mb-4">📋</div>
-                  <p className="text-base font-medium text-black mb-2">
+                  <p className="text-base font-medium text-graphite-secondary mb-2">
                     Заказы не найдены
                   </p>
                   <p className="text-sm text-gray-500 mb-6">

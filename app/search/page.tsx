@@ -7,7 +7,7 @@ import { supabase, User, Specialization, Service } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
-import { FiSearch, FiUser, FiFilter } from 'react-icons/fi'
+import { FiSearch, FiUser, FiFilter, FiMapPin, FiBriefcase, FiStar, FiCheckCircle } from 'react-icons/fi'
 
 function SearchContent() {
   const router = useRouter()
@@ -148,8 +148,73 @@ function SearchContent() {
 
   const searchMasters = async () => {
     try {
+      let profileIds: string[] | null = null
+
+      // Если есть текст запроса, ищем по специализациям и услугам
+      if (query.trim()) {
+        const searchQuery = query.trim()
+        
+        // Ищем специализации по частичному совпадению
+        const { data: specData } = await supabase
+          .from('specializations')
+          .select('id')
+          .ilike('name', `%${searchQuery}%`)
+        
+        // Ищем услуги по частичному совпадению
+        const { data: serviceData } = await supabase
+          .from('services')
+          .select('id')
+          .ilike('name', `%${searchQuery}%`)
+
+        const specIds = (specData || []).map(s => s.id)
+        const serviceIds = (serviceData || []).map(s => s.id)
+
+        // Получаем profile_id из найденных специализаций
+        let profileIdsFromSpecs: string[] = []
+        if (specIds.length > 0) {
+          const { data: profileSpecsData } = await supabase
+            .from('profile_specializations')
+            .select('profile_id')
+            .in('specialization_id', specIds)
+          profileIdsFromSpecs = (profileSpecsData || []).map(p => p.profile_id as string)
+        }
+
+        // Получаем profile_id из найденных услуг
+        let profileIdsFromServices: string[] = []
+        if (serviceIds.length > 0) {
+          const { data: profileServicesData } = await supabase
+            .from('profile_services')
+            .select('profile_id')
+            .in('service_id', serviceIds)
+          profileIdsFromServices = (profileServicesData || []).map(p => p.profile_id as string)
+        }
+
+        // Объединяем все найденные profile_id
+        const allProfileIds = Array.from(new Set([...profileIdsFromSpecs, ...profileIdsFromServices]))
+        
+        if (allProfileIds.length > 0) {
+          profileIds = allProfileIds
+        } else {
+          // Если не нашли по специализациям/услугам, ищем по имени и описанию
+          profileIds = null // Будем искать по имени и описанию ниже
+        }
+      }
+
+      // Если выбрана специализация или услуга, получаем profile_id
       const filteredIds = await fetchProfileIdsByFilters()
-      if (filteredIds && filteredIds.length === 0) {
+      
+      // Объединяем результаты поиска и фильтров
+      let finalProfileIds: string[] | null = null
+      if (profileIds && filteredIds) {
+        // Пересечение: мастера должны соответствовать и поиску, и фильтрам
+        finalProfileIds = profileIds.filter(id => filteredIds.includes(id))
+      } else if (profileIds) {
+        finalProfileIds = profileIds
+      } else if (filteredIds) {
+        finalProfileIds = filteredIds
+      }
+
+      if (finalProfileIds && finalProfileIds.length === 0) {
         setMasters([])
         return
       }
@@ -167,18 +232,24 @@ function SearchContent() {
             service:services (id, name, slug, specialization_id)
           )
         `)
-        .or(`full_name.ilike.%${query}%,description.ilike.%${query}%`)
         .eq('role', 'master')
 
-      if (cityForQuery) {
-        queryBuilder = queryBuilder.ilike('city', `%${cityForQuery}%`)
+      // Если есть текст запроса и не нашли по специализациям/услугам, ищем по имени и описанию
+      if (query.trim() && !profileIds) {
+        queryBuilder = queryBuilder.or(`full_name.ilike.%${query.trim()}%,description.ilike.%${query.trim()}%`)
       }
 
-      if (filteredIds) {
-        queryBuilder = queryBuilder.in('id', filteredIds)
+      // Фильтр по городу: если город указан, фильтруем, если нет - показываем всех
+      if (cityForQuery && cityForQuery.trim()) {
+        queryBuilder = queryBuilder.ilike('city', `%${cityForQuery.trim()}%`)
       }
 
-      const { data, error } = await queryBuilder.limit(20)
+      // Применяем фильтр по profile_id (из поиска или фильтров)
+      if (finalProfileIds) {
+        queryBuilder = queryBuilder.in('id', finalProfileIds)
+      }
+
+      const { data, error } = await queryBuilder.limit(50)
 
       if (error) throw error
       setMasters((data as any[]) || [])
@@ -260,26 +331,26 @@ function SearchContent() {
           <h1 className="text-2xl font-semibold mb-6 text-text-primary">Мастера</h1>
 
           {/* Search Form */}
-          <form onSubmit={handleSearch} className="card mb-6">
+          <form onSubmit={handleSearch} className="mb-6">
             <div className="flex gap-2">
               <div className="flex-1 relative">
-                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
+                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={16} />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Поиск мастеров..."
-                  className="input pl-12 pr-12"
+                  className="input pl-10 pr-10 h-10 text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => setShowFilters(!showFilters)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
                 >
-                  <FiFilter size={20} />
+                  <FiFilter size={16} />
                 </button>
               </div>
-              <button type="submit" className="btn btn-primary">
+              <button type="submit" className="btn btn-primary h-10 px-4 text-sm">
                 Найти
               </button>
             </div>
@@ -341,35 +412,57 @@ function SearchContent() {
                       <Link
                         key={master.id}
                         href={`/profile/${master.id}`}
-                        className="card hover:shadow-card-hover transition"
+                        className="card hover:shadow-card-hover transition-all h-[400px] flex flex-col !p-0 overflow-hidden"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-text-primary border border-border-color flex items-center justify-center text-white text-base font-semibold rounded-full">
-                            {master.avatar_url ? (
-                              <img
-                                src={master.avatar_url}
-                                alt={master.full_name}
-                                className="w-full h-full object-cover rounded-full"
-                              />
-                            ) : (
-                              master.full_name[0]?.toUpperCase() || '?'
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-semibold text-base text-text-primary">
-                              {master.full_name}{' '}
-                              <span className="text-base">
-                                {roleEmoji[master.role as keyof typeof roleEmoji]}
-                              </span>
-                            </div>
-                            {master.city && (
-                              <div className="text-sm text-text-secondary">{master.city}</div>
-                            )}
-                          </div>
+                        {/* Квадратный аватар на всю ширину */}
+                        <div className="w-full h-[200px] bg-graphite-primary flex items-center justify-center text-white text-2xl font-semibold rounded-t-md flex-shrink-0 overflow-hidden">
+                          {master.avatar_url ? (
+                            <img
+                              src={master.avatar_url}
+                              alt={master.full_name}
+                              className="w-full h-[200px] object-cover"
+                            />
+                          ) : (
+                            master.full_name[0]?.toUpperCase() || '?'
+                          )}
                         </div>
+
+                        {/* Основная информация */}
+                        <div className="flex flex-col items-center text-center p-4">
+                          <h3 className="font-semibold text-base text-graphite-secondary mb-1 line-clamp-2 leading-tight">
+                            {master.full_name}
+                          </h3>
+                          {master.city && (
+                            <div className="flex items-center gap-1 text-xs text-text-secondary mb-2">
+                              <FiMapPin size={12} strokeWidth={2} />
+                              <span>{master.city}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Описание */}
                         {master.description && (
-                          <div className="text-sm text-text-secondary mt-2 line-clamp-2">
+                          <p className="text-xs text-text-secondary mb-3 line-clamp-2 leading-relaxed flex-1 px-4">
                             {master.description}
+                          </p>
+                        )}
+
+                        {/* Специализации */}
+                        {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-border-light px-4 pb-4">
+                            {(master as any).profile_specializations.slice(0, 2).map((item: any) => (
+                              <span
+                                key={item.specialization?.id || item.specialization_id}
+                                className="px-2 py-0.5 bg-brand-accent/10 text-brand-accent text-[10px] font-medium rounded-md border border-brand-accent/20"
+                              >
+                                {item.specialization?.name}
+                              </span>
+                            ))}
+                            {(master as any).profile_specializations.length > 2 && (
+                              <span className="px-2 py-0.5 text-text-muted text-[10px] font-medium">
+                                +{(master as any).profile_specializations.length - 2}
+                              </span>
+                            )}
                           </div>
                         )}
                       </Link>
@@ -399,10 +492,11 @@ function SearchContent() {
                       <Link
                         key={master.id}
                         href={`/profile/${master.id}`}
-                        className="card hover:shadow-card-hover transition"
+                        className="card hover:shadow-card-hover transition-all"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-text-primary border border-border-color flex items-center justify-center text-white text-lg font-semibold rounded-full">
+                        <div className="flex items-start gap-4">
+                          {/* Аватар */}
+                          <div className="w-20 h-20 bg-graphite-primary border-2 border-border-light flex items-center justify-center text-white text-xl font-semibold rounded-full flex-shrink-0">
                             {master.avatar_url ? (
                               <img
                                 src={master.avatar_url}
@@ -413,29 +507,47 @@ function SearchContent() {
                               master.full_name[0]?.toUpperCase() || '?'
                             )}
                           </div>
-                          <div className="flex-1">
-                            <div className="font-semibold text-lg text-text-primary">
-                              {master.full_name}{' '}
-                              <span className="text-lg">
-                                {roleEmoji[master.role as keyof typeof roleEmoji]}
-                              </span>
-                            </div>
-                            <div className="text-sm text-text-secondary">
-                              {roleLabels[master.role as keyof typeof roleLabels]}
-                              {master.city && ` • ${master.city}`}
-                            </div>
-                            {master.description && (
-                              <div className="text-sm text-text-secondary mt-1 line-clamp-2">
-                                {master.description}
+
+                          {/* Основная информация */}
+                          <div className="flex-1 min-w-0">
+                            {/* Имя и роль */}
+                            <div className="mb-2">
+                              <h3 className="font-semibold text-lg text-graphite-secondary mb-1 leading-tight">
+                                {master.full_name}
+                              </h3>
+                              <div className="flex items-center gap-2 text-sm text-text-secondary">
+                                <div className="flex items-center gap-1">
+                                  <FiBriefcase size={14} strokeWidth={2} />
+                                  <span>{roleLabels[master.role as keyof typeof roleLabels]}</span>
+                                </div>
+                                {master.city && (
+                                  <>
+                                    <span>•</span>
+                                    <div className="flex items-center gap-1">
+                                      <FiMapPin size={14} strokeWidth={2} />
+                                      <span>{master.city}</span>
+                                    </div>
+                                  </>
+                                )}
                               </div>
+                            </div>
+
+                            {/* Описание */}
+                            {master.description && (
+                              <p className="text-sm text-text-secondary mb-3 line-clamp-2 leading-relaxed">
+                                {master.description}
+                              </p>
                             )}
+
+                            {/* Специализации */}
                             {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-2">
+                              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border-light">
                                 {(master as any).profile_specializations.map((item: any) => (
                                   <span
                                     key={item.specialization?.id || item.specialization_id}
-                                    className="px-2 py-1 bg-bg-secondary border border-border-color text-xs text-text-primary rounded-lg"
+                                    className="px-3 py-1 bg-brand-accent/10 text-brand-accent text-xs font-medium rounded-md border border-brand-accent/20 flex items-center gap-1"
                                   >
+                                    <FiCheckCircle size={12} strokeWidth={2.5} />
                                     {item.specialization?.name}
                                   </span>
                                 ))}

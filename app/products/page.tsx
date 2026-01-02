@@ -121,7 +121,7 @@ export default function ProductsPage() {
         </div>
 
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold text-text-primary">Каталог товаров</h1>
+          <h1 className="text-2xl font-semibold text-graphite-secondary tracking-tight">Каталог товаров</h1>
           {user && (
             <Link 
               href="/products/new" 
@@ -139,16 +139,16 @@ export default function ProductsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Поиск товаров..."
-            className="w-full input pr-12"
+            className="w-full input pr-10 h-10 text-sm"
           />
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors ${
-              showFilters ? 'bg-brand-accent text-white' : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
+            className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors ${
+              showFilters ? 'bg-brand-accent text-white' : 'text-text-secondary hover:text-graphite-secondary hover:bg-bg-secondary'
             }`}
             title="Фильтры"
           >
-            <FiFilter size={18} />
+            <FiFilter size={16} />
           </button>
         </div>
 

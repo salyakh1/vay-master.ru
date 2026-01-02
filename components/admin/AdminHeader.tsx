@@ -15,22 +15,22 @@ export default function AdminHeader() {
   }
 
   return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-border-color px-6 py-4">
+    <header className="bg-bg-card border-b border-border-light px-6 py-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">VayMaster Admin</h1>
+          <h1 className="text-xl font-semibold text-graphite-secondary tracking-tight">VAY-MASTER Admin</h1>
         </div>
         <div className="flex items-center gap-4">
           {user && (
-            <div className="text-sm text-text-secondary">
+            <div className="text-sm text-text-secondary font-medium">
               {user.full_name || user.email}
             </div>
           )}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-text-secondary hover:text-graphite-secondary transition-colors font-medium"
           >
-            <FiLogOut size={18} />
+            <FiLogOut size={18} strokeWidth={2} />
             <span>Выйти</span>
           </button>
         </div>

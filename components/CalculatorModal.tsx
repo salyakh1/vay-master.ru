@@ -190,8 +190,7 @@ export default function CalculatorModal({ isOpen, onClose, onSendResult }: Calcu
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border-color">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🔢</span>
-            <h2 className="text-lg font-semibold text-text-primary">Калькулятор</h2>
+            <h2 className="text-lg font-semibold text-graphite-secondary tracking-tight">Калькулятор</h2>
           </div>
           <button
             onClick={onClose}

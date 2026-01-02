@@ -3,16 +3,23 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../providers'
-import { supabase, Chat, Message, User } from '@/lib/supabase'
+import { supabase, Chat, Message, User, OrderResponse, Order } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { format, isToday, differenceInHours, differenceInDays } from 'date-fns'
+import { ru } from 'date-fns/locale'
 import Link from 'next/link'
+import { FiBriefcase, FiMessageSquare, FiCheckCircle, FiXCircle, FiClock } from 'react-icons/fi'
+
+type TabType = 'chats' | 'responses'
 
 export default function ChatsPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState<TabType>('chats')
   const [chats, setChats] = useState<(Chat & { otherUser: User; lastMessage?: Message; unreadCount?: number })[]>([])
+  const [responses, setResponses] = useState<(OrderResponse & { order?: Order; master?: User })[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingResponses, setLoadingResponses] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -22,7 +29,11 @@ export default function ChatsPage() {
 
   useEffect(() => {
     if (user) {
-      fetchChats()
+      if (activeTab === 'chats') {
+        fetchChats()
+      } else {
+        fetchResponses()
+      }
 
       // Подписываемся на изменения сообщений для обновления счетчиков
       const channel = supabase
@@ -65,16 +76,24 @@ export default function ChatsPage() {
       // Также обновляем при возврате на страницу (когда пользователь выходит из чата)
       const handleVisibilityChange = () => {
         if (!document.hidden) {
-          console.log('Page visible, refreshing chats list...')
-          fetchChats()
+          console.log('Page visible, refreshing...')
+          if (activeTab === 'chats') {
+            fetchChats()
+          } else {
+            fetchResponses()
+          }
         }
       }
       document.addEventListener('visibilitychange', handleVisibilityChange)
       
       // Обновляем при фокусе на окне
       const handleFocus = () => {
-        console.log('Window focused, refreshing chats list...')
-        fetchChats()
+        console.log('Window focused, refreshing...')
+        if (activeTab === 'chats') {
+          fetchChats()
+        } else {
+          fetchResponses()
+        }
       }
       window.addEventListener('focus', handleFocus)
       
@@ -86,7 +105,7 @@ export default function ChatsPage() {
       }
 
     }
-  }, [user])
+  }, [user, activeTab])
 
   const fetchChats = async () => {
     if (!user) return
@@ -204,6 +223,43 @@ export default function ChatsPage() {
     return format(messageDate, 'dd.MM.yyyy')
   }
 
+  const fetchResponses = async () => {
+    if (!user) return
+
+    setLoadingResponses(true)
+    try {
+      // Для всех ролей - получаем отклики на заказы пользователя
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('client_id', user.id)
+
+      if (!orders || orders.length === 0) {
+        setResponses([])
+        return
+      }
+
+      const orderIds = orders.map(o => o.id)
+
+      const { data, error } = await supabase
+        .from('order_responses')
+        .select(`
+          *,
+          order:orders!inner(id, title, status),
+          master:profiles!master_id(id, full_name, avatar_url, city)
+        `)
+        .in('order_id', orderIds)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setResponses((data || []) as any)
+    } catch (error) {
+      console.error('Error fetching responses:', error)
+    } finally {
+      setLoadingResponses(false)
+    }
+  }
+
   const startChat = async (otherUserId: string) => {
     if (!user) return
 
@@ -238,6 +294,32 @@ export default function ChatsPage() {
     }
   }
 
+  const getResponseStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Ожидает решения'
+      case 'accepted':
+        return 'Принят'
+      case 'rejected':
+        return 'Отклонен'
+      default:
+        return status
+    }
+  }
+
+  const getResponseStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-700 border-yellow-300'
+      case 'accepted':
+        return 'bg-green-100 text-green-700 border-green-300'
+      case 'rejected':
+        return 'bg-gray-100 text-gray-700 border-gray-300'
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-300'
+    }
+  }
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -249,64 +331,180 @@ export default function ChatsPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-bg-primary pb-20">
       <Navbar />
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6">Сообщения</h1>
+          <h1 className="text-3xl font-semibold mb-6 text-graphite-secondary tracking-tight">
+            {activeTab === 'chats' ? 'Сообщения' : 'Отклики'}
+          </h1>
 
-          {chats.length === 0 ? (
-            <div className="card text-center text-gray-500">
-              У вас пока нет сообщений
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {chats.map((chat) => (
-                <Link
-                  key={chat.id}
-                  href={`/chats/${chat.id}`}
-                  className="card hover:bg-gray-50 transition cursor-pointer"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 relative">
-                      {chat.otherUser.avatar_url ? (
-                        <img
-                          src={chat.otherUser.avatar_url}
-                          alt={chat.otherUser.full_name}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gray-200 flex items-center justify-center rounded-full text-gray-600 text-sm font-bold">
-                          {chat.otherUser.full_name[0]?.toUpperCase() || '?'}
+          {/* Tabs */}
+          <div className="flex gap-2 mb-6 border-b border-border-color">
+            <button
+              onClick={() => setActiveTab('chats')}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === 'chats'
+                  ? 'border-brand-accent text-brand-accent'
+                  : 'border-transparent text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FiMessageSquare size={18} />
+                <span>Чаты</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('responses')}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === 'responses'
+                  ? 'border-brand-accent text-brand-accent'
+                  : 'border-transparent text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FiBriefcase size={18} />
+                <span>Отклики</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Chats Tab */}
+          {activeTab === 'chats' && (
+            <>
+              {loading ? (
+                <div className="card text-center text-text-secondary py-12">
+                  Загрузка...
+                </div>
+              ) : chats.length === 0 ? (
+                <div className="card text-center text-text-secondary py-12">
+                  У вас пока нет сообщений
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {chats.map((chat) => (
+                    <Link
+                      key={chat.id}
+                      href={`/chats/${chat.id}`}
+                      className="card hover:bg-bg-secondary transition cursor-pointer"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 relative">
+                          {chat.otherUser.avatar_url ? (
+                            <img
+                              src={chat.otherUser.avatar_url}
+                              alt={chat.otherUser.full_name}
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-graphite-primary flex items-center justify-center rounded-full text-white text-sm font-semibold">
+                              {chat.otherUser.full_name[0]?.toUpperCase() || '?'}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="font-semibold truncate">{chat.otherUser.full_name}</div>
-                        {(chat.unreadCount ?? 0) > 0 && (
-                          <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
-                            {chat.unreadCount! > 99 ? '99+' : chat.unreadCount}
-                          </span>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className="font-semibold truncate text-graphite-secondary">{chat.otherUser.full_name}</div>
+                            {(chat.unreadCount ?? 0) > 0 && (
+                              <span className="bg-brand-accent text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                                {chat.unreadCount! > 99 ? '99+' : chat.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                          {chat.lastMessage && (
+                            <div className="text-sm text-text-secondary truncate mt-1">
+                              {chat.lastMessage.content}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {chat.lastMessage && (
+                            <div className="text-xs text-text-muted">
+                              {formatMessageTime(new Date(chat.lastMessage.created_at))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      {chat.lastMessage && (
-                        <div className="text-sm text-gray-500 truncate">
-                          {chat.lastMessage.content}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Responses Tab */}
+          {activeTab === 'responses' && (
+            <>
+              {loadingResponses ? (
+                <div className="card text-center text-text-secondary py-12">
+                  Загрузка...
+                </div>
+              ) : responses.length === 0 ? (
+                <div className="card text-center text-text-secondary py-12">
+                  Пока нет откликов на ваши заказы
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {responses.map((response) => {
+                    const order = response.order as any
+                    const master = response.master as any
+
+                    return (
+                      <Link
+                        key={response.id}
+                        href={`/orders/${response.order_id}`}
+                        className="card hover:bg-bg-secondary transition cursor-pointer"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 relative">
+                            {master?.avatar_url ? (
+                              <img
+                                src={master.avatar_url}
+                                alt={master.full_name}
+                                className="w-full h-full rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-graphite-primary flex items-center justify-center rounded-full text-white text-sm font-semibold">
+                                {master?.full_name?.[0]?.toUpperCase() || '?'}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="font-semibold truncate text-graphite-secondary">
+                                {master?.full_name || 'Мастер'}
+                              </div>
+                              <span className={`px-2 py-0.5 text-xs font-medium border rounded ${getResponseStatusColor(response.status)}`}>
+                                {getResponseStatusLabel(response.status)}
+                              </span>
+                            </div>
+                            {order?.title && (
+                              <div className="text-sm text-text-secondary mb-1">
+                                Заказ: {order.title}
+                              </div>
+                            )}
+                            {response.price && (
+                              <div className="text-base font-semibold text-brand-accent mb-1">
+                                {response.price.toLocaleString('ru-RU')} ₽
+                              </div>
+                            )}
+                            <div className="text-sm text-text-secondary truncate mt-1">
+                              {response.message}
+                            </div>
+                            <div className="flex items-center gap-2 mt-2 text-xs text-text-muted">
+                              <FiClock size={12} />
+                              <span>
+                                {format(new Date(response.created_at), 'd MMMM в HH:mm', { locale: ru })}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      {chat.lastMessage && (
-                        <div className="text-xs text-gray-400">
-                          {formatMessageTime(new Date(chat.lastMessage.created_at))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

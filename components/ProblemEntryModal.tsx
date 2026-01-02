@@ -136,7 +136,7 @@ export default function ProblemEntryModal() {
         {/* Close Button */}
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 text-text-secondary hover:text-text-primary transition-colors p-1"
+          className="absolute top-4 right-4 text-text-secondary hover:text-graphite-secondary transition-colors p-1"
           aria-label="Закрыть"
         >
           <FiX size={20} />
@@ -146,7 +146,7 @@ export default function ProblemEntryModal() {
         <div className="p-6">
           {/* Header */}
           <div className="mb-6">
-            <h2 className="text-2xl font-semibold text-text-primary mb-2">
+            <h2 className="text-2xl font-semibold text-graphite-secondary mb-2 tracking-tight">
               {searchType === null ? 'Что вы ищете?' : searchType === 'master' ? 'Ищете мастера?' : 'Ищете инструмент?'}
             </h2>
             <p className="text-base text-text-secondary leading-relaxed">

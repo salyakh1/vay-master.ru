@@ -1,18 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/app/providers'
 import { supabase, User, PortfolioItem, Specialization, Service, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import PortfolioGrid from '@/components/PortfolioGrid'
 import PortfolioGallery from '@/components/PortfolioGallery'
-import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock } from 'react-icons/fi'
+import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock, FiArrowLeft } from 'react-icons/fi'
 
 export default function ProfilePage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user: currentUser, loading: authLoading } = useAuth()
   const [profile, setProfile] = useState<User | null>(null)
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
@@ -648,19 +649,33 @@ export default function ProfilePage() {
     selectedSpecializationIds.includes(svc.specialization_id)
   )
 
+  const returnTo = searchParams.get('returnTo')
+
   return (
     <div className="min-h-screen bg-bg-primary pb-20">
       <Navbar />
       <div className="container mx-auto px-4 py-6">
         <div className="max-w-4xl mx-auto">
+          {/* Back to Responses Button */}
+          {returnTo && (
+            <div className="mb-4">
+              <button
+                onClick={() => router.push(returnTo)}
+                className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors font-medium"
+              >
+                <FiArrowLeft size={18} />
+                <span>Назад к откликам</span>
+              </button>
+            </div>
+          )}
           {/* Tabs */}
           <div className="flex gap-2 mb-6 border-b border-border-color">
             <button
               onClick={() => setActiveTab('profile')}
               className={`px-4 py-2 font-medium text-base transition-colors border-b-2 ${
                 activeTab === 'profile'
-                  ? 'border-brand-accent text-text-primary'
-                  : 'border-transparent text-text-secondary hover:text-text-primary'
+                  ? 'border-brand-accent text-graphite-secondary'
+                  : 'border-transparent text-text-secondary hover:text-graphite-secondary'
               }`}
             >
               Профиль
@@ -694,9 +709,9 @@ export default function ProfilePage() {
                   <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
                 )}
                 
-                {/* Avatar positioned on cover photo */}
+                {/* Avatar positioned on cover photo - Графитовый, строгий */}
                 <div className="absolute bottom-4 left-6">
-                  <div className="w-32 h-32 bg-text-primary border-4 border-white flex items-center justify-center text-white text-4xl font-semibold rounded-full shadow-lg">
+                  <div className="w-32 h-32 bg-graphite-primary border-4 border-bg-card flex items-center justify-center text-white text-4xl font-semibold rounded-full shadow-lg">
                     {profile.avatar_url ? (
                       <img
                         src={profile.avatar_url}
@@ -715,16 +730,11 @@ export default function ProfilePage() {
                 <div className="flex flex-col md:flex-row gap-6">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-3 flex-wrap">
-                      <h1 className="text-2xl font-semibold text-text-primary">{profile.full_name}</h1>
-                      {roleEmoji[displayRole as keyof typeof roleEmoji] && (
-                      <span className="text-xl">
-                          {roleEmoji[displayRole as keyof typeof roleEmoji]}
-                      </span>
-                      )}
-                      <span className={`px-3 py-1 border text-xs font-normal rounded-lg ${
+                      <h1 className="text-2xl font-semibold text-graphite-secondary tracking-tight">{profile.full_name}</h1>
+                      <span className={`px-3 py-1 border text-xs font-medium rounded-md ${
                         adminRole 
-                          ? 'border-red-500 text-red-600 bg-red-50' 
-                          : 'border-border-color text-text-primary bg-bg-secondary'
+                          ? 'border-brand-accent text-brand-accent bg-red-50' 
+                          : 'border-border-light text-graphite-secondary bg-bg-secondary'
                       }`}>
                         {roleLabels[displayRole as keyof typeof roleLabels] || roleLabels.client}
                       </span>
@@ -734,8 +744,8 @@ export default function ProfilePage() {
                             <button
                               onClick={toggleFollow}
                               disabled={followLoading}
-                              className={`ml-2 px-4 py-1.5 text-sm border rounded-lg transition-colors ${
-                                isFollowing ? 'bg-brand-accent text-white border-brand-accent' : 'bg-bg-primary text-text-primary border-border-color hover:border-brand-accent'
+                              className={`ml-2 px-4 py-1.5 text-sm border rounded-md transition-colors font-medium ${
+                                isFollowing ? 'bg-brand-accent text-white border-brand-accent' : 'bg-bg-primary text-graphite-secondary border-border-light hover:border-brand-accent'
                               }`}
                             >
                               {followLoading ? '...' : isFollowing ? 'Отписаться' : 'Подписаться'}
@@ -743,9 +753,9 @@ export default function ProfilePage() {
                           )}
                           <button
                             onClick={handleStartChat}
-                            className="ml-2 px-4 py-1.5 text-sm border border-brand-accent text-brand-accent rounded-lg transition-colors hover:bg-brand-accent hover:text-white flex items-center gap-1.5"
+                            className="ml-2 px-4 py-1.5 text-sm border border-brand-accent text-brand-accent rounded-md transition-colors hover:bg-brand-accent hover:text-white flex items-center gap-1.5 font-medium"
                           >
-                            <FiMessageCircle size={14} />
+                            <FiMessageCircle size={14} strokeWidth={2} />
                             Написать
                           </button>
                         </>
@@ -780,7 +790,7 @@ export default function ProfilePage() {
                   <div className="mt-6 pt-6 border-t border-border-color">
                     {profileSpecializations.length > 0 && (
                       <div className="mb-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
                           <FiBriefcase size={16} />
                           <span>Специализации</span>
                         </div>
@@ -788,7 +798,7 @@ export default function ProfilePage() {
                           {profileSpecializations.map((spec) => (
                             <span
                               key={spec.id}
-                              className="px-3 py-1 bg-bg-secondary border border-border-color text-xs font-normal text-text-primary rounded-lg"
+                              className="px-3 py-1 bg-bg-secondary border border-border-light text-xs font-medium text-graphite-secondary rounded-md"
                             >
                               {spec.name}
                             </span>
@@ -800,7 +810,7 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {profile.services && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
                             <FiBriefcase size={16} />
                             <span>Описание услуг</span>
                           </div>
@@ -809,7 +819,7 @@ export default function ProfilePage() {
                       )}
                       {profile.service_location && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
                             <FiHome size={16} />
                             <span>Место обслуживания</span>
                           </div>
@@ -822,7 +832,7 @@ export default function ProfilePage() {
                       )}
                       {profile.experience_years && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
                             <FiBriefcase size={16} />
                             <span>Опыт работы</span>
                           </div>
@@ -831,7 +841,7 @@ export default function ProfilePage() {
                       )}
                       {profile.work_schedule && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
                             <FiClock size={16} />
                             <span>График работы</span>
                           </div>
@@ -842,7 +852,7 @@ export default function ProfilePage() {
 
                     {profileServices.length > 0 && (
                       <div className="mt-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
                           <FiBriefcase size={16} />
                           <span>Выбранные услуги</span>
                         </div>
@@ -850,7 +860,7 @@ export default function ProfilePage() {
                           {profileServices.map((svc) => (
                             <span
                               key={svc.id}
-                              className="px-3 py-1 bg-bg-secondary border border-border-color text-xs font-normal text-text-primary rounded-lg"
+                              className="px-3 py-1 bg-bg-secondary border border-border-light text-xs font-medium text-graphite-secondary rounded-md"
                             >
                               {svc.name}
                             </span>
@@ -861,7 +871,7 @@ export default function ProfilePage() {
 
                     {profileSpecializations.length === 0 && profile.specialization && (
                       <div className="mt-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
                           <FiBriefcase size={16} />
                           <span>Специализация</span>
                         </div>
@@ -869,7 +879,7 @@ export default function ProfilePage() {
                           {profile.specialization.split(',').map((spec, index) => (
                             <span
                               key={index}
-                              className="px-3 py-1 bg-bg-secondary border border-border-color text-xs font-normal text-text-primary rounded-lg"
+                              className="px-3 py-1 bg-bg-secondary border border-border-light text-xs font-medium text-graphite-secondary rounded-md"
                             >
                               {spec.trim()}
                             </span>
@@ -885,7 +895,7 @@ export default function ProfilePage() {
                   <div className="mt-6 pt-6 border-t border-border-color">
                     {profile.product_categories && (
                       <div className="mb-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-text-primary">
+                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
                           <FiBriefcase size={16} />
                           <span>Категории товаров</span>
                         </div>
@@ -893,7 +903,7 @@ export default function ProfilePage() {
                           {profile.product_categories.split(',').map((category, index) => (
                             <span
                               key={index}
-                              className="px-3 py-1 bg-bg-secondary border border-border-color text-xs font-normal text-text-primary rounded-lg"
+                              className="px-3 py-1 bg-bg-secondary border border-border-light text-xs font-medium text-graphite-secondary rounded-md"
                             >
                               {category.trim()}
                             </span>
@@ -909,7 +919,7 @@ export default function ProfilePage() {
               {profile.role === 'seller' && (
                 <div className="mb-8">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-text-primary">Товары продавца</h2>
+                    <h2 className="text-xl font-semibold text-graphite-secondary tracking-tight">Товары продавца</h2>
                     {isOwnProfile && (
                       <Link
                         href="/products/new"
@@ -941,7 +951,7 @@ export default function ProfilePage() {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-base font-semibold text-text-primary line-clamp-1">
+                              <div className="text-base font-semibold text-graphite-secondary line-clamp-1">
                                 {product.name}
                               </div>
                               <div className="text-xl font-semibold text-brand-accent mt-1">
@@ -963,7 +973,7 @@ export default function ProfilePage() {
               {profile.role === 'master' && (
                 <div className="mb-8">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-text-primary">Портфолио</h2>
+                    <h2 className="text-xl font-semibold text-graphite-secondary tracking-tight">Портфолио</h2>
                     <div className="flex items-center gap-2">
                       {isOwnProfile && (
                         <Link
@@ -997,16 +1007,16 @@ export default function ProfilePage() {
           {/* Settings Tab Content */}
           {activeTab === 'settings' && isOwnProfile && (
             <div className="card">
-              <h1 className="text-xl font-semibold mb-6 text-text-primary">Настройки</h1>
+              <h1 className="text-xl font-semibold mb-6 text-graphite-secondary tracking-tight">Настройки</h1>
 
               {/* Image Upload Section */}
               <div className="mb-8 pb-8 border-b border-border-color">
-                <h2 className="text-lg font-semibold mb-4 text-text-primary">Изображения профиля</h2>
+                <h2 className="text-lg font-semibold mb-4 text-graphite-secondary tracking-tight">Изображения профиля</h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Avatar Upload */}
                 <div>
-                    <label className="block text-sm font-medium mb-2 text-text-primary">
+                    <label className="block text-sm font-medium mb-2 text-graphite-secondary">
                       Аватарка
                   </label>
                     <div className="flex items-center gap-4">
@@ -1037,7 +1047,7 @@ export default function ProfilePage() {
 
                   {/* Cover Photo Upload */}
                       <div>
-                    <label className="block text-sm font-medium mb-2 text-text-primary">
+                    <label className="block text-sm font-medium mb-2 text-graphite-secondary">
                       Фоновая картинка
                         </label>
                     <div className="flex items-center gap-4">
@@ -1072,14 +1082,14 @@ export default function ProfilePage() {
 
               {/* Password Change Section */}
               <div className="mb-8 pb-8 border-b border-border-color">
-                <h2 className="text-lg font-semibold mb-4 text-text-primary">Изменение пароля</h2>
+                <h2 className="text-lg font-semibold mb-4 text-graphite-secondary tracking-tight">Изменение пароля</h2>
                 <p className="text-sm text-text-secondary mb-4">
                   Пароль хранится в зашифрованном виде и не может быть просмотрен. Вы можете изменить его, указав текущий пароль.
                 </p>
 
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2 text-text-primary">
+                    <label className="block text-sm font-medium mb-2 text-graphite-secondary">
                       Текущий пароль *
                         </label>
                         <input
@@ -1094,7 +1104,7 @@ export default function ProfilePage() {
                       </div>
                       
                       <div>
-                    <label className="block text-sm font-medium mb-2 text-text-primary">
+                    <label className="block text-sm font-medium mb-2 text-graphite-secondary">
                       Новый пароль *
                         </label>
                         <input
@@ -1110,7 +1120,7 @@ export default function ProfilePage() {
                       </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-2 text-text-primary">
+                    <label className="block text-sm font-medium mb-2 text-graphite-secondary">
                       Подтвердите новый пароль *
                         </label>
                         <input
@@ -1432,7 +1442,7 @@ export default function ProfilePage() {
                         setProductCategories(profile.product_categories || '')
                       }
                     }}
-                    className="px-4 py-2 text-sm font-medium bg-white text-black border border-gray-300 hover:bg-gray-50 transition-colors"
+                    className="px-4 py-2 text-sm font-medium bg-bg-card text-graphite-secondary border border-border-light hover:bg-bg-secondary transition-colors"
                   >
                     Отмена
                   </button>
@@ -1453,7 +1463,7 @@ export default function ProfilePage() {
             className="bg-bg-primary border border-border-color rounded-lg shadow-card p-6 w-full max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold mb-4 text-text-primary">Аватарка</h3>
+            <h3 className="text-lg font-semibold mb-4 text-graphite-secondary tracking-tight">Аватарка</h3>
             <div className="flex flex-col gap-3">
               <label className="btn btn-primary cursor-pointer inline-flex items-center justify-center gap-2">
                 <FiCamera size={16} />
@@ -1486,7 +1496,7 @@ export default function ProfilePage() {
                           <button
                 type="button"
                 onClick={() => setShowAvatarModal(false)}
-                className="btn bg-bg-secondary hover:bg-bg-primary text-text-primary border border-border-color"
+                className="btn bg-bg-secondary hover:bg-bg-primary text-graphite-secondary border border-border-light"
                           >
                 Отмена
                           </button>
@@ -1505,7 +1515,7 @@ export default function ProfilePage() {
             className="bg-bg-primary border border-border-color rounded-lg shadow-card p-6 w-full max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold mb-4 text-text-primary">Фоновая картинка</h3>
+            <h3 className="text-lg font-semibold mb-4 text-graphite-secondary tracking-tight">Фоновая картинка</h3>
             <div className="flex flex-col gap-3">
               <label className="btn btn-primary cursor-pointer inline-flex items-center justify-center gap-2">
                 <FiCamera size={16} />
@@ -1538,7 +1548,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowCoverModal(false)}
-                className="btn bg-bg-secondary hover:bg-bg-primary text-text-primary border border-border-color"
+                className="btn bg-bg-secondary hover:bg-bg-primary text-graphite-secondary border border-border-light"
                             >
                 Отмена
               </button>
@@ -1664,7 +1674,7 @@ export default function ProfilePage() {
                     setDeleteError('')
                   }}
                   disabled={deletingAccount}
-                  className="btn bg-bg-secondary hover:bg-bg-primary text-text-primary border border-border-color"
+                  className="btn bg-bg-secondary hover:bg-bg-primary text-graphite-secondary border border-border-light"
                   >
                     Отмена
                   </button>

@@ -94,8 +94,7 @@ export default function FeedPage() {
           <div className="space-y-6 mt-4">
             {items.length === 0 ? (
               <div className="card text-center text-text-secondary py-12 animate-fade-in">
-                <div className="text-6xl mb-4">📝</div>
-                <p className="text-lg font-medium">Пока нет работ от ваших подписок.</p>
+                <p className="text-lg font-medium text-graphite-secondary">Пока нет работ от ваших подписок.</p>
               </div>
             ) : (
               items.map((item) => (
@@ -109,12 +108,12 @@ export default function FeedPage() {
                       )}
                     </div>
                     <div>
-                      <div className="font-semibold text-base text-text-primary">{item.master?.full_name || 'Мастер'}</div>
+                      <div className="font-semibold text-base text-graphite-secondary">{item.master?.full_name || 'Мастер'}</div>
                       <div className="text-sm text-text-secondary">{item.master?.city}</div>
                     </div>
                   </div>
                   <div className="mb-2">
-                    <div className="font-semibold text-lg text-text-primary">{item.title}</div>
+                    <div className="font-semibold text-lg text-graphite-secondary tracking-tight">{item.title}</div>
                     {item.description && (
                       <p className="text-base text-text-secondary mt-1 line-clamp-3 leading-relaxed">{item.description}</p>
                     )}

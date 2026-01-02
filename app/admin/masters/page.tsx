@@ -311,7 +311,7 @@ export default function AdminMastersPage() {
                   </div>
                   <div className="flex items-center gap-4 mt-2 text-xs text-text-secondary">
                     <span>📦 Работ: {master.portfolio_count || 0}</span>
-                    <span>💬 Откликов: {master.responses_count || 0}</span>
+                    <span>Откликов: {master.responses_count || 0}</span>
                     {master.accepted_responses_count && master.accepted_responses_count > 0 && (
                       <span className="text-brand-accent">✅ Принято: {master.accepted_responses_count}</span>
                     )}

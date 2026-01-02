@@ -4,13 +4,14 @@ import Link from 'next/link'
 import { Order } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { FiMapPin, FiClock, FiDollarSign, FiUser } from 'react-icons/fi'
+import { FiMapPin, FiClock, FiUser } from 'react-icons/fi'
 
 interface OrderCardProps {
   order: Order
 }
 
 const statusLabels: Record<string, string> = {
+  open: 'Открыт',
   new: 'Новый',
   in_progress: 'В работе',
   completed: 'Выполнен',
@@ -18,6 +19,7 @@ const statusLabels: Record<string, string> = {
 }
 
 const statusColors: Record<string, string> = {
+  open: 'bg-green-100 text-green-700 border-green-300',
   new: 'bg-bg-primary text-text-primary border-border-color',
   in_progress: 'bg-brand-accent text-white border-brand-accent',
   completed: 'bg-bg-primary text-text-secondary border-border-color',
@@ -80,9 +82,8 @@ export default function OrderCard({ order }: OrderCardProps) {
           )}
           {order.budget && (
             <div className="flex items-center gap-1">
-              <FiDollarSign size={16} className="text-text-primary" />
-              <span className="font-semibold text-text-primary">
-                {order.budget.toLocaleString('ru-RU')} ₽
+              <span className="text-xs text-text-secondary">
+                Бюджет: {order.budget.toLocaleString('ru-RU')} ₽
               </span>
             </div>
           )}

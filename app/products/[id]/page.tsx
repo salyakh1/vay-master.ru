@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiMessageCircle, FiShoppingCart, FiChevronLeft, FiChevronRight, FiArrowLeft } from 'react-icons/fi'
+import { FiMessageCircle, FiShoppingCart, FiChevronLeft, FiChevronRight, FiArrowLeft, FiUser } from 'react-icons/fi'
 import Link from 'next/link'
 
 export default function ProductPage() {
@@ -196,7 +196,6 @@ export default function ProductPage() {
                   />
                 ) : (
                   <div className="w-full aspect-square bg-gray-200 flex items-center justify-center text-6xl">
-                    🛒
                   </div>
                 )}
                 
@@ -281,17 +280,26 @@ export default function ProductPage() {
                 </div>
 
                 {!isOwner && (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleContact}
-                      className="flex-1 btn btn-primary flex items-center justify-center gap-2"
-                    >
-                      <FiMessageCircle />
-                      Написать продавцу
-                    </button>
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleContact}
+                        className="flex-1 btn btn-primary flex items-center justify-center gap-2"
+                      >
+                        <FiMessageCircle size={18} strokeWidth={2.5} />
+                        Написать продавцу
+                      </button>
+                      <Link
+                        href={`/profile/${seller.id}`}
+                        className="btn btn-outline flex items-center justify-center gap-2 px-6"
+                      >
+                        <FiUser size={18} strokeWidth={2.5} />
+                        Профиль
+                      </Link>
+                    </div>
                     {user.role !== 'seller' && (
-                      <button className="btn btn-secondary flex items-center justify-center gap-2">
-                        <FiShoppingCart />
+                      <button className="w-full btn btn-secondary flex items-center justify-center gap-2">
+                        <FiShoppingCart size={18} strokeWidth={2.5} />
                         В корзину
                       </button>
                     )}

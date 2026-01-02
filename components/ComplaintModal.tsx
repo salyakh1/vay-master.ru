@@ -76,12 +76,12 @@ export default function ComplaintModal({
         <div className="flex items-center justify-between p-4 border-b border-border-color">
           <div className="flex items-center gap-3">
             <FiAlertCircle size={24} className="text-red-600" />
-            <h2 className="text-xl font-semibold text-text-primary">Пожаловаться</h2>
+            <h2 className="text-xl font-semibold text-graphite-secondary tracking-tight">Пожаловаться</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-text-secondary hover:text-text-primary transition-colors"
+            className="text-text-secondary hover:text-graphite-secondary transition-colors"
           >
             <FiX size={24} />
           </button>

@@ -5,12 +5,15 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase, Order, OrderResponse, User } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiMessageCircle, FiMapPin, FiDollarSign, FiClock, FiUser, FiChevronLeft, FiChevronRight, FiArrowLeft } from 'react-icons/fi'
+import { FiMessageCircle, FiMapPin, FiClock, FiUser, FiChevronLeft, FiChevronRight, FiArrowLeft, FiCheckCircle, FiXCircle, FiBriefcase } from 'react-icons/fi'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import OrderResponseModal from '@/components/OrderResponseModal'
+import AcceptResponseModal from '@/components/AcceptResponseModal'
 
 const statusLabels: Record<string, string> = {
+  open: 'Открыт',
   new: 'Новый',
   in_progress: 'В работе',
   completed: 'Выполнен',
@@ -18,6 +21,7 @@ const statusLabels: Record<string, string> = {
 }
 
 const statusColors: Record<string, string> = {
+  open: 'bg-green-100 text-green-700 border-green-300',
   new: 'bg-blue-100 text-blue-700 border-blue-300',
   in_progress: 'bg-yellow-100 text-yellow-700 border-yellow-300',
   completed: 'bg-green-100 text-green-700 border-green-300',
@@ -35,6 +39,10 @@ export default function OrderPage() {
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const touchStartX = useRef<number>(0)
   const touchEndX = useRef<number>(0)
+  const [showResponseModal, setShowResponseModal] = useState(false)
+  const [showAcceptModal, setShowAcceptModal] = useState(false)
+  const [selectedResponse, setSelectedResponse] = useState<OrderResponse | null>(null)
+  const [userResponse, setUserResponse] = useState<OrderResponse | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -43,11 +51,12 @@ export default function OrderPage() {
   }, [user, authLoading, router])
 
   useEffect(() => {
-    if (params.id) {
+    if (params.id && user) {
       fetchOrder()
       fetchResponses()
+      checkUserResponse()
     }
-  }, [params.id])
+  }, [params.id, user])
 
   // Keyboard navigation for images
   useEffect(() => {
@@ -109,6 +118,102 @@ export default function OrderPage() {
     }
   }
 
+  const checkUserResponse = async () => {
+    if (!user || !params.id || user.role !== 'master') return
+    try {
+      const { data } = await supabase
+        .from('order_responses')
+        .select('*')
+        .eq('order_id', params.id)
+        .eq('master_id', user.id)
+        .maybeSingle()
+      
+      if (data) {
+        setUserResponse(data as OrderResponse)
+      }
+    } catch (error) {
+      console.error('Error checking user response:', error)
+    }
+  }
+
+  const handleRespond = async (price: string, message: string) => {
+    if (!user || !order) return
+
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    if (!token) {
+      throw new Error('Не авторизован')
+    }
+
+    const response = await fetch(`/api/orders/${order.id}/respond`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ price, message })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Ошибка при отправке отклика')
+    }
+
+    // Обновляем список откликов и проверяем свой отклик
+    await fetchResponses()
+    await checkUserResponse()
+  }
+
+  const handleAcceptResponse = async () => {
+    if (!selectedResponse || !user) return
+
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    if (!token) {
+      throw new Error('Не авторизован')
+    }
+
+    const response = await fetch(`/api/orders/responses/${selectedResponse.id}/accept`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Ошибка при принятии отклика')
+    }
+
+    // Обновляем заказ и отклики
+    await fetchOrder()
+    await fetchResponses()
+    setShowAcceptModal(false)
+    setSelectedResponse(null)
+  }
+
+  const handleRejectResponse = async (responseId: string) => {
+    if (!user) return
+
+    // Отклонение отклика (пока просто обновляем статус через Supabase)
+    // В будущем можно добавить отдельный endpoint
+    try {
+      const { error } = await supabase
+        .from('order_responses')
+        .update({ status: 'rejected' })
+        .eq('id', responseId)
+
+      if (error) throw error
+
+      await fetchResponses()
+    } catch (error) {
+      console.error('Error rejecting response:', error)
+      alert('Ошибка при отклонении отклика')
+    }
+  }
+
   const handleContact = async () => {
     if (!user || !order) return
 
@@ -117,6 +222,7 @@ export default function OrderPage() {
 
     try {
       // Check if chat already exists
+      let chatId: string
       const { data: existingChat } = await supabase
         .from('chats')
         .select('id')
@@ -124,7 +230,7 @@ export default function OrderPage() {
         .maybeSingle()
 
       if (existingChat) {
-        router.push(`/chats/${existingChat.id}`)
+        chatId = existingChat.id
       } else {
         // Create new chat
         const { data, error } = await supabase
@@ -137,12 +243,63 @@ export default function OrderPage() {
           .single()
 
         if (error) throw error
-        if (data) {
-          router.push(`/chats/${data.id}`)
-        }
+        if (!data) throw new Error('Failed to create chat')
+        chatId = data.id
       }
+
+      // Формируем карточку заказа
+      const images = order.images || []
+      const firstImage = images.length > 0 ? images[0] : null
+      
+      // Формируем структурированное сообщение с карточкой заказа
+      let orderCardMessage = `📋 **${order.title}**\n\n`
+      orderCardMessage += `${order.description}\n\n`
+      
+      if (order.category) {
+        orderCardMessage += `🏷️ Категория: ${order.category}\n`
+      }
+      
+      if (order.budget) {
+        orderCardMessage += `💰 Бюджет: ${order.budget.toLocaleString('ru-RU')} ₽\n`
+      }
+      
+      if (order.location) {
+        orderCardMessage += `📍 Адрес: ${order.location}`
+        if (order.city) {
+          orderCardMessage += `, ${order.city}`
+        }
+        orderCardMessage += `\n`
+      }
+      
+      orderCardMessage += `\n🔗 Ссылка: ${typeof window !== 'undefined' ? window.location.origin : ''}/orders/${order.id}`
+
+      // Отправляем сообщение с карточкой заказа
+      const messageData: any = {
+        chat_id: chatId,
+        sender_id: user.id,
+        content: orderCardMessage,
+        read: false,
+      }
+
+      // Если есть изображение, добавляем его
+      if (firstImage) {
+        messageData.image_url = firstImage
+      }
+
+      const { error: messageError } = await supabase
+        .from('messages')
+        .insert(messageData)
+
+      if (messageError) {
+        console.error('Error sending message:', messageError)
+        // Все равно переходим в чат, даже если сообщение не отправилось
+      }
+
+      // Переходим в чат
+      router.push(`/chats/${chatId}`)
     } catch (error) {
       console.error('Error starting chat:', error)
+      alert('Ошибка при создании чата. Попробуйте еще раз.')
     }
   }
 
@@ -207,7 +364,6 @@ export default function OrderPage() {
     return (
       <div className="min-h-screen bg-bg-primary pb-20 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-4xl mb-4">📋</div>
           <p className="text-lg font-medium text-text-primary mb-2">Заказ не найден</p>
           <Link href="/orders" className="text-brand-accent hover:underline">
             Вернуться к списку заказов
@@ -346,7 +502,6 @@ export default function OrderPage() {
               )}
               {order.budget && (
                 <div className="flex items-start gap-3">
-                  <FiDollarSign size={20} className="text-text-primary mt-1 flex-shrink-0" />
                   <div>
                     <div className="text-sm font-medium text-text-secondary mb-1">Бюджет</div>
                     <div className="text-2xl font-semibold text-brand-accent">
@@ -357,6 +512,50 @@ export default function OrderPage() {
               )}
             </div>
           </div>
+
+          {/* Response Button for Masters */}
+          {!isOwnOrder && user.role === 'master' && (order.status === 'open' || order.status === 'new') && !order.selected_master_id && (
+            <div className="card mb-6">
+              {userResponse ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FiCheckCircle size={24} className="text-green-600" />
+                    <div>
+                      <div className="font-semibold text-text-primary">Вы откликнулись на этот заказ</div>
+                      <div className="text-sm text-text-secondary">
+                        Статус: {userResponse.status === 'pending' ? 'Ожидает решения' : userResponse.status === 'accepted' ? 'Принят' : 'Отклонен'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-text-primary mb-1">Готовы взяться за этот заказ?</div>
+                    <div className="text-sm text-text-secondary">Откликнитесь с вашей ценой и описанием подхода</div>
+                  </div>
+                  <button
+                    onClick={() => setShowResponseModal(true)}
+                    className="btn btn-primary flex items-center gap-2"
+                  >
+                    <FiBriefcase size={18} />
+                    <span>Откликнуться</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Status Message for Closed Orders */}
+          {!isOwnOrder && user.role === 'master' && order.status !== 'open' && order.status !== 'new' && (
+            <div className="card mb-6 bg-bg-secondary border border-border-color">
+              <div className="text-text-secondary text-center py-4">
+                {order.status === 'in_progress' 
+                  ? 'На данный заказ уже найден исполнитель'
+                  : 'Этот заказ больше не принимает отклики'}
+              </div>
+            </div>
+          )}
 
           {/* Client Info */}
           {client && (
@@ -390,75 +589,155 @@ export default function OrderPage() {
                     </p>
                   )}
                 </div>
-                {!isOwnOrder && (
+                {!isOwnOrder && order.status === 'in_progress' && order.selected_master_id === user.id && (
                   <button
                     onClick={handleContact}
                     className="btn btn-primary flex items-center gap-2 flex-shrink-0"
                   >
                     <FiMessageCircle size={18} />
-                    <span>Написать</span>
+                    <span>Чат</span>
                   </button>
                 )}
               </div>
             </div>
           )}
 
-          {/* Responses Section */}
-          {responses.length > 0 && (
+          {/* Responses Section - Only for Order Owner */}
+          {isOwnOrder && (
             <div className="card">
               <h2 className="text-xl font-semibold text-text-primary mb-4">
                 Отклики мастеров ({responses.length})
+                {order.status === 'open' || order.status === 'new' ? (
+                  <span className="text-sm font-normal text-text-secondary ml-2">
+                    (максимум 30)
+                  </span>
+                ) : null}
               </h2>
-              <div className="space-y-4">
-                {responses.map((response) => {
-                  const master = response.master as any
-                  return (
-                    <div
-                      key={response.id}
-                      className="border border-border-color rounded-lg p-4 bg-bg-secondary"
-                    >
-                      <div className="flex items-start gap-3 mb-3">
-                        {master?.avatar_url ? (
-                          <img
-                            src={master.avatar_url}
-                            alt={master.full_name}
-                            className="w-12 h-12 object-cover border border-border-color rounded-full flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 bg-text-primary flex items-center justify-center text-white text-sm font-semibold border border-border-color rounded-full flex-shrink-0">
-                            {master?.full_name?.[0]?.toUpperCase() || '?'}
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <h4 className="font-semibold text-text-primary">
-                              {master?.full_name || 'Мастер'}
-                            </h4>
-                            {response.price && (
-                              <div className="text-lg font-semibold text-brand-accent">
-                                {response.price.toLocaleString('ru-RU')} ₽
+              {responses.length === 0 ? (
+                <div className="text-center py-8 text-text-secondary">
+                  <FiBriefcase size={48} className="mx-auto mb-4 opacity-50" />
+                  <p>Пока нет откликов на этот заказ</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {responses.map((response) => {
+                    const master = response.master as any
+                    const isAccepted = response.status === 'accepted'
+                    const isRejected = response.status === 'rejected'
+                    const isPending = response.status === 'pending'
+                    
+                    return (
+                      <div
+                        key={response.id}
+                        className={`border rounded-lg p-4 ${
+                          isAccepted 
+                            ? 'bg-green-50 border-green-300' 
+                            : isRejected
+                            ? 'bg-gray-50 border-gray-300 opacity-60'
+                            : 'bg-bg-secondary border-border-color'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3 mb-3">
+                          <Link href={`/profile/${master?.id}?returnTo=/orders/${params.id}`}>
+                            {master?.avatar_url ? (
+                              <img
+                                src={master.avatar_url}
+                                alt={master.full_name}
+                                className="w-12 h-12 object-cover border border-border-color rounded-full flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 bg-text-primary flex items-center justify-center text-white text-sm font-semibold border border-border-color rounded-full flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+                                {master?.full_name?.[0]?.toUpperCase() || '?'}
                               </div>
                             )}
-                          </div>
-                          {master?.city && (
-                            <div className="text-sm text-text-secondary mb-2">{master.city}</div>
-                          )}
-                          <p className="text-sm text-text-primary leading-relaxed">
-                            {response.message}
-                          </p>
-                          <div className="text-xs text-text-secondary mt-2">
-                            {format(new Date(response.created_at), 'd MMMM в HH:mm', { locale: ru })}
+                          </Link>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <Link href={`/profile/${master?.id}?returnTo=/orders/${params.id}`} className="hover:text-brand-accent transition-colors">
+                                <h4 className="font-semibold text-text-primary">
+                                  {master?.full_name || 'Мастер'}
+                                </h4>
+                              </Link>
+                              <div className="flex items-center gap-3">
+                                {response.price && (
+                                  <div className="text-lg font-semibold text-brand-accent">
+                                    {response.price.toLocaleString('ru-RU')} ₽
+                                  </div>
+                                )}
+                                {isAccepted && (
+                                  <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 border border-green-300 rounded">
+                                    Принят
+                                  </span>
+                                )}
+                                {isRejected && (
+                                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded">
+                                    Отклонен
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {master?.city && (
+                              <div className="text-sm text-text-secondary mb-2">{master.city}</div>
+                            )}
+                            <p className="text-sm text-text-primary leading-relaxed mb-2">
+                              {response.message}
+                            </p>
+                            <div className="text-xs text-text-secondary">
+                              {format(new Date(response.created_at), 'd MMMM в HH:mm', { locale: ru })}
+                            </div>
                           </div>
                         </div>
+                        
+                        {/* Action Buttons - Only for pending responses when order is open */}
+                        {isPending && (order.status === 'open' || order.status === 'new') && !order.selected_master_id && (
+                          <div className="flex gap-3 pt-3 border-t border-border-color">
+                            <button
+                              onClick={() => {
+                                setSelectedResponse(response)
+                                setShowAcceptModal(true)
+                              }}
+                              className="flex-1 btn btn-primary flex items-center justify-center gap-2"
+                            >
+                              <FiCheckCircle size={18} />
+                              <span>Принять</span>
+                            </button>
+                            <button
+                              onClick={() => handleRejectResponse(response.id)}
+                              className="flex-1 btn btn-secondary flex items-center justify-center gap-2"
+                            >
+                              <FiXCircle size={18} />
+                              <span>Отклонить</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Modals */}
+      <OrderResponseModal
+        isOpen={showResponseModal}
+        onClose={() => setShowResponseModal(false)}
+        onSubmit={handleRespond}
+        orderTitle={order.title}
+      />
+
+      <AcceptResponseModal
+        isOpen={showAcceptModal}
+        onClose={() => {
+          setShowAcceptModal(false)
+          setSelectedResponse(null)
+        }}
+        onConfirm={handleAcceptResponse}
+        masterName={(selectedResponse?.master as any)?.full_name || 'Мастер'}
+        price={selectedResponse?.price}
+      />
     </div>
   )
 }

@@ -278,19 +278,19 @@ export default function ProblemResultPage() {
               <div className="text-2xl font-bold text-black mb-1">
                 {result.stats.servicesCount}
               </div>
-              <div className="text-xs text-gray-500 uppercase tracking-wide">Услуг найдено</div>
+              <div className="text-xs text-text-muted font-medium">Услуг найдено</div>
             </div>
             <div className="card text-center">
               <div className="text-2xl font-bold text-black mb-1">
                 {result.stats.mastersCount}
               </div>
-              <div className="text-xs text-gray-500 uppercase tracking-wide">Мастеров</div>
+              <div className="text-xs text-text-muted font-medium">Мастеров</div>
             </div>
             <div className="card text-center">
               <div className="text-2xl font-bold text-black mb-1">
                 {result.stats.productsCount}
               </div>
-              <div className="text-xs text-gray-500 uppercase tracking-wide">Товаров</div>
+              <div className="text-xs text-text-muted font-medium">Товаров</div>
             </div>
           </div>
 

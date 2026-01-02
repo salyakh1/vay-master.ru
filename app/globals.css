@@ -3,21 +3,37 @@
 @tailwind utilities;
 
 :root {
-  /* VAY-MASTER Brand Colors */
-  --brand-accent: #C7362F;
-  --brand-accent-hover: #B02E28;
+  /* ============================================
+     VAY-MASTER: КАРДИНАЛЬНЫЙ РЕДИЗАЙН
+     Графитово-чёрный как основной, красный только акцент
+     ============================================ */
   
-  /* Background Colors */
-  --bg-primary: #FFFFFF;
-  --bg-secondary: #F5F6F7;
+  /* КРАСНЫЙ - ТОЛЬКО АКЦЕНТ (CTA, статусы, критические сигналы) */
+  --brand-accent: #C7362F;         /* Основной красный - ТОЛЬКО для акцентов */
+  --brand-accent-hover: #A92C27;   /* Hover красный */
+  --brand-accent-dark: #7F1D1D;    /* Тёмный премиум - для PRO/статусов */
   
-  /* Text Colors */
-  --text-primary: #111111;
-  --text-secondary: #6B7280;
+  /* ГРАФИТОВО-ЧЁРНЫЙ - ОСНОВНОЙ ЦВЕТ СИСТЕМЫ */
+  --graphite-primary: #1C1C1E;     /* Основной графитовый - для важных элементов */
+  --graphite-secondary: #111111;    /* Вторичный графитовый - для текста */
+  --graphite-tertiary: #2C2C2E;     /* Третичный - для кнопок secondary */
   
-  /* Border Colors */
-  --border-color: #E5E7EB;
-  --border-hover: #D1D5DB;
+  /* ФОНОВАЯ СИСТЕМА - НЕЙТРАЛЬНЫЕ ПРОФЕССИОНАЛЬНЫЕ */
+  --bg-primary: #F4F4F4;            /* Основной фон - нейтральный серый */
+  --bg-primary-alt: #F2F2F2;       /* Альтернативный основной */
+  --bg-secondary: #E8E8E8;          /* Вторичный фон */
+  --bg-card: #FFFFFF;               /* Фон карточек - белый */
+  --bg-dark: #1C1C1E;              /* Тёмные секции - графитовый */
+  
+  /* ТЕКСТОВАЯ ПАЛИТРА */
+  --text-primary: #111111;          /* Основной текст - графитовый */
+  --text-secondary: #6B7280;        /* Вторичный текст */
+  --text-muted: #9CA3AF;            /* Подписи / мета */
+  
+  /* ГРАНИЦЫ */
+  --border-color: #D1D5DB;          /* Основная граница */
+  --border-light: #E5E7EB;          /* Светлая граница */
+  --border-hover: #9CA3AF;           /* Hover граница */
 }
 
 * {
@@ -29,14 +45,15 @@
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   padding-bottom: env(safe-area-inset-bottom);
-  line-height: 1.6;
+  line-height: 1.75;                /* Увеличенный для профессиональной читаемости */
   font-weight: 400;
   overflow-x: hidden;
   touch-action: pan-y;
+  letter-spacing: -0.01em;          /* Строгий, инженерный стиль */
 }
 
 /* Smooth scrolling */
@@ -72,36 +89,41 @@ html {
 }
 
 .card {
-  background: var(--bg-primary);
-  border-radius: 10px;
-  padding: 24px;
-  margin-bottom: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.2s ease;
+  background: var(--bg-card);
+  border-radius: 6px;              /* Строгий, минимальное скругление */
+  padding: 32px;                     /* Плотные, тяжёлые карточки */
+  margin-bottom: 24px;
+  border: 1px solid var(--border-light);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
 }
 
 .card:hover {
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06);
+  border-color: var(--border-color);
 }
 
 .btn {
-  padding: 12px 24px;
-  border-radius: 10px;
+  padding: 16px 32px;                /* Крупные, уверенные кнопки */
+  border-radius: 6px;                /* Строгое скругление */
   font-weight: 500;
   font-size: 15px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   line-height: 1.5;
+  letter-spacing: -0.01em;
 }
 
+/* PRIMARY - СТРОГАЯ КРАСНАЯ (только для CTA) */
 .btn-primary {
   background: var(--brand-accent);
   color: white;
+  font-weight: 500;
 }
 
 .btn-primary:hover {
@@ -109,28 +131,32 @@ html {
 }
 
 .btn-primary:active {
-  background: var(--brand-accent);
-  transform: scale(0.98);
+  background: var(--brand-accent-dark);
+  transform: translateY(1px);
 }
 
+/* SECONDARY - ГРАФИТОВАЯ */
 .btn-secondary {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--graphite-tertiary);
+  color: white;
+  font-weight: 500;
 }
 
 .btn-secondary:hover {
-  background: #E5E7EB;
+  background: var(--graphite-primary);
 }
 
+/* OUTLINE - МИНИМАЛИСТИЧНАЯ, ИНЖЕНЕРНАЯ */
 .btn-outline {
   background: transparent;
-  border: 1px solid var(--border-color);
+  border: 1.5px solid var(--border-color);
   color: var(--text-primary);
+  font-weight: 500;
 }
 
 .btn-outline:hover {
   background: var(--bg-secondary);
-  border-color: var(--border-hover);
+  border-color: var(--text-secondary);
 }
 
 .btn:disabled {
@@ -141,49 +167,53 @@ html {
 
 .input {
   width: 100%;
-  padding: 14px 16px;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+  padding: 18px 20px;                /* Крупные, чёткие инпуты */
+  border: 1.5px solid var(--border-color);
+  border-radius: 6px;
   font-size: 15px;
-  background: var(--bg-primary);
+  background: var(--bg-card);
   color: var(--text-primary);
-  transition: all 0.2s ease;
-  line-height: 1.5;
+  transition: all 0.15s ease;
+  line-height: 1.6;
+  font-weight: 400;
+  font-family: inherit;
 }
 
 .input::placeholder {
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .input:focus {
   outline: none;
   border-color: var(--brand-accent);
-  box-shadow: 0 0 0 3px rgba(199, 54, 47, 0.1);
+  box-shadow: 0 0 0 3px rgba(199, 54, 47, 0.08);
+  background: white;
 }
 
 .textarea {
   width: 100%;
-  padding: 14px 16px;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+  padding: 18px 20px;                /* Крупные, чёткие */
+  border: 1.5px solid var(--border-color);
+  border-radius: 6px;
   font-size: 15px;
-  background: var(--bg-primary);
+  background: var(--bg-card);
   color: var(--text-primary);
   resize: vertical;
-  min-height: 120px;
+  min-height: 160px;                 /* Больше места для текста */
   font-family: inherit;
-  transition: all 0.2s ease;
-  line-height: 1.6;
+  transition: all 0.15s ease;
+  line-height: 1.75;                 /* Увеличенный для профессиональной читаемости */
 }
 
 .textarea::placeholder {
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .textarea:focus {
   outline: none;
   border-color: var(--brand-accent);
-  box-shadow: 0 0 0 3px rgba(199, 54, 47, 0.1);
+  box-shadow: 0 0 0 3px rgba(199, 54, 47, 0.08);
+  background: white;
 }
 
 /* Portfolio Gallery Animations - Instagram Style */
@@ -232,18 +262,18 @@ html {
 }
 
 .animate-slide-in-up {
-  animation: slide-in-up 0.4s ease-out forwards;
+  animation: slide-in-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .animate-slide-in-down {
-  animation: slide-in-down 0.4s ease-out forwards;
+  animation: slide-in-down 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .animate-slide-out-up {
-  animation: slide-out-up 0.4s ease-out forwards;
+  animation: slide-out-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .animate-slide-out-down {
-  animation: slide-out-down 0.4s ease-out forwards;
+  animation: slide-out-down 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 

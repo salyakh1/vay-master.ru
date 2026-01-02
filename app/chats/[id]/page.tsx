@@ -339,27 +339,30 @@ export default function ChatPage() {
     if (!confirm('Вы уверены, что хотите удалить этот чат для всех участников? Это действие нельзя отменить.')) return
 
     try {
-      // Удаляем все сообщения
-      const { error: messagesError } = await supabase
-        .from('messages')
-        .delete()
-        .eq('chat_id', params.id)
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) {
+        throw new Error('Не авторизован')
+      }
 
-      if (messagesError) throw messagesError
+      const response = await fetch(`/api/chats/${params.id}/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
 
-      // Удаляем чат
-      const { error: chatError } = await supabase
-        .from('chats')
-        .delete()
-        .eq('id', params.id)
+      const data = await response.json()
 
-      if (chatError) throw chatError
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка при удалении чата')
+      }
 
       alert('Чат удален для всех участников')
       router.push('/chats')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting chat for all:', error)
-      alert('Ошибка при удалении чата')
+      alert(error.message || 'Ошибка при удалении чата')
     }
   }
 
@@ -387,17 +390,17 @@ export default function ChatPage() {
                 onClick={() => setShowChatMenu(!showChatMenu)}
                 className="p-2 hover:bg-bg-secondary rounded-lg transition-colors"
               >
-                <FiMoreVertical size={20} className="text-text-primary" />
+                <FiMoreVertical size={20} className="text-graphite-secondary" strokeWidth={2} />
               </button>
               {showChatMenu && (
-                <div className="absolute left-0 top-full mt-2 bg-white border border-border-color rounded-lg shadow-card min-w-[200px] z-50">
+                <div className="absolute left-0 top-full mt-2 bg-bg-card border border-border-light rounded-md shadow-card min-w-[200px] z-50">
                   <button
                     type="button"
                     onClick={() => {
                       setShowChatMenu(false)
                       handleDeleteChatForMe()
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-lg transition-colors text-left text-text-primary"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-md transition-colors text-left text-graphite-secondary font-medium"
                   >
                     <FiTrash2 size={18} />
                     <span>Удалить чат у меня</span>
@@ -408,7 +411,7 @@ export default function ChatPage() {
                       setShowChatMenu(false)
                       handleDeleteChatForAll()
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-lg transition-colors text-left text-text-primary"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-md transition-colors text-left text-graphite-secondary font-medium"
                   >
                     <FiTrash2 size={18} />
                     <span>Удалить чат у всех</span>
@@ -440,7 +443,7 @@ export default function ChatPage() {
               )}
             </div>
             <div>
-              <div className="font-semibold text-text-primary">{otherUser.full_name}</div>
+              <div className="font-semibold text-graphite-secondary tracking-tight">{otherUser.full_name}</div>
               <div className="text-sm text-text-secondary">{otherUser.city || ''}</div>
             </div>
           </div>
@@ -476,7 +479,7 @@ export default function ChatPage() {
                     />
                   )}
                   {message.content && (
-                  <div className={isOwn ? 'text-white' : 'text-text-primary'}>{message.content}</div>
+                  <div className={isOwn ? 'text-white' : 'text-graphite-secondary'}>{message.content}</div>
                   )}
                   <div
                     className={`text-xs mt-1 ${
@@ -496,7 +499,7 @@ export default function ChatPage() {
         <div className="bg-bg-primary border-t border-border-color px-4 py-3 relative menu-container">
           {/* Menu Modal */}
           {showMenu && (
-            <div className="absolute bottom-full left-4 mb-2 bg-white border border-border-color rounded-lg shadow-card p-2 min-w-[200px] z-50">
+            <div className="absolute bottom-full left-4 mb-2 bg-bg-card border border-border-light rounded-md shadow-card p-2 min-w-[200px] z-50">
               <button
                 type="button"
                 onClick={() => {
@@ -504,8 +507,8 @@ export default function ChatPage() {
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-lg transition-colors text-left"
               >
-                <FiImage size={20} className="text-text-primary" />
-                <span className="text-text-primary">Отправить фото</span>
+                <FiImage size={20} className="text-graphite-secondary" strokeWidth={2} />
+                <span className="text-graphite-secondary font-medium">Отправить фото</span>
               </button>
               <button
                 type="button"
@@ -516,7 +519,7 @@ export default function ChatPage() {
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-lg transition-colors text-left"
               >
                 <span className="text-2xl">🔢</span>
-                <span className="text-text-primary">Калькулятор</span>
+                <span className="text-graphite-secondary font-medium">Калькулятор</span>
               </button>
             </div>
           )}
@@ -525,7 +528,7 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={() => setShowMenu(!showMenu)}
-              className="btn bg-bg-secondary hover:bg-bg-primary text-text-primary border border-border-color flex items-center justify-center"
+              className="btn bg-bg-secondary hover:bg-bg-primary text-graphite-secondary border border-border-light flex items-center justify-center"
               disabled={uploadingImage}
             >
               <FiPlus size={20} />

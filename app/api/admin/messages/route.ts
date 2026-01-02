@@ -89,40 +89,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Нет получателей для отправки' }, { status: 400 })
     }
 
-    // Получаем или создаем системного пользователя
-    let systemUserId = ADMIN_SYSTEM_USER_ID
-
-    if (!systemUserId) {
-      // Если не указан системный пользователь, используем первого активного администратора
-      const { data: firstAdmin } = await supabaseClient
-        .from('admin_roles')
-        .select('user_id')
-        .eq('is_active', true)
-        .limit(1)
-        .single()
-
-      if (!firstAdmin) {
-        return NextResponse.json({ error: 'Не найден активный администратор для отправки сообщений' }, { status: 400 })
-      }
-
-      systemUserId = firstAdmin.user_id
-    }
-
-    // Проверяем, что системный пользователь существует
-    const { data: systemUser } = await supabaseClient
-      .from('profiles')
-      .select('*')
-      .eq('id', systemUserId)
-      .single()
-
-    if (!systemUser) {
-      return NextResponse.json(
-        { error: 'Системный пользователь не найден. Создайте пользователя в auth.users и укажите его ID в ADMIN_SYSTEM_USER_ID' },
-        { status: 400 }
-      )
-    }
-
-    // Используем supabaseAdmin для создания чатов и сообщений (обход RLS)
+    // Используем supabaseAdmin для поиска системного пользователя и создания чатов (обход RLS)
     if (!supabaseServiceRoleKey) {
       return NextResponse.json(
         { error: 'SUPABASE_SERVICE_ROLE_KEY не настроен. Добавьте его в .env.local и перезапустите сервер.' },
@@ -136,6 +103,80 @@ export async function POST(request: NextRequest) {
         persistSession: false,
       },
     })
+
+    // Получаем или создаем системного пользователя
+    let systemUserId = ADMIN_SYSTEM_USER_ID
+    let systemUser = null
+
+    // Сначала проверяем, существует ли пользователь с указанным ADMIN_SYSTEM_USER_ID
+    if (systemUserId) {
+      const { data: checkUser, error: checkError } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('id', systemUserId)
+        .maybeSingle()
+
+      if (checkError) {
+        console.error('Error checking system user:', checkError)
+      }
+
+      if (checkUser) {
+        systemUser = checkUser
+        console.log('Using configured system user:', systemUserId)
+      }
+    }
+
+    // Если системный пользователь не найден, используем первого активного администратора
+    if (!systemUser) {
+      console.log('System user not found, using first active admin instead')
+      
+      const { data: firstAdmin, error: adminError } = await supabaseAdmin
+        .from('admin_roles')
+        .select('user_id')
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (adminError) {
+        console.error('Error finding admin:', adminError)
+        return NextResponse.json({ 
+          error: `Ошибка при поиске администратора: ${adminError.message}` 
+        }, { status: 500 })
+      }
+
+      if (!firstAdmin) {
+        console.error('No active admin found in admin_roles table')
+        return NextResponse.json({ 
+          error: 'Не найден активный администратор для отправки сообщений. Убедитесь, что в системе есть хотя бы один активный администратор в таблице admin_roles.' 
+        }, { status: 400 })
+      }
+
+      // Проверяем, что администратор существует в profiles
+      const { data: adminProfile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('id', firstAdmin.user_id)
+        .single()
+
+      if (profileError) {
+        console.error('Error finding admin profile:', profileError)
+        return NextResponse.json({ 
+          error: `Ошибка при поиске профиля администратора: ${profileError.message}` 
+        }, { status: 500 })
+      }
+
+      if (!adminProfile) {
+        console.error('Admin profile not found for user:', firstAdmin.user_id)
+        return NextResponse.json({ 
+          error: 'Профиль администратора не найден. Убедитесь, что администратор имеет профиль в системе.' 
+        }, { status: 400 })
+      }
+
+      systemUserId = firstAdmin.user_id
+      systemUser = adminProfile
+      console.log('Using first active admin as system user:', systemUserId, adminProfile.full_name || adminProfile.email)
+    }
 
     // Отправляем сообщения
     let sentCount = 0

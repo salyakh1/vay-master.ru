@@ -87,7 +87,11 @@ export default function RegisterPage() {
         }
 
         // Отправляем приветственное сообщение от администрации
+        // Добавляем небольшую задержку, чтобы профиль точно был создан
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
         try {
+          console.log('[register] Sending welcome message for user:', authData.user.id, 'role:', role)
           const welcomeResponse = await fetch('/api/welcome-message', {
             method: 'POST',
             headers: {
@@ -99,12 +103,23 @@ export default function RegisterPage() {
             }),
           })
 
+          const welcomeData = await welcomeResponse.json()
+          
           if (!welcomeResponse.ok) {
-            console.error('Failed to send welcome message:', await welcomeResponse.text())
+            console.error('[register] Failed to send welcome message:', {
+              status: welcomeResponse.status,
+              statusText: welcomeResponse.statusText,
+              data: welcomeData
+            })
             // Не прерываем регистрацию, если не удалось отправить приветственное сообщение
+          } else {
+            console.log('[register] Welcome message sent successfully:', welcomeData)
           }
-        } catch (welcomeError) {
-          console.error('Error sending welcome message:', welcomeError)
+        } catch (welcomeError: any) {
+          console.error('[register] Error sending welcome message:', {
+            error: welcomeError.message,
+            stack: welcomeError.stack
+          })
           // Не прерываем регистрацию, если не удалось отправить приветственное сообщение
         }
 

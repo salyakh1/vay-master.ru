@@ -258,8 +258,8 @@ export default function AdminOrdersPage() {
                   <div className="flex flex-wrap items-center gap-3 text-xs text-text-secondary">
                     <span>📁 {order.category}</span>
                     {order.location && <span>📍 {order.location}</span>}
-                    {order.budget && <span>💰 {order.budget.toLocaleString('ru-RU')} ₽</span>}
-                    <span>💬 {order.responses_count || 0} откликов</span>
+                    {order.budget && <span>{order.budget.toLocaleString('ru-RU')} ₽</span>}
+                    <span>{order.responses_count || 0} откликов</span>
                     {order.days_since_created !== undefined && order.days_since_created > 0 && (
                       <span className={order.days_since_created > 7 ? 'text-red-600' : ''}>
                         {order.days_since_created} дн. назад
