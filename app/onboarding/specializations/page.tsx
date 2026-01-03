@@ -117,8 +117,8 @@ export default function SpecializationsOnboardingPage() {
         if (svcError) throw svcError
       }
 
-      // Редирект на профиль
-      router.push(`/profile/${user.id}`)
+      // Редирект на главную страницу после выбора специализаций
+      router.push('/')
     } catch (error: any) {
       console.error('Error saving specializations:', error)
       setError(error.message || 'Ошибка при сохранении')

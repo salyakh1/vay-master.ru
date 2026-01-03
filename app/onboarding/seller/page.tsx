@@ -85,8 +85,8 @@ export default function SellerOnboardingPage() {
 
       if (updateError) throw updateError
 
-      // Редирект на каталог товаров
-      router.push('/products')
+      // Редирект на главную страницу после выбора категорий
+      router.push('/')
     } catch (error: any) {
       console.error('Error saving categories:', error)
       setError(error.message || 'Ошибка при сохранении')
