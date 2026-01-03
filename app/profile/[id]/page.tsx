@@ -671,7 +671,7 @@ export default function ProfilePage() {
   // Определяем, какую роль показывать: админскую или из профиля
   const displayRole = adminRole || profile.role
 
-  const isOwnProfile = currentUser.id === profile.id
+  const isOwnProfile = currentUser?.id === profile.id
   const filteredServices = services.filter((svc) =>
     selectedSpecializationIds.includes(svc.specialization_id)
   )
