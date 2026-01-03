@@ -45,6 +45,17 @@ export default function RegisterPage() {
       if (authError) throw authError
 
       if (authData.user) {
+        // Если сессия не создана автоматически, ждем немного и проверяем
+        if (!authData.session) {
+          // Ждем, пока сессия установится (может потребоваться время для подтверждения email)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          // Проверяем сессию еще раз
+          const { data: { session } } = await supabase.auth.getSession()
+          if (!session) {
+            console.warn('Session not created after registration, user may need to login')
+          }
+        }
+        
         // Profile will be created automatically by trigger
         // Wait a bit for trigger to execute, then verify profile exists
         await new Promise(resolve => setTimeout(resolve, 500))

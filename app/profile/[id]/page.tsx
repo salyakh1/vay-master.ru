@@ -41,7 +41,6 @@ export default function ProfilePage() {
   const [deletePassword, setDeletePassword] = useState('')
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-  const [showAuthModal, setShowAuthModal] = useState(false)
   
   // Settings form state - common
   const [fullName, setFullName] = useState('')
@@ -73,18 +72,12 @@ export default function ProfilePage() {
   const [productCategories, setProductCategories] = useState('')
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      router.push('/')
-    }
-  }, [currentUser, authLoading, router])
-
-  useEffect(() => {
     if (params.id) {
       // Сначала загружаем профиль, потом остальные данные
       fetchProfile()
       if (currentUser) {
-    checkFollowing()
-    }
+        checkFollowing()
+      }
     }
   }, [params.id, currentUser])
 
@@ -95,13 +88,27 @@ export default function ProfilePage() {
 
   const fetchProfile = async () => {
     try {
+      setLoading(true)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', params.id)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching profile:', error)
+        // Если профиль не найден, устанавливаем profile в null
+        setProfile(null)
+        setLoading(false)
+        return
+      }
+      
+      if (!data) {
+        setProfile(null)
+        setLoading(false)
+        return
+      }
+      
       const userData = data as User
       setProfile(userData)
 
@@ -624,15 +631,9 @@ export default function ProfilePage() {
     )
   }
 
-  // Для неавторизованных показываем модальное окно
-  useEffect(() => {
-    if (!authLoading && !currentUser && profile) {
-      setShowAuthModal(true)
-    }
-  }, [authLoading, currentUser, profile])
-
   if (!profile) {
-    if (!authLoading && !currentUser) {
+    // Если профиль не загружен и пользователь не авторизован, показываем модальное окно
+    if (!authLoading && !currentUser && !loading) {
       return (
         <div className="min-h-screen bg-bg-primary flex items-center justify-center">
           <AuthRequiredModal 
@@ -643,12 +644,16 @@ export default function ProfilePage() {
         </div>
       )
     }
+    // Показываем загрузку, если профиль еще загружается
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg">Загрузка...</div>
       </div>
     )
   }
+  
+  // Если профиль загружен, но пользователь не авторизован (просматривает чужой профиль)
+  // Это нормально, просто не показываем кнопки редактирования
 
   const roleLabels = {
     master: 'Мастер',
@@ -1832,17 +1837,7 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* Auth Required Modal */}
-          {!currentUser && (
-            <AuthRequiredModal 
-              isOpen={showAuthModal} 
-              onClose={() => {
-                setShowAuthModal(false)
-                router.push('/')
-              }} 
-              type="master"
-            />
-          )}
+          {/* Auth Required Modal - показывается в условии if (!profile) выше */}
     </div>
   )
 }
