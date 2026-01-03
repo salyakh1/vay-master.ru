@@ -52,21 +52,10 @@ function SearchContent() {
   }, [query, cityFilter, selectedSpec, selectedService])
 
   useEffect(() => {
-    if (user) {
-      // Сначала загружаем город пользователя, потом мастеров из этого города
-      fetchUserCity()
-    } else {
-      // Для неавторизованных загружаем случайных мастеров
-      fetchRandomProfiles()
-    }
-  }, [user])
-
-  // Загружаем мастеров из города пользователя после того, как город загружен
-  useEffect(() => {
-    if (user && userCity) {
-      fetchRandomProfiles()
-    }
-  }, [user, userCity])
+    // Загружаем всех мастеров при загрузке страницы (для всех пользователей)
+    // Рандомность применяется только к порядку отображения
+    fetchRandomProfiles()
+  }, [])
 
   const performSearch = async () => {
     const hasFilters =
@@ -95,7 +84,8 @@ function SearchContent() {
 
   const fetchRandomProfiles = async () => {
     try {
-      // Если город пользователя не указан, показываем всех мастеров
+      // Показываем всех мастеров без фильтрации по городу
+      // Фильтрация по городу применяется только при явном выборе фильтра
       let query = supabase
         .from('profiles')
         .select(`
@@ -109,12 +99,10 @@ function SearchContent() {
         `)
         .eq('role', 'master')
 
-      // Фильтруем по городу пользователя, если он указан
-      if (userCity && userCity.trim()) {
-        query = query.ilike('city', `%${userCity.trim()}%`)
-      }
+      // Не применяем фильтр по городу пользователя - показываем всех мастеров
+      // Фильтр по городу будет применяться только если пользователь явно выберет его в фильтрах
 
-      const { data, error } = await query.limit(20)
+      const { data, error } = await query
 
       if (error) throw error
       const list = (data as any[]) || []
@@ -218,8 +206,6 @@ function SearchContent() {
         return
       }
 
-      const cityForQuery = cityFilter || userCity
-
       let queryBuilder = supabase
         .from('profiles')
         .select(`
@@ -238,9 +224,9 @@ function SearchContent() {
         queryBuilder = queryBuilder.or(`full_name.ilike.%${query.trim()}%,description.ilike.%${query.trim()}%`)
       }
 
-      // Фильтр по городу: если город указан, фильтруем, если нет - показываем всех
-      if (cityForQuery && cityForQuery.trim()) {
-        queryBuilder = queryBuilder.ilike('city', `%${cityForQuery.trim()}%`)
+      // Фильтр по городу: применяется только если пользователь явно выбрал его в фильтрах
+      if (cityFilter && cityFilter.trim()) {
+        queryBuilder = queryBuilder.ilike('city', `%${cityFilter.trim()}%`)
       }
 
       // Применяем фильтр по profile_id (из поиска или фильтров)
