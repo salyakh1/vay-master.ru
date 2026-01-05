@@ -730,35 +730,43 @@ export default function ProfilePage() {
           {activeTab === 'profile' && (
             <>
               {/* Cover Photo and Avatar */}
-              <div className="relative mb-4 sm:mb-6 rounded-lg overflow-hidden h-[200px] sm:h-[250px]">
+              <div className="relative mb-4 sm:mb-6 rounded-2xl overflow-hidden h-[200px] sm:h-[250px] group/cover shadow-glossy">
                 {profile.cover_photo_url ? (
-                  <img
-                    src={profile.cover_photo_url}
-                    alt="Cover"
-                    className="w-full h-full object-cover"
-                  />
+                  <>
+                    <img
+                      src={profile.cover_photo_url}
+                      alt="Cover"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover/cover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/10 to-transparent opacity-0 group-hover/cover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+                  </>
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
+                  <div className="w-full h-full bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400" />
                 )}
                 
-                {/* Avatar positioned on cover photo - Графитовый, строгий */}
-                <div className="absolute bottom-2 sm:bottom-4 left-3 sm:left-6">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 bg-graphite-primary border-2 sm:border-4 border-bg-card flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-semibold rounded-full shadow-lg">
+                {/* Avatar positioned on cover photo - Глянцевый, премиальный */}
+                <div className="absolute bottom-2 sm:bottom-4 left-3 sm:left-6 group/avatar">
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 bg-gradient-to-br from-graphite-primary to-graphite-tertiary border-2 sm:border-4 border-white/50 flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-semibold rounded-full shadow-premium overflow-hidden">
                     {profile.avatar_url ? (
-                      <img
-                        src={profile.avatar_url}
-                        alt={profile.full_name}
-                        className="w-full h-full object-cover rounded-full"
-                      />
+                      <>
+                        <img
+                          src={profile.avatar_url}
+                          alt={profile.full_name}
+                          className="w-full h-full object-cover rounded-full transition-all duration-300 group-hover/avatar:scale-110"
+                        />
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                      </>
                     ) : (
                       profile.full_name[0]?.toUpperCase() || '?'
                     )}
+                    {/* Блик на аватаре */}
+                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/40 to-transparent rounded-t-full opacity-60"></div>
                   </div>
                 </div>
               </div>
 
               {/* Profile Info Card */}
-              <div className="card mb-4 sm:mb-6 mt-12 sm:mt-16 md:mt-20 w-full">
+              <div className="card-glossy mb-4 sm:mb-6 mt-12 sm:mt-16 md:mt-20 w-full">
                 <div className="flex flex-col md:flex-row gap-4 sm:gap-6 w-full">
                   <div className="flex-1 w-full">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3 flex-wrap">

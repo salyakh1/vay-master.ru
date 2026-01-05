@@ -26,26 +26,29 @@ export default function AuthRequiredModal({ isOpen, onClose, type = 'master' }: 
 
   return (
     <div 
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-md bg-bg-primary border border-border-color rounded-lg shadow-card animate-fade-in"
+        className="relative w-full max-w-md glass-strong border border-white/30 rounded-2xl shadow-premium animate-fade-in overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Глянцевый эффект */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none"></div>
+        
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-text-secondary hover:text-graphite-secondary transition-colors p-1"
+          className="absolute top-4 right-4 text-text-secondary hover:text-graphite-secondary transition-all p-2 rounded-lg hover:bg-white/10 z-30"
           aria-label="Закрыть"
         >
           <FiX size={20} />
         </button>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-6 relative z-20">
           <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 bg-brand-accent/10 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-brand-accent/20 to-brand-accent/10 rounded-full flex items-center justify-center backdrop-blur-sm border border-brand-accent/30 shadow-glow">
               <FiLock size={32} className="text-brand-accent" />
             </div>
           </div>

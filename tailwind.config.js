@@ -78,8 +78,23 @@ module.exports = {
       },
       boxShadow: {
         'card': '0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06)',
-        'card-hover': '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.1)',
-        'premium': '0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.08)',
+        'card-hover': '0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+        'premium': '0 12px 32px rgba(0, 0, 0, 0.15), 0 6px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+        'glow': '0 0 20px rgba(199, 54, 47, 0.3), 0 0 40px rgba(199, 54, 47, 0.1)',
+        'glow-hover': '0 0 30px rgba(199, 54, 47, 0.4), 0 0 60px rgba(199, 54, 47, 0.15)',
+        'glass': '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+        'glossy': '0 4px 16px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+      },
+      backgroundImage: {
+        'gradient-red': 'linear-gradient(135deg, #C7362F 0%, #E84A42 50%, #C7362F 100%)',
+        'gradient-red-hover': 'linear-gradient(135deg, #A92C27 0%, #C7362F 50%, #A92C27 100%)',
+        'gradient-dark': 'linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 50%, #1C1C1E 100%)',
+        'gradient-glossy': 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.1) 100%)',
+        'shimmer': 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%)',
+      },
+      backdropBlur: {
+        'glass': '10px',
+        'glass-strong': '20px',
       },
       letterSpacing: {
         'tight': '-0.01em',         // Строгий, инженерный
@@ -88,6 +103,31 @@ module.exports = {
       spacing: {
         '18': '4.5rem',
         '22': '5.5rem',
+      },
+      animation: {
+        'shimmer': 'shimmer 2s infinite',
+        'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
+        'float': 'float 3s ease-in-out infinite',
+        'glossy-shine': 'glossy-shine 3s ease-in-out infinite',
+      },
+      keyframes: {
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
+        'glow-pulse': {
+          '0%, 100%': { boxShadow: '0 0 20px rgba(199, 54, 47, 0.3)' },
+          '50%': { boxShadow: '0 0 30px rgba(199, 54, 47, 0.5)' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        'glossy-shine': {
+          '0%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+          '100%': { backgroundPosition: '0% 50%' },
+        },
       },
     },
   },

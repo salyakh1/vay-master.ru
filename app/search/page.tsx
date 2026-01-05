@@ -390,28 +390,34 @@ function SearchContent() {
                   <div className="grid grid-cols-2 gap-4">
                     {randomProfiles.map((master) => {
                       const MasterCard = (
-                        <div className="card hover:shadow-card-hover transition-all h-[400px] flex flex-col !p-0 overflow-hidden">
+                        <div className="card-glossy group h-[400px] flex flex-col !p-0 overflow-hidden relative">
+                          {/* Глянцевый эффект */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10 rounded-[12px]"></div>
+                          
                           {/* Квадратный аватар на всю ширину */}
-                          <div className="w-full h-[200px] bg-graphite-primary flex items-center justify-center text-white text-2xl font-semibold rounded-t-md flex-shrink-0 overflow-hidden">
+                          <div className="w-full h-[200px] bg-gradient-to-br from-graphite-primary to-graphite-tertiary flex items-center justify-center text-white text-2xl font-semibold rounded-t-[12px] flex-shrink-0 overflow-hidden relative group/image">
                             {master.avatar_url ? (
-                              <img
-                                src={master.avatar_url}
-                                alt={master.full_name}
-                                className="w-full h-[200px] object-cover"
-                              />
+                              <>
+                                <img
+                                  src={master.avatar_url}
+                                  alt={master.full_name}
+                                  className="w-full h-[200px] object-cover transition-all duration-500 group-hover/image:scale-110 group-hover/image:brightness-110"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/20 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+                              </>
                             ) : (
                               master.full_name[0]?.toUpperCase() || '?'
                             )}
                           </div>
 
                           {/* Основная информация */}
-                          <div className="flex flex-col items-center text-center p-4">
-                            <h3 className="font-semibold text-base text-graphite-secondary mb-1 line-clamp-2 leading-tight">
+                          <div className="flex flex-col items-center text-center p-4 relative z-20">
+                            <h3 className="font-semibold text-base bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent mb-1 line-clamp-2 leading-tight group-hover:from-brand-accent group-hover:to-brand-accent-hover transition-all">
                               {master.full_name}
                             </h3>
                             {master.city && (
                               <div className="flex items-center gap-1 text-xs text-text-secondary mb-2">
-                                <FiMapPin size={12} strokeWidth={2} />
+                                <FiMapPin size={12} strokeWidth={2} className="text-brand-accent/60" />
                                 <span>{master.city}</span>
                               </div>
                             )}
@@ -426,11 +432,11 @@ function SearchContent() {
 
                           {/* Специализации */}
                           {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-border-light px-4 pb-4">
+                            <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-border-light/50 px-4 pb-4 relative z-20">
                               {(master as any).profile_specializations.slice(0, 2).map((item: any) => (
                                 <span
                                   key={item.specialization?.id || item.specialization_id}
-                                  className="px-2 py-0.5 bg-brand-accent/10 text-brand-accent text-[10px] font-medium rounded-md border border-brand-accent/20"
+                                  className="px-2 py-0.5 bg-gradient-to-br from-brand-accent/15 to-brand-accent/10 text-brand-accent text-[10px] font-medium rounded-lg border border-brand-accent/30 backdrop-blur-sm shadow-sm transition-all group-hover:border-brand-accent/50 group-hover:shadow-md"
                                 >
                                   {item.specialization?.name}
                                 </span>
@@ -478,26 +484,34 @@ function SearchContent() {
                   <div className="space-y-4">
                     {masters.map((master) => {
                       const MasterCardContent = (
-                        <div className="card hover:shadow-card-hover transition-all">
-                        <div className="flex items-start gap-4">
+                        <div className="card-glossy group relative">
+                          {/* Глянцевый эффект */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10 rounded-[12px]"></div>
+                          
+                        <div className="flex items-start gap-4 relative z-20">
                           {/* Аватар */}
-                          <div className="w-20 h-20 bg-graphite-primary border-2 border-border-light flex items-center justify-center text-white text-xl font-semibold rounded-full flex-shrink-0">
-                            {master.avatar_url ? (
-                              <img
-                                src={master.avatar_url}
-                                alt={master.full_name}
-                                className="w-full h-full object-cover rounded-full"
-                              />
-                            ) : (
-                              master.full_name[0]?.toUpperCase() || '?'
-                            )}
+                          <div className="relative group/avatar">
+                            <div className="w-20 h-20 bg-gradient-to-br from-graphite-primary to-graphite-tertiary border-2 border-white/50 flex items-center justify-center text-white text-xl font-semibold rounded-full flex-shrink-0 shadow-glossy overflow-hidden">
+                              {master.avatar_url ? (
+                                <>
+                                  <img
+                                    src={master.avatar_url}
+                                    alt={master.full_name}
+                                    className="w-full h-full object-cover rounded-full transition-all duration-300 group-hover/avatar:scale-110"
+                                  />
+                                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300"></div>
+                                </>
+                              ) : (
+                                master.full_name[0]?.toUpperCase() || '?'
+                              )}
+                            </div>
                           </div>
 
                           {/* Основная информация */}
                           <div className="flex-1 min-w-0">
                             {/* Имя и роль */}
                             <div className="mb-2">
-                              <h3 className="font-semibold text-lg text-graphite-secondary mb-1 leading-tight">
+                              <h3 className="font-semibold text-lg bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent mb-1 leading-tight group-hover:from-brand-accent group-hover:to-brand-accent-hover transition-all">
                                 {master.full_name}
                               </h3>
                               <div className="flex items-center gap-2 text-sm text-text-secondary">
@@ -526,11 +540,11 @@ function SearchContent() {
 
                             {/* Специализации */}
                             {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border-light">
+                              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border-light/50">
                                 {(master as any).profile_specializations.map((item: any) => (
                                   <span
                                     key={item.specialization?.id || item.specialization_id}
-                                    className="px-3 py-1 bg-brand-accent/10 text-brand-accent text-xs font-medium rounded-md border border-brand-accent/20 flex items-center gap-1"
+                                    className="px-3 py-1 bg-gradient-to-br from-brand-accent/15 to-brand-accent/10 text-brand-accent text-xs font-medium rounded-lg border border-brand-accent/30 backdrop-blur-sm shadow-sm flex items-center gap-1 transition-all group-hover:border-brand-accent/50 group-hover:shadow-md"
                                   >
                                     <FiCheckCircle size={12} strokeWidth={2.5} />
                                     {item.specialization?.name}

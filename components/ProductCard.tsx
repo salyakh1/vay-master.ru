@@ -16,22 +16,29 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
   const [showAuthModal, setShowAuthModal] = useState(false)
 
   const ProductCardContent = (
-      <div className="bg-bg-card overflow-hidden transition-all hover:shadow-card-hover group card cursor-pointer h-[400px] flex flex-col !p-0">
+      <div className="card-glossy overflow-hidden group cursor-pointer h-[400px] flex flex-col !p-0 relative">
+        {/* Глянцевый эффект на карточке */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
+        
         {/* Изображение товара */}
-        <div className="w-full h-[200px] bg-bg-secondary relative overflow-hidden rounded-t-md flex-shrink-0">
+        <div className="w-full h-[200px] bg-bg-secondary relative overflow-hidden rounded-t-[12px] flex-shrink-0 group/image">
           {product.images && product.images.length > 0 ? (
-            <img
-              src={product.images[0]}
-              alt={product.name}
-              className="w-full h-[200px] object-cover transition-transform duration-300 group-hover:scale-105"
-            />
+            <>
+              <img
+                src={product.images[0]}
+                alt={product.name}
+                className="w-full h-[200px] object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
+              />
+              {/* Блик на изображении */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/20 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-text-secondary text-4xl bg-bg-secondary">
               <FiShoppingBag size={48} strokeWidth={1.5} />
             </div>
           )}
           {!product.in_stock && (
-            <div className="absolute top-3 right-3 bg-graphite-primary/90 text-white px-3 py-1.5 text-xs font-semibold rounded-md">
+            <div className="absolute top-3 right-3 bg-graphite-primary/95 backdrop-blur-sm text-white px-3 py-1.5 text-xs font-semibold rounded-lg shadow-glossy border border-white/10">
               Нет в наличии
             </div>
           )}
@@ -52,12 +59,12 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
           </div>
 
           {/* Цена и количество */}
-          <div className="flex items-baseline justify-between mb-4 pt-4 border-t border-border-light">
-            <div className="text-lg font-semibold text-graphite-secondary">
+          <div className="flex items-baseline justify-between mb-4 pt-4 border-t border-border-light/50">
+            <div className="text-lg font-semibold text-graphite-secondary bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent">
               {product.price.toLocaleString('ru-RU')} ₽
             </div>
             {product.stock_count !== null && product.stock_count !== undefined && product.stock_count > 0 && (
-              <div className="text-xs text-text-secondary bg-bg-secondary px-2.5 py-1 font-medium rounded-md">
+              <div className="text-xs text-text-secondary bg-gradient-to-br from-bg-secondary to-bg-primary px-2.5 py-1 font-medium rounded-lg shadow-sm border border-border-light/50">
                 {product.stock_count} шт
               </div>
             )}

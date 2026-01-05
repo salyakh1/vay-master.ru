@@ -399,7 +399,7 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 z-50 bg-white flex flex-col"
+      className="fixed inset-0 z-50 bg-gradient-to-br from-bg-primary to-bg-secondary flex flex-col"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -408,14 +408,17 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
         WebkitOverflowScrolling: 'touch'
       }}
     >
-      {/* Top Header - Минималистичный */}
-      <div className="absolute top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-3 pointer-events-none">
+      {/* Top Header - Глянцевый */}
+      <div className="absolute top-0 left-0 right-0 z-40 glass-strong border-b border-white/30 p-3 pointer-events-none shadow-glass">
         <div className="flex items-center justify-between pointer-events-auto">
           <div className="flex items-center gap-3">
             {master && (
-              <div className="w-8 h-8 bg-gray-200 border border-gray-300 flex items-center justify-center text-gray-700 text-sm font-bold rounded-full">
+              <div className="w-8 h-8 bg-gradient-to-br from-graphite-primary to-graphite-tertiary border-2 border-white/50 flex items-center justify-center text-white text-sm font-bold rounded-full shadow-glossy overflow-hidden">
                 {master.avatar_url ? (
-                  <img src={master.avatar_url} alt={master.full_name} className="w-full h-full object-cover rounded-full" />
+                  <>
+                    <img src={master.avatar_url} alt={master.full_name} className="w-full h-full object-cover rounded-full" />
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-60"></div>
+                  </>
                 ) : (
                   master.full_name[0]?.toUpperCase() || '?'
                 )}
@@ -432,9 +435,9 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 transition-colors rounded-full pointer-events-auto"
+            className="p-2 hover:bg-white/20 transition-all rounded-full pointer-events-auto backdrop-blur-sm border border-white/20"
           >
-            <FiX size={20} className="text-gray-700" />
+            <FiX size={20} className="text-graphite-secondary" />
           </button>
         </div>
         {/* Индикатор текущей работы */}
@@ -491,15 +494,15 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
           <>
             <button
               onClick={handlePreviousMedia}
-              className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/80 hover:bg-white transition-colors z-20 rounded-full backdrop-blur-sm pointer-events-auto border border-gray-200 shadow-sm"
+              className="absolute left-2 top-1/2 -translate-y-1/2 p-2 glass hover:bg-white/90 transition-all z-20 rounded-full backdrop-blur-md pointer-events-auto border border-white/30 shadow-glossy hover:scale-110"
             >
-              <FiChevronLeft size={20} className="text-gray-700" />
+              <FiChevronLeft size={20} className="text-graphite-secondary" />
             </button>
             <button
               onClick={handleNextMedia}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/80 hover:bg-white transition-colors z-20 rounded-full backdrop-blur-sm pointer-events-auto border border-gray-200 shadow-sm"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 glass hover:bg-white/90 transition-all z-20 rounded-full backdrop-blur-md pointer-events-auto border border-white/30 shadow-glossy hover:scale-110"
             >
-              <FiChevronRight size={20} className="text-gray-700" />
+              <FiChevronRight size={20} className="text-graphite-secondary" />
             </button>
           </>
         )}
@@ -521,9 +524,9 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
         )}
       </div>
 
-      {/* Bottom Section - White Background */}
+      {/* Bottom Section - Глянцевый фон */}
       <div 
-        className={`absolute bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 transition-all duration-300 ${
+        className={`absolute bottom-0 left-0 right-0 z-40 glass-strong border-t border-white/30 transition-all duration-300 shadow-glass ${
           showComments ? 'h-2/3' : 'h-auto'
         }`}
       >
@@ -531,15 +534,15 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
         <div className="flex items-center gap-4 p-4 border-b border-gray-200 pointer-events-auto">
           <button
             onClick={handleLike}
-            className={`flex items-center gap-2 transition-colors ${
-              liked ? 'text-red-500' : 'text-gray-700 hover:text-red-500'
+            className={`flex items-center gap-2 transition-all hover:scale-110 ${
+              liked ? 'text-brand-accent' : 'text-graphite-secondary hover:text-brand-accent'
             }`}
           >
-            <FiHeart size={24} fill={liked ? 'currentColor' : 'none'} />
+            <FiHeart size={24} fill={liked ? 'currentColor' : 'none'} className={liked ? 'drop-shadow-glow' : ''} />
           </button>
           <button
             onClick={() => setShowComments(!showComments)}
-            className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-2 text-graphite-secondary hover:text-brand-accent transition-all hover:scale-110"
           >
             <FiMessageCircle size={24} />
           </button>

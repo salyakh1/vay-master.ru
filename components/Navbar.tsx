@@ -128,32 +128,37 @@ export default function Navbar() {
 
   return (
     <>
-      {/* Top header - Строгий, графитовый, минималистичный */}
-      <header className="sticky top-0 z-40 bg-bg-card border-b border-border-light">
+      {/* Top header - Глянцевый, премиальный */}
+      <header className="sticky top-0 z-40 glass-strong border-b border-white/30 shadow-glass backdrop-blur-md">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="text-xl font-semibold text-graphite-secondary tracking-tight">
+            <Link href="/" className="text-xl font-semibold bg-gradient-to-r from-graphite-secondary via-brand-accent to-graphite-secondary bg-clip-text text-transparent tracking-tight hover:from-brand-accent hover:via-brand-accent-hover hover:to-brand-accent transition-all">
               VAY-MASTER
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Fixed bottom navigation - Строгая, графитовая, бизнес-инструмент */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-bg-card border-t border-border-light z-50 safe-area-inset-bottom pointer-events-auto">
+      {/* Fixed bottom navigation - Глянцевая, премиальная */}
+      <nav className="fixed bottom-0 left-0 right-0 glass-strong border-t border-white/30 shadow-glass backdrop-blur-md z-50 safe-area-inset-bottom pointer-events-auto">
         <div className="w-full px-0">
           <div className="flex items-center justify-between sm:justify-evenly h-16 pointer-events-auto w-full">
             <Link
               href="/feed"
-              className={`flex flex-col items-center justify-center gap-0.5 sm:gap-1 flex-1 min-w-0 py-2 transition-colors ${
+              className={`flex flex-col items-center justify-center gap-0.5 sm:gap-1 flex-1 min-w-0 py-2 transition-all relative group ${
                 pathname === '/feed'
                   ? 'text-brand-accent'
-                  : 'text-text-secondary hover:text-graphite-secondary'
+                  : 'text-text-secondary hover:text-brand-accent'
               }`}
               prefetch={true}
             >
-              <FiHome className="w-5 h-5 sm:w-[22px] sm:h-[22px]" strokeWidth={pathname === '/feed' ? 2.5 : 2} />
-              <span className="text-[10px] sm:text-xs font-medium leading-tight">Лента</span>
+              <div className={`relative ${pathname === '/feed' ? 'glow-effect' : ''}`}>
+                <FiHome className="w-5 h-5 sm:w-[22px] sm:h-[22px] transition-all group-hover:scale-110" strokeWidth={pathname === '/feed' ? 2.5 : 2} />
+                {pathname === '/feed' && (
+                  <div className="absolute inset-0 bg-brand-accent/20 rounded-full blur-md -z-10 animate-glow-pulse"></div>
+                )}
+              </div>
+              <span className={`text-[10px] sm:text-xs font-medium leading-tight transition-all ${pathname === '/feed' ? 'font-semibold' : ''}`}>Лента</span>
             </Link>
 
             <Link
@@ -207,7 +212,7 @@ export default function Navbar() {
               <div className="relative">
                 <FiMessageCircle className="w-5 h-5 sm:w-[22px] sm:h-[22px]" strokeWidth={pathname?.startsWith('/chats') ? 2.5 : 2} />
                 {!pathname?.startsWith('/chats') && (unreadChatsCount ?? 0) > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-brand-accent text-white text-[9px] sm:text-[10px] font-bold rounded-full min-w-[16px] sm:min-w-[18px] h-4 sm:h-4.5 flex items-center justify-center px-1 sm:px-1.5">
+                  <span className="absolute -top-1 -right-1 bg-gradient-to-br from-brand-accent to-brand-accent-hover text-white text-[9px] sm:text-[10px] font-bold rounded-full min-w-[16px] sm:min-w-[18px] h-4 sm:h-4.5 flex items-center justify-center px-1 sm:px-1.5 shadow-glow border border-white/30 animate-pulse">
                     {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
                   </span>
                 )}
