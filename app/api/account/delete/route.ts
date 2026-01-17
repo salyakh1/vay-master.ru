@@ -3,19 +3,10 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export async function POST(request: NextRequest) {
   try {
-    // Проверяем переменные окружения внутри функции
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-    console.log('[DELETE-ACCOUNT API] Service key check:', {
-      exists: !!serviceKey,
-      length: serviceKey?.length || 0,
-      firstChars: serviceKey?.substring(0, 30) || 'N/A',
-      envKeys: Object.keys(process.env).filter(k => k.includes('SUPABASE'))
-    })
-
     const body = await request.json()
     const { email, password } = body
 
@@ -58,23 +49,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Неверный пароль' }, { status: 401 })
     }
 
-    // Проверяем Service Role Key (читаем заново внутри функции)
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
-    
-    if (!serviceRoleKey) {
-      console.error('SUPABASE_SERVICE_ROLE_KEY is missing. Available env vars:', {
-        hasUrl: !!supabaseUrl,
-        hasAnonKey: !!supabaseAnonKey,
-        hasServiceKey: !!serviceRoleKey,
-        envKeys: Object.keys(process.env).filter(k => k.includes('SUPABASE'))
-      })
+    if (!supabaseServiceRoleKey) {
       return NextResponse.json(
         { error: 'SUPABASE_SERVICE_ROLE_KEY не настроен. Добавьте его в .env.local и перезапустите сервер.' },
         { status: 500 }
       )
     }
 
-    const supabaseAdmin = createClient(supabaseUrl!, serviceRoleKey, {
+    const supabaseAdmin = createClient(supabaseUrl!, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,

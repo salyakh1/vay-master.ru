@@ -16,6 +16,8 @@ import {
   FiFileText,
   FiImage,
   FiMessageSquare,
+  FiStar,
+  FiCreditCard,
 } from 'react-icons/fi'
 
 interface AdminSidebarProps {
@@ -56,6 +58,12 @@ export default function AdminSidebar({ role, currentPath }: AdminSidebarProps) {
       roles: ['super_admin', 'moderator', 'support'],
     },
     {
+      title: 'Отзывы',
+      href: '/admin/reviews',
+      icon: FiStar,
+      roles: ['super_admin', 'moderator', 'support'],
+    },
+    {
       title: 'Писать пользователям',
       href: '/admin/messages',
       icon: FiMessageSquare,
@@ -78,6 +86,12 @@ export default function AdminSidebar({ role, currentPath }: AdminSidebarProps) {
       href: '/admin/banners',
       icon: FiImage,
       roles: ['super_admin', 'moderator'],
+    },
+    {
+      title: 'Подписки',
+      href: '/admin/subscriptions',
+      icon: FiCreditCard,
+      roles: ['super_admin'],
     },
     {
       title: 'Безопасность',

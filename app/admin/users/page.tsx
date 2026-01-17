@@ -148,31 +148,36 @@ export default function AdminUsersPage() {
 
       {/* Filters */}
       <div className="card">
-        <div className="flex gap-4 flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchUsers()}
-                placeholder="Поиск по имени, email, телефону..."
-                className="input pl-10"
-              />
-            </div>
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && fetchUsers()}
+              placeholder="Поиск по имени, email, телефону..."
+              className="input pl-10 w-full h-10 text-sm"
+            />
           </div>
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="input md:w-48"
-          >
-            <option value="">Все роли</option>
-            <option value="master">Мастера</option>
-            <option value="seller">Продавцы</option>
-            <option value="client">Клиенты</option>
-          </select>
-          <button onClick={fetchUsers} className="btn btn-primary">
+          <div className={`relative select-wrapper w-full ${roleFilter ? 'has-value' : ''}`} data-placeholder="Роль">
+            <select
+              value={roleFilter || ''}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="input w-full h-10 text-sm appearance-none cursor-pointer"
+              style={{
+                color: !roleFilter ? 'transparent' : 'var(--text-primary)',
+              }}
+            >
+              <option value="" disabled style={{ color: 'var(--text-muted)', display: 'none' }}>
+                Роль
+              </option>
+              <option value="master">Мастера</option>
+              <option value="seller">Продавцы</option>
+              <option value="client">Клиенты</option>
+            </select>
+          </div>
+          <button onClick={fetchUsers} className="btn btn-primary h-10 w-full text-sm">
             Найти
           </button>
         </div>
@@ -302,6 +307,4 @@ export default function AdminUsersPage() {
     </div>
   )
 }
-
-
-
+}

@@ -94,11 +94,12 @@ export default function Home() {
     <div className="min-h-screen bg-bg-primary pb-20">
       {user && <Navbar />}
       
+      {/* Баннеры без отступов по бокам */}
+      <div className="w-full mb-12 pt-8">
+        <AdBannerSlider page="home" />
+      </div>
+      
       <div className="container mx-auto px-4">
-        {/* Баннеры */}
-        <div className="mb-12 pt-8">
-          <AdBannerSlider page="home" />
-        </div>
 
         {/* 1. HERO-БЛОК */}
         <section className="max-w-4xl mx-auto text-center mb-24 pt-12">

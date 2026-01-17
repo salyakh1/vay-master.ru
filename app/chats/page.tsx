@@ -333,38 +333,38 @@ export default function ChatsPage() {
   return (
     <div className="min-h-screen bg-bg-primary pb-20">
       <Navbar />
-      <div className="container mx-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-semibold mb-6 text-graphite-secondary tracking-tight">
+      <div className="container mx-auto px-4 py-4 sm:py-6">
+        <div className="max-w-2xl mx-auto">
+          <h1 className="text-2xl font-semibold mb-4 sm:mb-6 text-graphite-secondary tracking-tight">
             {activeTab === 'chats' ? 'Сообщения' : 'Отклики'}
           </h1>
 
           {/* Tabs */}
-          <div className="flex gap-2 mb-6 border-b border-border-color">
+          <div className="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-border-color/60">
             <button
               onClick={() => setActiveTab('chats')}
-              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+              className={`px-3 sm:px-4 py-2 font-medium transition-colors border-b-2 ${
                 activeTab === 'chats'
                   ? 'border-brand-accent text-brand-accent'
                   : 'border-transparent text-text-secondary hover:text-text-primary'
               }`}
             >
-              <div className="flex items-center gap-2">
-                <FiMessageSquare size={18} />
-                <span>Чаты</span>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <FiMessageSquare size={16} />
+                <span className="text-sm sm:text-base">Чаты</span>
               </div>
             </button>
             <button
               onClick={() => setActiveTab('responses')}
-              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+              className={`px-3 sm:px-4 py-2 font-medium transition-colors border-b-2 ${
                 activeTab === 'responses'
                   ? 'border-brand-accent text-brand-accent'
                   : 'border-transparent text-text-secondary hover:text-text-primary'
               }`}
             >
-              <div className="flex items-center gap-2">
-                <FiBriefcase size={18} />
-                <span>Отклики</span>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <FiBriefcase size={16} />
+                <span className="text-sm sm:text-base">Отклики</span>
               </div>
             </button>
           </div>
@@ -373,23 +373,23 @@ export default function ChatsPage() {
           {activeTab === 'chats' && (
             <>
               {loading ? (
-                <div className="card text-center text-text-secondary py-12">
+                <div className="bg-bg-card rounded-lg border border-border-light/40 p-8 sm:p-12 text-center text-text-secondary">
                   Загрузка...
                 </div>
               ) : chats.length === 0 ? (
-                <div className="card text-center text-text-secondary py-12">
+                <div className="bg-bg-card rounded-lg border border-border-light/40 p-8 sm:p-12 text-center text-text-secondary">
                   У вас пока нет сообщений
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4 sm:space-y-5">
                   {chats.map((chat) => (
                     <Link
                       key={chat.id}
                       href={`/chats/${chat.id}`}
-                      className="card hover:bg-bg-secondary transition cursor-pointer"
+                      className="block bg-bg-card rounded-lg border border-border-light/40 p-4 sm:p-5 hover:bg-bg-secondary hover:border-border-color/60 transition-all cursor-pointer"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 relative">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden flex-shrink-0 relative">
                           {chat.otherUser.avatar_url ? (
                             <img
                               src={chat.otherUser.avatar_url}
@@ -397,29 +397,29 @@ export default function ChatsPage() {
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
-                            <div className="w-full h-full bg-graphite-primary flex items-center justify-center rounded-full text-white text-sm font-semibold">
+                            <div className="w-full h-full bg-graphite-primary flex items-center justify-center rounded-full text-white text-base sm:text-lg font-semibold">
                               {chat.otherUser.full_name[0]?.toUpperCase() || '?'}
                             </div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <div className="font-semibold truncate text-graphite-secondary">{chat.otherUser.full_name}</div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="font-semibold truncate text-graphite-secondary text-base sm:text-lg">{chat.otherUser.full_name}</div>
                             {(chat.unreadCount ?? 0) > 0 && (
-                              <span className="bg-brand-accent text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                              <span className="bg-brand-accent text-white text-xs font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5 flex-shrink-0">
                                 {chat.unreadCount! > 99 ? '99+' : chat.unreadCount}
                               </span>
                             )}
                           </div>
                           {chat.lastMessage && (
-                            <div className="text-sm text-text-secondary truncate mt-1">
+                            <div className="text-sm text-text-secondary truncate">
                               {chat.lastMessage.content}
                             </div>
                           )}
                         </div>
-                        <div className="flex flex-col items-end gap-1">
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
                           {chat.lastMessage && (
-                            <div className="text-xs text-text-muted">
+                            <div className="text-xs text-text-secondary font-medium whitespace-nowrap">
                               {formatMessageTime(new Date(chat.lastMessage.created_at))}
                             </div>
                           )}
@@ -436,15 +436,15 @@ export default function ChatsPage() {
           {activeTab === 'responses' && (
             <>
               {loadingResponses ? (
-                <div className="card text-center text-text-secondary py-12">
+                <div className="bg-bg-card rounded-lg border border-border-light/40 p-8 sm:p-12 text-center text-text-secondary">
                   Загрузка...
                 </div>
               ) : responses.length === 0 ? (
-                <div className="card text-center text-text-secondary py-12">
+                <div className="bg-bg-card rounded-lg border border-border-light/40 p-8 sm:p-12 text-center text-text-secondary">
                   Пока нет откликов на ваши заказы
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4 sm:space-y-5">
                   {responses.map((response) => {
                     const order = response.order as any
                     const master = response.master as any
@@ -453,10 +453,10 @@ export default function ChatsPage() {
                       <Link
                         key={response.id}
                         href={`/orders/${response.order_id}`}
-                        className="card hover:bg-bg-secondary transition cursor-pointer"
+                        className="block bg-bg-card rounded-lg border border-border-light/40 p-4 sm:p-5 hover:bg-bg-secondary hover:border-border-color/60 transition-all cursor-pointer"
                       >
-                        <div className="flex items-start gap-4">
-                          <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 relative">
+                        <div className="flex items-start gap-3 sm:gap-4">
+                          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden flex-shrink-0 relative">
                             {master?.avatar_url ? (
                               <img
                                 src={master.avatar_url}
@@ -464,14 +464,14 @@ export default function ChatsPage() {
                                 className="w-full h-full rounded-full object-cover"
                               />
                             ) : (
-                              <div className="w-full h-full bg-graphite-primary flex items-center justify-center rounded-full text-white text-sm font-semibold">
+                              <div className="w-full h-full bg-graphite-primary flex items-center justify-center rounded-full text-white text-base sm:text-lg font-semibold">
                                 {master?.full_name?.[0]?.toUpperCase() || '?'}
                               </div>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <div className="font-semibold truncate text-graphite-secondary">
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                              <div className="font-semibold truncate text-graphite-secondary text-base sm:text-lg">
                                 {master?.full_name || 'Мастер'}
                               </div>
                               <span className={`px-2 py-0.5 text-xs font-medium border rounded ${getResponseStatusColor(response.status)}`}>
@@ -479,19 +479,19 @@ export default function ChatsPage() {
                               </span>
                             </div>
                             {order?.title && (
-                              <div className="text-sm text-text-secondary mb-1">
+                              <div className="text-sm text-text-secondary mb-1.5">
                                 Заказ: {order.title}
                               </div>
                             )}
                             {response.price && (
-                              <div className="text-base font-semibold text-brand-accent mb-1">
+                              <div className="text-base font-semibold text-brand-accent mb-1.5">
                                 {response.price.toLocaleString('ru-RU')} ₽
                               </div>
                             )}
-                            <div className="text-sm text-text-secondary truncate mt-1">
+                            <div className="text-sm text-text-secondary truncate mb-2">
                               {response.message}
                             </div>
-                            <div className="flex items-center gap-2 mt-2 text-xs text-text-muted">
+                            <div className="flex items-center gap-2 text-xs text-text-secondary">
                               <FiClock size={12} />
                               <span>
                                 {format(new Date(response.created_at), 'd MMMM в HH:mm', { locale: ru })}

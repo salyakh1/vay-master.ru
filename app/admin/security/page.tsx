@@ -145,20 +145,42 @@ export default function AdminSecurityPage() {
 
       {/* Filters */}
       <div className="card">
-        <div className="flex gap-4 flex-wrap">
-          <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="input md:w-48">
-            <option value="">Все уровни</option>
-            <option value="critical">Критический</option>
-            <option value="high">Высокий</option>
-            <option value="medium">Средний</option>
-            <option value="low">Низкий</option>
-          </select>
-          <select value={resolvedFilter} onChange={(e) => setResolvedFilter(e.target.value)} className="input md:w-48">
-            <option value="">Все</option>
-            <option value="unresolved">Нерешенные</option>
-            <option value="resolved">Решенные</option>
-          </select>
-          <button onClick={fetchAlerts} className="btn btn-primary">
+        <div className="flex flex-col gap-3">
+          <div className={`relative select-wrapper w-full ${severityFilter ? 'has-value' : ''}`} data-placeholder="Уровень">
+            <select 
+              value={severityFilter || ''} 
+              onChange={(e) => setSeverityFilter(e.target.value)} 
+              className="input w-full h-10 text-sm appearance-none cursor-pointer"
+              style={{
+                color: !severityFilter ? 'transparent' : 'var(--text-primary)',
+              }}
+            >
+              <option value="" disabled style={{ color: 'var(--text-muted)', display: 'none' }}>
+                Уровень
+              </option>
+              <option value="critical">Критический</option>
+              <option value="high">Высокий</option>
+              <option value="medium">Средний</option>
+              <option value="low">Низкий</option>
+            </select>
+          </div>
+          <div className={`relative select-wrapper w-full ${resolvedFilter ? 'has-value' : ''}`} data-placeholder="Статус">
+            <select 
+              value={resolvedFilter || ''} 
+              onChange={(e) => setResolvedFilter(e.target.value)} 
+              className="input w-full h-10 text-sm appearance-none cursor-pointer"
+              style={{
+                color: !resolvedFilter ? 'transparent' : 'var(--text-primary)',
+              }}
+            >
+              <option value="" disabled style={{ color: 'var(--text-muted)', display: 'none' }}>
+                Статус
+              </option>
+              <option value="unresolved">Нерешенные</option>
+              <option value="resolved">Решенные</option>
+            </select>
+          </div>
+          <button onClick={fetchAlerts} className="btn btn-primary h-10 w-full text-sm">
             Обновить
           </button>
         </div>

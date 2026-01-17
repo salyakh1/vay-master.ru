@@ -281,10 +281,10 @@ export default function AdBannerSlider({
   const currentBanner = banners[safeIndex]
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative w-full ${className}`}>
       <div
         ref={containerRef}
-        className="relative overflow-hidden rounded-2xl bg-bg-secondary md:h-[280px] h-[180px] md:max-w-[1200px] md:mx-auto"
+        className="relative overflow-hidden bg-bg-secondary md:h-[280px] h-[180px] w-full"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

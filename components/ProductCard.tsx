@@ -16,21 +16,17 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
   const [showAuthModal, setShowAuthModal] = useState(false)
 
   const ProductCardContent = (
-      <div className="card-glossy overflow-hidden group cursor-pointer h-[400px] flex flex-col !p-0 relative">
-        {/* Глянцевый эффект на карточке */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
+      <div className="card-glossy overflow-hidden group cursor-pointer flex flex-col !p-0 relative h-full">
         
         {/* Изображение товара */}
-        <div className="w-full h-[200px] bg-bg-secondary relative overflow-hidden rounded-t-[12px] flex-shrink-0 group/image">
+        <div className="w-full aspect-square bg-bg-secondary relative overflow-hidden rounded-t-[12px] flex-shrink-0">
           {product.images && product.images.length > 0 ? (
             <>
               <img
                 src={product.images[0]}
                 alt={product.name}
-                className="w-full h-[200px] object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
+                className="w-full h-full object-cover"
               />
-              {/* Блик на изображении */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/20 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
             </>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-text-secondary text-4xl bg-bg-secondary">
@@ -45,43 +41,45 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
         </div>
 
         {/* Информация о товаре */}
-        <div className="flex flex-col flex-1 p-4">
+        <div className="flex flex-col flex-1 p-4 sm:p-5">
           {/* Название и категория */}
-          <div className="mb-4">
-            <h3 className="font-semibold text-lg mb-1.5 line-clamp-2 text-graphite-secondary leading-tight group-hover:text-brand-accent transition-colors">
+          <div className="mb-3">
+            <h3 className="font-semibold text-[15px] sm:text-base mb-1.5 line-clamp-2 text-graphite-secondary leading-snug min-h-[42px]">
               {product.name}
             </h3>
-            {product.category_ref && (
-              <div className="text-xs text-text-muted">
-                {product.category_ref.name}
-              </div>
-            )}
+            <div className={`text-xs text-text-muted min-h-[16px] ${product.category_ref ? '' : 'opacity-0'}`}>
+              {product.category_ref?.name || '—'}
+            </div>
           </div>
 
           {/* Цена и количество */}
-          <div className="flex items-baseline justify-between mb-4 pt-4 border-t border-border-light/50">
-            <div className="text-lg font-semibold text-graphite-secondary bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent">
+          <div className="flex items-baseline justify-between mb-3 pt-3 border-t border-border-light/40">
+            <div className="text-base sm:text-lg font-semibold text-graphite-secondary">
               {product.price.toLocaleString('ru-RU')} ₽
             </div>
             {product.stock_count !== null && product.stock_count !== undefined && product.stock_count > 0 && (
-              <div className="text-xs text-text-secondary bg-gradient-to-br from-bg-secondary to-bg-primary px-2.5 py-1 font-medium rounded-lg shadow-sm border border-border-light/50">
+              <div className="text-xs text-text-secondary bg-gradient-to-br from-bg-secondary to-bg-primary px-2.5 py-1 font-medium rounded-lg shadow-sm border border-border-light/40">
                 {product.stock_count} шт
               </div>
             )}
           </div>
 
           {/* Информация о продавце */}
-          <div className="flex items-center gap-2 text-xs text-text-secondary pt-3 border-t border-border-light">
-            <div className="w-6 h-6 bg-graphite-primary rounded-full flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
-              {seller?.full_name?.[0]?.toUpperCase() || 'П'}
+          <div className="flex items-center gap-2.5 text-xs text-text-secondary pt-3 border-t border-border-light/40 mt-auto">
+            <div className="w-7 h-7 bg-graphite-primary rounded-full overflow-hidden flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
+              {seller?.avatar_url ? (
+                <img src={seller.avatar_url} alt={seller.full_name} className="w-full h-full object-cover" />
+              ) : (
+                seller?.full_name?.[0]?.toUpperCase() || 'П'
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-medium text-graphite-secondary truncate">
                 {seller?.full_name || 'Продавец'}
               </div>
-              {seller?.city && (
-                <div className="text-text-muted truncate">{seller.city}</div>
-              )}
+              <div className={`text-text-muted truncate min-h-[16px] ${seller?.city ? '' : 'opacity-0'}`}>
+                {seller?.city || '—'}
+              </div>
             </div>
           </div>
         </div>
@@ -90,7 +88,7 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
 
   if (currentUser) {
     return (
-      <Link href={`/products/${product.id}`}>
+      <Link href={`/products/${product.id}`} className="block h-full">
         {ProductCardContent}
       </Link>
     )
@@ -98,7 +96,7 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
 
   return (
     <>
-      <div onClick={() => setShowAuthModal(true)} className="cursor-pointer">
+      <div onClick={() => setShowAuthModal(true)} className="cursor-pointer h-full">
         {ProductCardContent}
       </div>
       <AuthRequiredModal 

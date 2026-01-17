@@ -3,6 +3,7 @@ import { Inter, Manrope } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 import ProblemEntryModal from '@/components/ProblemEntryModal'
+import Footer from '@/components/Footer'
 
 const inter = Inter({ 
   subsets: ['latin', 'cyrillic'],
@@ -28,9 +29,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru" suppressHydrationWarning>
-      <body className={`${inter.variable} ${manrope.variable} font-sans`} suppressHydrationWarning>
+      <body className={`${inter.variable} ${manrope.variable} font-sans flex flex-col min-h-screen`} suppressHydrationWarning>
         <Providers>
-          {children}
+          <main className="flex-1">
+            {children}
+          </main>
+          <Footer />
           <ProblemEntryModal />
         </Providers>
       </body>

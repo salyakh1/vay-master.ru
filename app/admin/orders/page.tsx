@@ -184,36 +184,56 @@ export default function AdminOrdersPage() {
 
       {/* Filters */}
       <div className="card">
-        <div className="flex gap-4 flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchOrders()}
-                placeholder="Поиск по названию, описанию, адресу..."
-                className="input pl-10"
-              />
-            </div>
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && fetchOrders()}
+              placeholder="Поиск по названию, описанию, адресу..."
+              className="input pl-10 w-full h-10 text-sm"
+            />
           </div>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input md:w-48">
-            <option value="">Все статусы</option>
-            <option value="new">Новые</option>
-            <option value="in_progress">В работе</option>
-            <option value="completed">Завершенные</option>
-            <option value="cancelled">Отмененные</option>
-          </select>
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="input md:w-48">
-            <option value="">Все категории</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
+          <div className={`relative select-wrapper w-full ${statusFilter ? 'has-value' : ''}`} data-placeholder="Статус">
+            <select 
+              value={statusFilter || ''} 
+              onChange={(e) => setStatusFilter(e.target.value)} 
+              className="input w-full h-10 text-sm appearance-none cursor-pointer"
+              style={{
+                color: !statusFilter ? 'transparent' : 'var(--text-primary)',
+              }}
+            >
+              <option value="" disabled style={{ color: 'var(--text-muted)', display: 'none' }}>
+                Статус
               </option>
-            ))}
-          </select>
-          <button onClick={fetchOrders} className="btn btn-primary">
+              <option value="new">Новые</option>
+              <option value="in_progress">В работе</option>
+              <option value="completed">Завершенные</option>
+              <option value="cancelled">Отмененные</option>
+            </select>
+          </div>
+          <div className={`relative select-wrapper w-full ${categoryFilter ? 'has-value' : ''}`} data-placeholder="Категория">
+            <select 
+              value={categoryFilter || ''} 
+              onChange={(e) => setCategoryFilter(e.target.value)} 
+              className="input w-full h-10 text-sm appearance-none cursor-pointer"
+              style={{
+                color: !categoryFilter ? 'transparent' : 'var(--text-primary)',
+              }}
+            >
+              <option value="" disabled style={{ color: 'var(--text-muted)', display: 'none' }}>
+                Категория
+              </option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button onClick={fetchOrders} className="btn btn-primary h-10 w-full text-sm">
             Найти
           </button>
         </div>

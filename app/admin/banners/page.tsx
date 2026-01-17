@@ -17,6 +17,20 @@ const BANNER_TYPES = [
   { value: 'category_promo', label: 'Промо категории' },
 ]
 
+const AD_TYPES = [
+  { value: 'HERO_SPONSORED', label: 'Верхние промо-блоки (Hero)' },
+  { value: 'INLINE_CONTEXT', label: 'Контекстная реклама (между карточками)' },
+  { value: 'SPONSORED_CARD', label: 'Карточка-реклама (в списках)' },
+  { value: 'PROFILE_RELATED', label: 'Реклама в профиле мастера' },
+  { value: 'FOOTER_BRAND', label: 'Логотипы партнёров (футер)' },
+]
+
+const PRICING_MODELS = [
+  { value: 'fixed', label: 'Фиксированная цена' },
+  { value: 'cpc', label: 'За клик (CPC)' },
+  { value: 'cpa', label: 'За действие (CPA)' },
+]
+
 const TARGET_TYPES = [
   { value: 'master', label: 'Мастер' },
   { value: 'product', label: 'Товар' },
@@ -73,11 +87,69 @@ export default function AdminBannersPage() {
       description: '',
       image_url: '',
       type: 'image',
+      ad_type: 'HERO_SPONSORED',
       target_type: null,
       pages: [],
       priority: 0,
       duration: 5,
       is_active: true,
+      category: [],
+      keywords: [],
+      regions: ['ALL'],
+      brand_name: '',
+      pricing_model: 'fixed',
+      show_badge: true,
+      badge_text: 'Реклама',
+    })
+    setShowCreateModal(true)
+  }
+
+  const handleCreateBannerWithType = (adType: string) => {
+    // Определяем формат баннера по умолчанию для каждого типа
+    let defaultType = 'image'
+    let defaultPages = ['home']
+    
+    switch (adType) {
+      case 'HERO_SPONSORED':
+        defaultType = 'image_text'
+        defaultPages = ['home']
+        break
+      case 'INLINE_CONTEXT':
+        defaultType = 'image'
+        defaultPages = ['search', 'products']
+        break
+      case 'SPONSORED_CARD':
+        defaultType = 'image_text'
+        defaultPages = ['search', 'products']
+        break
+      case 'PROFILE_RELATED':
+        defaultType = 'image_text'
+        defaultPages = []
+        break
+      case 'FOOTER_BRAND':
+        defaultType = 'image'
+        defaultPages = ['home']
+        break
+    }
+
+    setEditingBanner({
+      title: '',
+      description: '',
+      image_url: '',
+      type: defaultType as any,
+      ad_type: adType as any,
+      target_type: null,
+      pages: defaultPages,
+      priority: 0,
+      duration: 5,
+      is_active: true,
+      category: [],
+      keywords: [],
+      regions: ['ALL'],
+      brand_name: '',
+      pricing_model: 'fixed',
+      show_badge: true,
+      badge_text: 'Реклама',
     })
     setShowCreateModal(true)
   }
@@ -160,13 +232,27 @@ export default function AdminBannersPage() {
         return
       }
 
-      const bannerData = {
+      const bannerData: any = {
         ...editingBanner,
         priority: editingBanner.priority || 0,
         duration: editingBanner.duration || 5,
         is_active: editingBanner.is_active ?? true,
+        ad_type: editingBanner.ad_type || 'HERO_SPONSORED',
+        category: editingBanner.category || [],
+        keywords: editingBanner.keywords || [],
+        regions: editingBanner.regions || ['ALL'],
+        pricing_model: editingBanner.pricing_model || 'fixed',
+        show_badge: editingBanner.show_badge ?? true,
+        badge_text: editingBanner.badge_text || 'Реклама',
         created_by: currentUser.id,
       }
+
+      // Удаляем undefined значения
+      Object.keys(bannerData).forEach((key) => {
+        if (bannerData[key] === undefined) {
+          delete bannerData[key]
+        }
+      })
 
       if (editingBanner.id) {
         // Update
@@ -255,15 +341,54 @@ export default function AdminBannersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-text-primary mb-2">Баннеры</h1>
-          <p className="text-text-secondary">Управление рекламными баннерами</p>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-text-primary mb-2">Баннеры</h1>
+            <p className="text-text-secondary">Управление рекламными баннерами</p>
+          </div>
+          <button onClick={handleCreateBanner} className="btn btn-primary">
+            <FiPlus className="mr-2" size={18} />
+            Создать баннер
+          </button>
         </div>
-        <button onClick={handleCreateBanner} className="btn btn-primary">
-          <FiPlus className="mr-2" size={18} />
-          Создать баннер
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={() => handleCreateBannerWithType('HERO_SPONSORED')} 
+            className="btn btn-outline text-sm px-3 py-2"
+          >
+            <FiPlus className="mr-2" size={16} />
+            Hero реклама
+          </button>
+          <button 
+            onClick={() => handleCreateBannerWithType('INLINE_CONTEXT')} 
+            className="btn btn-outline text-sm px-3 py-2"
+          >
+            <FiPlus className="mr-2" size={16} />
+            Inline реклама
+          </button>
+          <button 
+            onClick={() => handleCreateBannerWithType('SPONSORED_CARD')} 
+            className="btn btn-outline text-sm px-3 py-2"
+          >
+            <FiPlus className="mr-2" size={16} />
+            Sponsored Card
+          </button>
+          <button 
+            onClick={() => handleCreateBannerWithType('PROFILE_RELATED')} 
+            className="btn btn-outline text-sm px-3 py-2"
+          >
+            <FiPlus className="mr-2" size={16} />
+            Profile Related
+          </button>
+          <button 
+            onClick={() => handleCreateBannerWithType('FOOTER_BRAND')} 
+            className="btn btn-outline text-sm px-3 py-2"
+          >
+            <FiPlus className="mr-2" size={16} />
+            Footer Brand
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -317,8 +442,20 @@ export default function AdminBannersPage() {
                     )}
                   </div>
                   <div className="text-sm text-text-secondary mb-2">
-                    Тип: {BANNER_TYPES.find((t) => t.value === banner.type)?.label || banner.type}
+                    <div className="mb-1">
+                      <span className="font-medium">Тип рекламы:</span>{' '}
+                      {AD_TYPES.find((t) => t.value === banner.ad_type)?.label || banner.ad_type || 'HERO_SPONSORED'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Формат:</span>{' '}
+                      {BANNER_TYPES.find((t) => t.value === banner.type)?.label || banner.type}
+                    </div>
                   </div>
+                  {banner.brand_name && (
+                    <div className="text-sm text-text-secondary mb-2">
+                      <span className="font-medium">Бренд:</span> {banner.brand_name}
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-1 mb-2">
                     {banner.pages.map((page) => (
                       <span key={page} className="text-xs px-2 py-0.5 bg-bg-secondary rounded">
@@ -326,10 +463,39 @@ export default function AdminBannersPage() {
                       </span>
                     ))}
                   </div>
+                  {(banner.category?.length || banner.keywords?.length || banner.regions?.length) && (
+                    <div className="flex flex-wrap gap-1 mb-2 text-xs">
+                      {banner.category && banner.category.length > 0 && (
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                          Категории: {banner.category.join(', ')}
+                        </span>
+                      )}
+                      {banner.keywords && banner.keywords.length > 0 && (
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded">
+                          Ключевые слова: {banner.keywords.join(', ')}
+                        </span>
+                      )}
+                      {banner.regions && banner.regions.length > 0 && !banner.regions.includes('ALL') && (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded">
+                          Регионы: {banner.regions.join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-4 text-xs text-text-secondary">
                     <span>Приоритет: {banner.priority}</span>
                     <span>Просмотры: {banner.views}</span>
                     <span>Клики: {banner.clicks}</span>
+                    {banner.impression_limit && (
+                      <span className="text-orange-600">
+                        Лимит показов: {banner.current_impressions || 0}/{banner.impression_limit}
+                      </span>
+                    )}
+                    {banner.click_limit && (
+                      <span className="text-orange-600">
+                        Лимит кликов: {banner.current_clicks || 0}/{banner.click_limit}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -356,11 +522,23 @@ export default function AdminBannersPage() {
                 </div>
               )}
               <div>
-                <div className="text-sm text-text-secondary mb-1">Тип</div>
+                <div className="text-sm text-text-secondary mb-1">Тип рекламы</div>
+                <div className="font-medium text-text-primary">
+                  {AD_TYPES.find((t) => t.value === selectedBanner.ad_type)?.label || selectedBanner.ad_type || 'HERO_SPONSORED'}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-text-secondary mb-1">Формат баннера</div>
                 <div className="font-medium text-text-primary">
                   {BANNER_TYPES.find((t) => t.value === selectedBanner.type)?.label || selectedBanner.type}
                 </div>
               </div>
+              {selectedBanner.brand_name && (
+                <div>
+                  <div className="text-sm text-text-secondary mb-1">Бренд</div>
+                  <div className="font-medium text-text-primary">{selectedBanner.brand_name}</div>
+                </div>
+              )}
               <div>
                 <div className="text-sm text-text-secondary mb-1">Страницы показа</div>
                 <div className="flex flex-wrap gap-1">
@@ -371,14 +549,69 @@ export default function AdminBannersPage() {
                   ))}
                 </div>
               </div>
+              {(selectedBanner.category?.length || selectedBanner.keywords?.length || selectedBanner.regions?.length) && (
+                <div>
+                  <div className="text-sm text-text-secondary mb-1">Контекстная реклама</div>
+                  <div className="space-y-2">
+                    {selectedBanner.category && selectedBanner.category.length > 0 && (
+                      <div>
+                        <span className="text-xs text-text-secondary">Категории: </span>
+                        <span className="text-xs text-text-primary">{selectedBanner.category.join(', ')}</span>
+                      </div>
+                    )}
+                    {selectedBanner.keywords && selectedBanner.keywords.length > 0 && (
+                      <div>
+                        <span className="text-xs text-text-secondary">Ключевые слова: </span>
+                        <span className="text-xs text-text-primary">{selectedBanner.keywords.join(', ')}</span>
+                      </div>
+                    )}
+                    {selectedBanner.regions && selectedBanner.regions.length > 0 && (
+                      <div>
+                        <span className="text-xs text-text-secondary">Регионы: </span>
+                        <span className="text-xs text-text-primary">
+                          {selectedBanner.regions.includes('ALL') ? 'Все регионы' : selectedBanner.regions.join(', ')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {selectedBanner.pricing_model && (
+                <div>
+                  <div className="text-sm text-text-secondary mb-1">Монетизация</div>
+                  <div className="text-sm text-text-primary">
+                    Модель: {PRICING_MODELS.find((m) => m.value === selectedBanner.pricing_model)?.label || selectedBanner.pricing_model}
+                    {selectedBanner.pricing_model === 'cpc' && selectedBanner.price_per_click && (
+                      <div>Цена за клик: {selectedBanner.price_per_click} ₽</div>
+                    )}
+                    {selectedBanner.pricing_model === 'cpa' && selectedBanner.price_per_action && (
+                      <div>Цена за действие: {selectedBanner.price_per_action} ₽</div>
+                    )}
+                    {selectedBanner.pricing_model === 'fixed' && selectedBanner.fixed_price && (
+                      <div>Фиксированная цена: {selectedBanner.fixed_price} ₽</div>
+                    )}
+                  </div>
+                </div>
+              )}
               <div>
                 <div className="text-sm text-text-secondary mb-1">Статистика</div>
-                <div className="text-sm text-text-primary">
-                  Просмотры: {selectedBanner.views} | Клики: {selectedBanner.clicks}
-                  {selectedBanner.clicks > 0 && (
-                    <span className="ml-2">
+                <div className="text-sm text-text-primary space-y-1">
+                  <div>Просмотры: {selectedBanner.views}</div>
+                  <div>Клики: {selectedBanner.clicks}</div>
+                  {selectedBanner.clicks > 0 && selectedBanner.views > 0 && (
+                    <div>
                       CTR: {((selectedBanner.clicks / selectedBanner.views) * 100).toFixed(2)}%
-                    </span>
+                    </div>
+                  )}
+                  {selectedBanner.impression_limit && (
+                    <div className="text-orange-600">
+                      Лимит показов: {selectedBanner.current_impressions || 0} / {selectedBanner.impression_limit}
+                    </div>
+                  )}
+                  {selectedBanner.click_limit && (
+                    <div className="text-orange-600">
+                      Лимит кликов: {selectedBanner.current_clicks || 0} / {selectedBanner.click_limit}
+                    </div>
                   )}
                 </div>
               </div>
@@ -524,6 +757,39 @@ export default function AdminBannersPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1">
+                    Тип рекламы (Ad Type) *
+                  </label>
+                  <select
+                    value={editingBanner.ad_type || 'HERO_SPONSORED'}
+                    onChange={(e) => setEditingBanner({ ...editingBanner, ad_type: e.target.value as any })}
+                    className="input w-full"
+                  >
+                    {AD_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-text-secondary mt-1">
+                    Определяет, где и как будет показываться реклама
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1">
+                    Название бренда
+                  </label>
+                  <input
+                    type="text"
+                    value={editingBanner.brand_name || ''}
+                    onChange={(e) => setEditingBanner({ ...editingBanner, brand_name: e.target.value })}
+                    className="input w-full"
+                    placeholder="Название бренда или рекламодателя"
+                  />
                 </div>
 
                 <div>
@@ -698,6 +964,262 @@ export default function AdminBannersPage() {
                         })
                       }
                       className="input w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Контекстная реклама */}
+                <div className="border-t border-border-color pt-4 mt-4">
+                  <h3 className="text-lg font-semibold text-text-primary mb-3">Контекстная реклама</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1">
+                      Категории (через запятую)
+                    </label>
+                    <input
+                      type="text"
+                      value={editingBanner.category?.join(', ') || ''}
+                      onChange={(e) =>
+                        setEditingBanner({
+                          ...editingBanner,
+                          category: e.target.value
+                            .split(',')
+                            .map((c) => c.trim())
+                            .filter((c) => c.length > 0),
+                        })
+                      }
+                      className="input w-full"
+                      placeholder="roofing, electric, tiles"
+                    />
+                    <p className="text-xs text-text-secondary mt-1">
+                      Категории товаров/услуг для контекстного показа
+                    </p>
+                  </div>
+
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-text-primary mb-1">
+                      Ключевые слова (через запятую)
+                    </label>
+                    <input
+                      type="text"
+                      value={editingBanner.keywords?.join(', ') || ''}
+                      onChange={(e) =>
+                        setEditingBanner({
+                          ...editingBanner,
+                          keywords: e.target.value
+                            .split(',')
+                            .map((k) => k.trim())
+                            .filter((k) => k.length > 0),
+                        })
+                      }
+                      className="input w-full"
+                      placeholder="кровля, ремонт, электрика"
+                    />
+                  </div>
+
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-text-primary mb-1">
+                      Регионы (через запятую, или "ALL" для всех)
+                    </label>
+                    <input
+                      type="text"
+                      value={editingBanner.regions?.join(', ') || 'ALL'}
+                      onChange={(e) =>
+                        setEditingBanner({
+                          ...editingBanner,
+                          regions: e.target.value
+                            .split(',')
+                            .map((r) => r.trim())
+                            .filter((r) => r.length > 0),
+                        })
+                      }
+                      className="input w-full"
+                      placeholder="ALL или Grozny, Moscow"
+                    />
+                  </div>
+                </div>
+
+                {/* Монетизация */}
+                <div className="border-t border-border-color pt-4 mt-4">
+                  <h3 className="text-lg font-semibold text-text-primary mb-3">Монетизация</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1">
+                      Модель оплаты
+                    </label>
+                    <select
+                      value={editingBanner.pricing_model || 'fixed'}
+                      onChange={(e) =>
+                        setEditingBanner({ ...editingBanner, pricing_model: e.target.value as any })
+                      }
+                      className="input w-full"
+                    >
+                      {PRICING_MODELS.map((model) => (
+                        <option key={model.value} value={model.value}>
+                          {model.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {editingBanner.pricing_model === 'cpc' && (
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-text-primary mb-1">
+                        Цена за клик (₽)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={editingBanner.price_per_click || ''}
+                        onChange={(e) =>
+                          setEditingBanner({
+                            ...editingBanner,
+                            price_per_click: parseFloat(e.target.value) || undefined,
+                          })
+                        }
+                        className="input w-full"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  )}
+
+                  {editingBanner.pricing_model === 'cpa' && (
+                    <>
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-text-primary mb-1">
+                          Цена за действие (₽)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editingBanner.price_per_action || ''}
+                          onChange={(e) =>
+                            setEditingBanner({
+                              ...editingBanner,
+                              price_per_action: parseFloat(e.target.value) || undefined,
+                            })
+                          }
+                          className="input w-full"
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-text-primary mb-1">
+                          Аффилиатная ссылка
+                        </label>
+                        <input
+                          type="url"
+                          value={editingBanner.affiliate_url || ''}
+                          onChange={(e) =>
+                            setEditingBanner({ ...editingBanner, affiliate_url: e.target.value })
+                          }
+                          className="input w-full"
+                          placeholder="https://..."
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {editingBanner.pricing_model === 'fixed' && (
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-text-primary mb-1">
+                        Фиксированная цена (₽)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={editingBanner.fixed_price || ''}
+                        onChange={(e) =>
+                          setEditingBanner({
+                            ...editingBanner,
+                            fixed_price: parseFloat(e.target.value) || undefined,
+                          })
+                        }
+                        className="input w-full"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Лимиты */}
+                <div className="border-t border-border-color pt-4 mt-4">
+                  <h3 className="text-lg font-semibold text-text-primary mb-3">Лимиты</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-1">
+                        Лимит показов
+                      </label>
+                      <input
+                        type="number"
+                        value={editingBanner.impression_limit || ''}
+                        onChange={(e) =>
+                          setEditingBanner({
+                            ...editingBanner,
+                            impression_limit: e.target.value ? parseInt(e.target.value) : undefined,
+                          })
+                        }
+                        className="input w-full"
+                        placeholder="Без лимита"
+                      />
+                      <p className="text-xs text-text-secondary mt-1">
+                        Текущие: {editingBanner.current_impressions || 0}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-1">
+                        Лимит кликов
+                      </label>
+                      <input
+                        type="number"
+                        value={editingBanner.click_limit || ''}
+                        onChange={(e) =>
+                          setEditingBanner({
+                            ...editingBanner,
+                            click_limit: e.target.value ? parseInt(e.target.value) : undefined,
+                          })
+                        }
+                        className="input w-full"
+                        placeholder="Без лимита"
+                      />
+                      <p className="text-xs text-text-secondary mt-1">
+                        Текущие: {editingBanner.current_clicks || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Бейдж */}
+                <div className="border-t border-border-color pt-4 mt-4">
+                  <h3 className="text-lg font-semibold text-text-primary mb-3">Маркировка</h3>
+                  
+                  <div className="mb-3">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editingBanner.show_badge ?? true}
+                        onChange={(e) =>
+                          setEditingBanner({ ...editingBanner, show_badge: e.target.checked })
+                        }
+                        className="rounded"
+                      />
+                      <span className="text-sm text-text-primary">Показывать бейдж "Реклама"</span>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1">
+                      Текст бейджа
+                    </label>
+                    <input
+                      type="text"
+                      value={editingBanner.badge_text || 'Реклама'}
+                      onChange={(e) =>
+                        setEditingBanner({ ...editingBanner, badge_text: e.target.value })
+                      }
+                      className="input w-full"
+                      placeholder="Реклама"
                     />
                   </div>
                 </div>

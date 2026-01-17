@@ -11,6 +11,8 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import OrderResponseModal from '@/components/OrderResponseModal'
 import AcceptResponseModal from '@/components/AcceptResponseModal'
+import ProUpgradeModal from '@/components/ProUpgradeModal'
+import { formatRemaining, getCooldownRemainingMs, getMasterAccess } from '@/lib/masterAccess'
 
 const statusLabels: Record<string, string> = {
   open: 'Открыт',
@@ -43,6 +45,9 @@ export default function OrderPage() {
   const [showAcceptModal, setShowAcceptModal] = useState(false)
   const [selectedResponse, setSelectedResponse] = useState<OrderResponse | null>(null)
   const [userResponse, setUserResponse] = useState<OrderResponse | null>(null)
+  const [showProModal, setShowProModal] = useState(false)
+  const [proCountdownText, setProCountdownText] = useState<string | undefined>(undefined)
+  const [disableMasterRestrictions, setDisableMasterRestrictions] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -57,6 +62,13 @@ export default function OrderPage() {
       checkUserResponse()
     }
   }, [params.id, user])
+
+  useEffect(() => {
+    fetch('/api/pro/settings')
+      .then((r) => r.json())
+      .then((d) => setDisableMasterRestrictions(!!d?.disableMasterRestrictions))
+      .catch(() => {})
+  }, [])
 
   // Keyboard navigation for images
   useEffect(() => {
@@ -387,6 +399,8 @@ export default function OrderPage() {
   }
 
   const isOwnOrder = user.id === order.client_id
+  const access = getMasterAccess(user)
+  const isRestrictedMaster = user.role === 'master' && !disableMasterRestrictions && !access.isPro && !access.isTrial
 
   return (
     <div className="min-h-screen bg-bg-primary pb-20">
@@ -488,18 +502,46 @@ export default function OrderPage() {
 
             {/* Order Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 border-t border-border-color">
-              {order.location && (
-                <div className="flex items-start gap-3">
-                  <FiMapPin size={20} className="text-text-primary mt-1 flex-shrink-0" />
-                  <div>
-                    <div className="text-sm font-medium text-text-secondary mb-1">Адрес</div>
-                    <div className="text-base text-text-primary">{order.location}</div>
-                    {order.city && (
-                      <div className="text-sm text-text-secondary mt-1">{order.city}</div>
-                    )}
+              {(typeof (order as any)?.lat === 'number' && typeof (order as any)?.lng === 'number') ? (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <FiMapPin size={20} className="text-text-primary mt-1 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-text-secondary mb-1">Место выполнения работ</div>
+                      {(order as any)?.geocode_label ? (
+                        <div className="text-base text-text-primary font-medium mb-2">
+                          {(order as any).geocode_label}
+                        </div>
+                      ) : null}
+                      <div className="text-xs text-text-secondary mb-3">
+                        Координаты: {(order as any).lat.toFixed(6)}, {(order as any).lng.toFixed(6)}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/orders?view=map&focus=${order.id}`)}
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-brand-accent hover:underline"
+                        title="Открыть этот заказ на карте"
+                      >
+                        <FiMapPin size={16} />
+                        Открыть на карте
+                      </button>
+                    </div>
+                  </div>
+                  {/* Мини-карта */}
+                  <div className="h-48 w-full rounded-lg overflow-hidden border border-border-light/60">
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      frameBorder="0"
+                      scrolling="no"
+                      marginHeight={0}
+                      marginWidth={0}
+                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${(order as any).lng - 0.01},${(order as any).lat - 0.01},${(order as any).lng + 0.01},${(order as any).lat + 0.01}&layer=mapnik&marker=${(order as any).lat},${(order as any).lng}`}
+                      className="w-full h-full"
+                    />
                   </div>
                 </div>
-              )}
+              ) : null}
               {order.budget && (
                 <div className="flex items-start gap-3">
                   <div>
@@ -535,7 +577,31 @@ export default function OrderPage() {
                     <div className="text-sm text-text-secondary">Откликнитесь с вашей ценой и описанием подхода</div>
                   </div>
                   <button
-                    onClick={() => setShowResponseModal(true)}
+                    onClick={async () => {
+                      // Ограничение: 1 отклик в 3 дня для не-PRO после пробной недели
+                      if (isRestrictedMaster) {
+                        try {
+                          const { data: lastResp } = await supabase
+                            .from('order_responses')
+                            .select('created_at')
+                            .eq('master_id', user.id)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .maybeSingle()
+
+                          const remainingMs = getCooldownRemainingMs(lastResp?.created_at || null, 3)
+                          if (remainingMs > 0) {
+                            const r = formatRemaining(remainingMs)
+                            setProCountdownText(`Осталось до следующего отклика: ${r.days}д ${r.hours}ч ${r.minutes}м`)
+                            setShowProModal(true)
+                            return
+                          }
+                        } catch (e) {
+                          console.error('Cooldown check failed:', e)
+                        }
+                      }
+                      setShowResponseModal(true)
+                    }}
                     className="btn btn-primary flex items-center gap-2"
                   >
                     <FiBriefcase size={18} />
@@ -561,8 +627,13 @@ export default function OrderPage() {
           {client && (
             <div className="card mb-6">
               <h2 className="text-xl font-semibold text-text-primary mb-4">Клиент</h2>
+              {isRestrictedMaster && !isOwnOrder && (
+                <div className="mb-4 text-sm text-text-secondary bg-bg-secondary/60 border border-border-light/60 rounded-lg p-3">
+                  ФИО клиента скрыто по вашему тарифу. Оформите <span className="font-semibold text-brand-accent">PRO</span>, чтобы видеть данные клиента.
+                </div>
+              )}
               <div className="flex items-start gap-4">
-                {client.avatar_url ? (
+                {!isRestrictedMaster && client.avatar_url ? (
                   <img
                     src={client.avatar_url}
                     alt={client.full_name}
@@ -570,12 +641,12 @@ export default function OrderPage() {
                   />
                 ) : (
                   <div className="w-16 h-16 bg-text-primary flex items-center justify-center text-white text-xl font-semibold border-2 border-border-color rounded-full flex-shrink-0">
-                    {client.full_name?.[0]?.toUpperCase() || '?'}
+                    {isRestrictedMaster ? '•' : (client.full_name?.[0]?.toUpperCase() || '?')}
                   </div>
                 )}
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-text-primary mb-1">
-                    {client.full_name || 'Клиент'}
+                    {isRestrictedMaster && !isOwnOrder ? 'Клиент (скрыто)' : (client.full_name || 'Клиент')}
                   </h3>
                   {client.city && (
                     <div className="flex items-center gap-1 text-sm text-text-secondary mb-2">
@@ -737,6 +808,15 @@ export default function OrderPage() {
         onConfirm={handleAcceptResponse}
         masterName={(selectedResponse?.master as any)?.full_name || 'Мастер'}
         price={selectedResponse?.price}
+      />
+
+      <ProUpgradeModal
+        isOpen={showProModal}
+        onClose={() => setShowProModal(false)}
+        title="Ограничения тарифа"
+        description="После пробной недели без PRO вы можете оставлять отклик не чаще 1 раза в 3 дня. Оформите PRO, чтобы снять ограничение."
+        countdownText={proCountdownText}
+        ctaText="Купить PRO мастер"
       />
     </div>
   )

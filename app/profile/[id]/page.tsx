@@ -8,8 +8,18 @@ import { supabase, User, PortfolioItem, Specialization, Service, Product } from 
 import Navbar from '@/components/Navbar'
 import PortfolioGrid from '@/components/PortfolioGrid'
 import PortfolioGallery from '@/components/PortfolioGallery'
-import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock, FiArrowLeft, FiLogOut, FiUser, FiShield } from 'react-icons/fi'
+import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock, FiArrowLeft, FiLogOut, FiUser, FiShield, FiHeart, FiShoppingBag, FiChevronDown, FiChevronUp, FiSend } from 'react-icons/fi'
+import { format } from 'date-fns'
+import { ru } from 'date-fns/locale'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
+import AdSlot from '@/components/AdSlot'
+import ReviewCard from '@/components/ReviewCard'
+import ReviewForm from '@/components/ReviewForm'
+import ReviewReplyForm from '@/components/ReviewReplyForm'
+import RatingStars from '@/components/RatingStars'
+import StoriesCircle from '@/components/StoriesCircle'
+import CreateStory from '@/components/CreateStory'
+import { Story } from '@/lib/supabase'
 
 export default function ProfilePage() {
   const params = useParams()
@@ -32,6 +42,20 @@ export default function ProfilePage() {
   const [profileServices, setProfileServices] = useState<Service[]>([])
   const [isFollowing, setIsFollowing] = useState<boolean>(false)
   const [followLoading, setFollowLoading] = useState(false)
+  const [followersCount, setFollowersCount] = useState<number>(0)
+  const [productsCount, setProductsCount] = useState<number>(0)
+  const [masterReviews, setMasterReviews] = useState<any[]>([])
+  const [productReviews, setProductReviews] = useState<any[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [editingReview, setEditingReview] = useState<any>(null)
+  const [replyingToReview, setReplyingToReview] = useState<string | null>(null)
+  const [reviewsExpanded, setReviewsExpanded] = useState(false)
+  const [quickReviewRating, setQuickReviewRating] = useState(0)
+  const [quickReviewText, setQuickReviewText] = useState('')
+  const [sendingQuickReview, setSendingQuickReview] = useState(false)
+  const [existingUserReview, setExistingUserReview] = useState<any>(null)
+  const [profileStories, setProfileStories] = useState<Story[]>([])
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
@@ -76,8 +100,8 @@ export default function ProfilePage() {
       // Сначала загружаем профиль, потом остальные данные
       fetchProfile()
       if (currentUser) {
-        checkFollowing()
-      }
+    checkFollowing()
+    }
     }
   }, [params.id, currentUser])
 
@@ -147,10 +171,18 @@ export default function ProfilePage() {
       await fetchSelections()
       
       // Загружаем данные в зависимости от роли
-      if (userData.role === 'master') {
+      const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+      if (userData.role === 'master' && profileId) {
         await fetchPortfolio()
-      } else if (userData.role === 'seller') {
+        await fetchMasterReviews(profileId)
+      } else if (userData.role === 'seller' && profileId) {
         await fetchSellerProducts()
+        await fetchSellerStats(profileId)
+        await fetchProductReviews(profileId)
+      }
+      // Загружаем истории профиля
+      if (profileId) {
+        await fetchProfileStories(profileId)
       }
     } catch (error) {
       console.error('Error fetching profile:', error)
@@ -162,15 +194,19 @@ export default function ProfilePage() {
   const checkFollowing = async () => {
     if (!currentUser || !params.id) return
     try {
+      const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+      if (!profileId) return
+      
       const { data, error } = await supabase
         .from('follows')
         .select('id')
         .eq('follower_id', currentUser.id)
-        .eq('following_id', params.id)
+        .eq('following_id', profileId)
         .maybeSingle()
       if (error) throw error
       setIsFollowing(!!data)
     } catch (error) {
+      console.error('Error checking follow status:', error)
       setIsFollowing(false)
     }
   }
@@ -294,6 +330,10 @@ export default function ProfilePage() {
           .insert({ follower_id: currentUser.id, following_id: profile.id })
         setIsFollowing(true)
       }
+      // Обновляем статистику подписчиков после изменения подписки
+      if (profile.role === 'seller') {
+        await fetchSellerStats(profile.id)
+      }
     } catch (error) {
       console.error('Follow error:', error)
     } finally {
@@ -359,7 +399,8 @@ export default function ProfilePage() {
         .from('products')
         .select(`
           *,
-          seller:profiles(id, full_name, avatar_url, city)
+          seller:profiles(id, full_name, avatar_url, city),
+          category_ref:product_categories(id, name, section)
         `)
         .eq('seller_id', params.id)
         .order('created_at', { ascending: false })
@@ -368,6 +409,198 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error fetching products:', error)
       setProducts([])
+    }
+  }
+
+  const fetchSellerStats = async (sellerId: string) => {
+    try {
+      // Получаем количество подписчиков
+      const { count: followersCount, error: followersError } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('following_id', sellerId)
+      
+      if (followersError) {
+        console.error('Error fetching followers count:', followersError)
+      }
+      
+      // Получаем количество товаров
+      const { count: productsCount, error: productsError } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('seller_id', sellerId)
+      
+      if (productsError) {
+        console.error('Error fetching products count:', productsError)
+      }
+      
+      // Получаем количество отзывов о продавце (из отзывов о товарах)
+      const { count: reviewsCount, error: reviewsError } = await supabase
+        .from('product_reviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('seller_id', sellerId)
+      
+      if (reviewsError) {
+        console.error('Error fetching reviews count:', reviewsError)
+      }
+      
+      setFollowersCount(followersCount ?? 0)
+      setProductsCount(productsCount ?? 0)
+      
+      // Обновляем статистику в профиле (для отображения)
+      if (profile && profile.role === 'seller') {
+        setProfile({
+          ...profile,
+          seller_reviews_count: reviewsCount ?? 0,
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching seller stats:', error)
+      setFollowersCount(0)
+      setProductsCount(0)
+    }
+  }
+
+  const fetchMasterReviews = async (masterId: string) => {
+    try {
+      setReviewsLoading(true)
+      const { data, error } = await supabase
+        .from('master_reviews')
+        .select(`
+          *,
+          reviewer:profiles!reviewer_id(id, full_name, avatar_url, role)
+        `)
+        .eq('master_id', masterId)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (error) throw error
+
+      // Получаем ответы на отзывы
+      const reviewIds = data?.map(r => r.id) || []
+      if (reviewIds.length > 0) {
+        const { data: replies } = await supabase
+          .from('review_replies')
+          .select(`
+            *,
+            author:profiles!author_id(id, full_name, avatar_url)
+          `)
+          .eq('review_type', 'master')
+          .in('review_id', reviewIds)
+          .order('created_at', { ascending: true })
+
+        const repliesMap = new Map<string, any[]>()
+        replies?.forEach(reply => {
+          if (!repliesMap.has(reply.review_id)) {
+            repliesMap.set(reply.review_id, [])
+          }
+          repliesMap.get(reply.review_id)!.push(reply)
+        })
+
+      const reviewsWithReplies = data?.map(review => ({
+        ...review,
+        replies: repliesMap.get(review.id) || []
+      })) || []
+
+        setMasterReviews(reviewsWithReplies)
+        
+        // Проверяем, есть ли отзыв от текущего пользователя
+        if (currentUser) {
+          const userReview = reviewsWithReplies.find((r: any) => r.reviewer_id === currentUser.id)
+          if (userReview) {
+            setExistingUserReview(userReview)
+            // Предзаполняем форму редактирования
+            setQuickReviewRating(userReview.rating)
+            setQuickReviewText(userReview.comment || '')
+          } else {
+            setExistingUserReview(null)
+            setQuickReviewRating(0)
+            setQuickReviewText('')
+          }
+        }
+      } else {
+        setMasterReviews([])
+        setExistingUserReview(null)
+        setQuickReviewRating(0)
+        setQuickReviewText('')
+      }
+    } catch (error) {
+      console.error('Error fetching master reviews:', error)
+      setMasterReviews([])
+      setExistingUserReview(null)
+    } finally {
+      setReviewsLoading(false)
+    }
+  }
+
+  const fetchProfileStories = async (userId: string) => {
+    try {
+      const params = new URLSearchParams({
+        userId: userId,
+        ...(currentUser?.id && { currentUserId: currentUser.id }),
+      })
+      const response = await fetch(`/api/stories?${params.toString()}`)
+      if (!response.ok) throw new Error('Failed to fetch stories')
+      const data = await response.json()
+      setProfileStories(data.stories || [])
+    } catch (error) {
+      console.error('Error fetching profile stories:', error)
+      setProfileStories([])
+    }
+  }
+
+  const fetchProductReviews = async (sellerId: string) => {
+    try {
+      setReviewsLoading(true)
+      // Получаем все отзывы о товарах продавца
+      const { data, error } = await supabase
+        .from('product_reviews')
+        .select(`
+          *,
+          reviewer:profiles!reviewer_id(id, full_name, avatar_url, role),
+          product:products!product_id(id, name)
+        `)
+        .eq('seller_id', sellerId)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (error) throw error
+
+      // Получаем ответы на отзывы
+      const reviewIds = data?.map(r => r.id) || []
+      if (reviewIds.length > 0) {
+        const { data: replies } = await supabase
+          .from('review_replies')
+          .select(`
+            *,
+            author:profiles!author_id(id, full_name, avatar_url)
+          `)
+          .eq('review_type', 'product')
+          .in('review_id', reviewIds)
+          .order('created_at', { ascending: true })
+
+        const repliesMap = new Map<string, any[]>()
+        replies?.forEach(reply => {
+          if (!repliesMap.has(reply.review_id)) {
+            repliesMap.set(reply.review_id, [])
+          }
+          repliesMap.get(reply.review_id)!.push(reply)
+        })
+
+        const reviewsWithReplies = data?.map(review => ({
+          ...review,
+          replies: repliesMap.get(review.id) || []
+        })) || []
+
+        setProductReviews(reviewsWithReplies)
+      } else {
+        setProductReviews([])
+      }
+    } catch (error) {
+      console.error('Error fetching product reviews:', error)
+      setProductReviews([])
+    } finally {
+      setReviewsLoading(false)
     }
   }
 
@@ -508,6 +741,7 @@ export default function ProfilePage() {
       alert('Ошибка при удалении фоновой картинки')
     }
   }
+
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -701,7 +935,7 @@ export default function ProfilePage() {
             </div>
           )}
           {/* Tabs */}
-          <div className="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-border-color overflow-x-auto">
+          <div className="flex gap-1 sm:gap-2 mb-6 sm:mb-8 border-b border-border-color/40 overflow-x-auto">
             <button
               onClick={() => setActiveTab('profile')}
               className={`px-3 sm:px-4 py-2 font-medium text-sm sm:text-base transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
@@ -724,13 +958,21 @@ export default function ProfilePage() {
                 Настройки
               </button>
             )}
+            {isOwnProfile && (currentUser?.role === 'master' || currentUser?.role === 'seller') && (
+              <button
+                onClick={() => router.push('/pro')}
+                className="px-3 sm:px-4 py-2 font-semibold text-sm sm:text-base transition-colors border-b-2 whitespace-nowrap flex-shrink-0 border-transparent text-brand-accent hover:text-brand-accent-hover"
+              >
+                PRO / Подписка
+              </button>
+            )}
           </div>
 
           {/* Profile Tab Content */}
           {activeTab === 'profile' && (
             <>
               {/* Cover Photo and Avatar */}
-              <div className="relative mb-4 sm:mb-6 rounded-2xl overflow-hidden h-[200px] sm:h-[250px] group/cover shadow-glossy">
+              <div className="relative mb-8 sm:mb-10 rounded-2xl overflow-hidden h-[200px] sm:h-[250px] group/cover shadow-glossy">
                 {profile.cover_photo_url ? (
                   <>
                     <img
@@ -749,11 +991,11 @@ export default function ProfilePage() {
                   <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 bg-gradient-to-br from-graphite-primary to-graphite-tertiary border-2 sm:border-4 border-white/50 flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-semibold rounded-full shadow-premium overflow-hidden">
                     {profile.avatar_url ? (
                       <>
-                        <img
-                          src={profile.avatar_url}
-                          alt={profile.full_name}
+                      <img
+                        src={profile.avatar_url}
+                        alt={profile.full_name}
                           className="w-full h-full object-cover rounded-full transition-all duration-300 group-hover/avatar:scale-110"
-                        />
+                      />
                         <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                       </>
                     ) : (
@@ -766,8 +1008,8 @@ export default function ProfilePage() {
               </div>
 
               {/* Profile Info Card */}
-              <div className="card-glossy mb-4 sm:mb-6 mt-12 sm:mt-16 md:mt-20 w-full">
-                <div className="flex flex-col md:flex-row gap-4 sm:gap-6 w-full">
+              <div className="card-glossy mb-8 sm:mb-10 mt-12 sm:mt-16 md:mt-20 w-full">
+                <div className="flex flex-col md:flex-row gap-4 sm:gap-6 w-full px-4 sm:px-5">
                   <div className="flex-1 w-full">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3 flex-wrap">
                       <h1 className="text-xl sm:text-2xl font-semibold text-graphite-secondary tracking-tight">{profile.full_name}</h1>
@@ -802,9 +1044,9 @@ export default function ProfilePage() {
                       )}
                     </div>
                     {profile.description && (
-                      <p className="text-text-secondary mb-4 text-base leading-relaxed">{profile.description}</p>
+                      <p className="text-text-secondary mb-5 text-base leading-relaxed">{profile.description}</p>
                     )}
-                    <div className="flex flex-wrap gap-3 text-sm text-text-secondary">
+                    <div className="flex flex-wrap gap-4 text-sm text-text-secondary">
                       {profile.city && (
                         <div className="flex items-center gap-1">
                           <FiMapPin size={14} />
@@ -825,20 +1067,37 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
+                {/* Истории профиля (только для мастера/продавца) */}
+                {(profile.role === 'master' || profile.role === 'seller') && (
+                  <div className="mt-6 px-4 sm:px-5">
+                    <StoriesCircle
+                      stories={profileStories}
+                      currentUser={currentUser}
+                      isOwnProfile={isOwnProfile}
+                      onStoryCreated={() => {
+                        const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                        if (profileId) {
+                          fetchProfileStories(profileId)
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+
                 {/* Master-specific information */}
                 {profile.role === 'master' && (
-                  <div className="mt-6 pt-6 border-t border-border-color">
+                  <div className="mt-10 pt-8 px-4 sm:px-5 border-t border-border-color/40">
                     {profileSpecializations.length > 0 && (
-                      <div className="mb-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
+                      <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-graphite-secondary">
                           <FiBriefcase size={16} />
                           <span>Специализации</span>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2.5">
                           {profileSpecializations.map((spec) => (
                             <span
                               key={spec.id}
-                              className="px-3 py-1 bg-bg-secondary border border-border-light text-xs font-medium text-graphite-secondary rounded-md"
+                              className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
                             >
                               {spec.name}
                             </span>
@@ -847,10 +1106,10 @@ export default function ProfilePage() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
                       {profile.services && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
+                          <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-graphite-secondary">
                             <FiBriefcase size={16} />
                             <span>Описание услуг</span>
                           </div>
@@ -859,7 +1118,7 @@ export default function ProfilePage() {
                       )}
                       {profile.service_location && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
+                          <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-graphite-secondary">
                             <FiHome size={16} />
                             <span>Место обслуживания</span>
                           </div>
@@ -872,7 +1131,7 @@ export default function ProfilePage() {
                       )}
                       {profile.experience_years && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
+                          <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-graphite-secondary">
                             <FiBriefcase size={16} />
                             <span>Опыт работы</span>
                           </div>
@@ -881,7 +1140,7 @@ export default function ProfilePage() {
                       )}
                       {profile.work_schedule && (
                         <div>
-                          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
+                          <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-graphite-secondary">
                             <FiClock size={16} />
                             <span>График работы</span>
                           </div>
@@ -891,16 +1150,16 @@ export default function ProfilePage() {
                     </div>
 
                     {profileServices.length > 0 && (
-                      <div className="mt-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
+                      <div className="mt-8">
+                        <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-graphite-secondary">
                           <FiBriefcase size={16} />
-                          <span>Выбранные услуги</span>
+                          <span>Услуги мастера</span>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2.5">
                           {profileServices.map((svc) => (
                             <span
                               key={svc.id}
-                              className="px-3 py-1 bg-bg-secondary border border-border-light text-xs font-medium text-graphite-secondary rounded-md"
+                              className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
                             >
                               {svc.name}
                             </span>
@@ -909,17 +1168,305 @@ export default function ProfilePage() {
                       </div>
                     )}
 
+                    {/* Отзывы о мастере - раскрываемая секция */}
+                    {profile.role === 'master' && (
+                      <div className="mt-8 border-t border-border-color/40 pt-6">
+                        <button
+                          onClick={() => setReviewsExpanded(!reviewsExpanded)}
+                          className="w-full flex items-center justify-between text-left"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-graphite-secondary">Отзывы</span>
+                            {(masterReviews.length > 0 || (profile.master_reviews_count && profile.master_reviews_count > 0)) ? (
+                              <div className="flex items-center gap-1.5">
+                                {profile.master_rating && profile.master_rating > 0 ? (
+                                  <>
+                                    <span className="text-sm">⭐</span>
+                                    <span className="text-xs text-text-secondary font-medium">
+                                      {profile.master_rating.toFixed(1)} · {(masterReviews.length > 0 ? masterReviews.length : profile.master_reviews_count || 0)} {(masterReviews.length === 1 || (profile.master_reviews_count === 1)) ? 'отзыв' : ((masterReviews.length < 5 || (profile.master_reviews_count && profile.master_reviews_count < 5)) ? 'отзыва' : 'отзывов')}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-text-secondary font-medium">
+                                    {(masterReviews.length > 0 ? masterReviews.length : profile.master_reviews_count || 0)} {(masterReviews.length === 1 || (profile.master_reviews_count === 1)) ? 'отзыв' : ((masterReviews.length < 5 || (profile.master_reviews_count && profile.master_reviews_count < 5)) ? 'отзыва' : 'отзывов')}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-text-secondary">Пока нет отзывов</span>
+                            )}
+                          </div>
+                          {reviewsExpanded ? (
+                            <FiChevronUp size={18} className="text-text-secondary" />
+                          ) : (
+                            <FiChevronDown size={18} className="text-text-secondary" />
+                          )}
+                        </button>
+
+                        {/* Раскрываемая область с отзывами и полем ввода (стиль чата) */}
+                        {reviewsExpanded && (
+                          <div className="mt-4 card-glossy p-0 overflow-hidden flex flex-col" style={{ maxHeight: '600px' }}>
+                            {/* Список отзывов (прокручиваемая область) */}
+                            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 max-h-[450px]">
+                              {reviewsLoading ? (
+                                <div className="text-center text-text-secondary py-10">
+                                  Загрузка отзывов...
+                                </div>
+                              ) : masterReviews.length === 0 ? (
+                                <div className="text-center text-text-secondary py-10">
+                                  Пока нет отзывов
+                                </div>
+                              ) : (
+                                masterReviews.map((review) => (
+                                  <ReviewCard
+                                    key={review.id}
+                                    review={review}
+                                    reviewType="master"
+                                    currentUser={currentUser}
+                                    onReply={(reviewId) => setReplyingToReview(replyingToReview === reviewId ? null : reviewId)}
+                                    onEdit={(review) => {
+                                      setEditingReview(review)
+                                      setShowReviewForm(true)
+                                    }}
+                                    onDelete={async (reviewId) => {
+                                      if (confirm('Вы уверены, что хотите удалить отзыв?')) {
+                                        try {
+                                          const { error } = await supabase
+                                            .from('master_reviews')
+                                            .delete()
+                                            .eq('id', reviewId)
+                                          if (error) throw error
+                                          
+                                          // Если удалили свой отзыв - сбрасываем форму и показываем форму создания
+                                          if (currentUser && reviewId === existingUserReview?.id) {
+                                            setExistingUserReview(null)
+                                            setQuickReviewRating(0)
+                                            setQuickReviewText('')
+                                          }
+                                          
+                                          const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                                          if (profileId) {
+                                            fetchMasterReviews(profileId)
+                                            fetchProfile()
+                                          }
+                                        } catch (error) {
+                                          console.error('Error deleting review:', error)
+                                          alert('Ошибка при удалении отзыва')
+                                        }
+                                      }
+                                    }}
+                                    showReplies={true}
+                                  />
+                                ))
+                              )}
+                              {replyingToReview && currentUser && (
+                                <div className="pt-3 border-t border-border-light/40">
+                                  <ReviewReplyForm
+                                    reviewId={replyingToReview}
+                                    reviewType="master"
+                                    currentUserId={currentUser.id}
+                                    onSuccess={() => {
+                                      setReplyingToReview(null)
+                                      const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                                      if (profileId) {
+                                        fetchMasterReviews(profileId)
+                                      }
+                                    }}
+                                    onCancel={() => setReplyingToReview(null)}
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Поле для быстрого создания/редактирования отзыва (внизу, как в чате) - двухэтапный процесс */}
+                            {currentUser && profile && currentUser.id !== profile.id && !existingUserReview && (
+                              <div className="border-t border-border-color/40 bg-bg-primary px-4 py-3">
+                                {/* Этап 1: Выбор рейтинга (показывается сначала) */}
+                                {quickReviewRating === 0 && (
+                                  <div className="space-y-3">
+                                    <label className="block text-sm font-medium text-graphite-secondary text-center">
+                                      Ваша оценка *
+                                    </label>
+                                    <div className="flex justify-center py-2">
+                                      <div className="bg-bg-secondary/50 rounded-lg px-4 py-3 border border-border-light/60">
+                                        <RatingStars
+                                          rating={quickReviewRating}
+                                          onRatingChange={(rating) => {
+                                            setQuickReviewRating(rating)
+                                          }}
+                                          size="lg"
+                                          readonly={false}
+                                        />
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-text-secondary text-center">
+                                      Выберите оценку, чтобы продолжить
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Этап 2: Поле для текста отзыва (показывается после выбора рейтинга) */}
+                                {quickReviewRating > 0 && (
+                                  <form
+                                    onSubmit={async (e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      
+                                      if (!currentUser || !profile) {
+                                        alert('Ошибка: пользователь не авторизован')
+                                        return
+                                      }
+
+                                      if (quickReviewRating === 0) {
+                                        alert('Пожалуйста, выберите рейтинг')
+                                        return
+                                      }
+
+                                      // Проверяем, есть ли уже отзыв от этого пользователя
+                                      const existingReview = masterReviews.find(r => r.reviewer_id === currentUser.id)
+                                      
+                                      setSendingQuickReview(true)
+                                      try {
+                                        const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                                        if (!profileId) {
+                                          throw new Error('ID профиля не найден')
+                                        }
+
+                                        // Если отзыв уже есть, обновляем его, иначе создаем новый
+                                        if (existingReview) {
+                                          // Обновляем существующий отзыв (рейтинг и комментарий)
+                                          const { error } = await supabase
+                                            .from('master_reviews')
+                                            .update({
+                                              rating: quickReviewRating,
+                                              comment: quickReviewText.trim() || null,
+                                            })
+                                            .eq('id', existingReview.id)
+
+                                          if (error) throw error
+                                        } else {
+                                          // Создаем новый отзыв с выбранным рейтингом
+                                          const { error } = await supabase
+                                            .from('master_reviews')
+                                            .insert({
+                                              master_id: profile.id,
+                                              reviewer_id: currentUser.id,
+                                              rating: quickReviewRating,
+                                              comment: quickReviewText.trim() || null,
+                                            })
+
+                                          if (error) {
+                                            if (error.code === '23505') {
+                                              alert('Вы уже оставили отзыв. Можно отредактировать существующий.')
+                                              return
+                                            }
+                                            throw error
+                                          }
+                                        }
+
+                                        // Обновляем данные
+                                        if (profileId) {
+                                          await fetchMasterReviews(profileId)
+                                          await fetchProfile()
+                                        }
+                                        
+                                        // Если это был новый отзыв - сбрасываем форму, иначе оставляем для редактирования
+                                        if (!existingReview) {
+                                          setQuickReviewRating(0)
+                                          setQuickReviewText('')
+                                        }
+                                        
+                                        // Прокручиваем к началу списка отзывов
+                                        setTimeout(() => {
+                                          const reviewsContainer = document.querySelector('.overflow-y-auto')
+                                          if (reviewsContainer) {
+                                            reviewsContainer.scrollTop = 0
+                                          }
+                                        }, 100)
+                                      } catch (error: any) {
+                                        console.error('Error creating review:', error)
+                                        alert(`Ошибка при отправке отзыва: ${error.message || 'Неизвестная ошибка'}`)
+                                      } finally {
+                                        setSendingQuickReview(false)
+                                      }
+                                    }}
+                                    className="space-y-3"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {/* Показываем выбранный рейтинг с возможностью изменить */}
+                                    <div className="flex items-center justify-between">
+                                      <label className="block text-sm font-medium text-graphite-secondary">
+                                        Ваша оценка: {quickReviewRating} {quickReviewRating === 1 ? 'звезда' : quickReviewRating < 5 ? 'звезды' : 'звезд'}
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={() => setQuickReviewRating(0)}
+                                        className="text-xs text-text-secondary hover:text-brand-accent transition-colors"
+                                      >
+                                        Изменить
+                                      </button>
+                                    </div>
+                                    <div className="flex justify-center">
+                                      <RatingStars
+                                        rating={quickReviewRating}
+                                        onRatingChange={(rating) => {
+                                          setQuickReviewRating(rating)
+                                        }}
+                                        size="md"
+                                        readonly={false}
+                                      />
+                                    </div>
+
+                                    {/* Поле ввода текста */}
+                                    <div className="flex gap-2">
+                                      <div className="flex-1 relative">
+                                        <textarea
+                                          value={quickReviewText}
+                                          onChange={(e) => setQuickReviewText(e.target.value)}
+                                          placeholder="Написать отзыв (необязательно)..."
+                                          rows={2}
+                                          className="input resize-none pr-16 w-full text-sm"
+                                          maxLength={1000}
+                                        />
+                                        <div className="absolute bottom-2 right-12 text-xs text-text-secondary pointer-events-none">
+                                          {quickReviewText.length}/1000
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="submit"
+                                        disabled={sendingQuickReview}
+                                        className="h-auto px-4 py-2 bg-brand-accent text-white rounded-lg hover:bg-brand-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0 self-end"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                        }}
+                                      >
+                                        {sendingQuickReview ? (
+                                          <span className="text-xs">Отправка...</span>
+                                        ) : (
+                                          <FiSend size={18} />
+                                        )}
+                                      </button>
+                                    </div>
+                                  </form>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {profileSpecializations.length === 0 && profile.specialization && (
-                      <div className="mt-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
+                      <div className="mt-8">
+                        <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-graphite-secondary">
                           <FiBriefcase size={16} />
                           <span>Специализация</span>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2.5">
                           {profile.specialization.split(',').map((spec, index) => (
                             <span
                               key={index}
-                              className="px-3 py-1 bg-bg-secondary border border-border-light text-xs font-medium text-graphite-secondary rounded-md"
+                              className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
                             >
                               {spec.trim()}
                             </span>
@@ -932,18 +1479,18 @@ export default function ProfilePage() {
 
                 {/* Seller-specific information */}
                 {profile.role === 'seller' && (
-                  <div className="mt-6 pt-6 border-t border-border-color">
+                  <div className="mt-10 pt-8 border-t border-border-color/40">
                     {profile.product_categories && (
-                      <div className="mb-4">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
+                      <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-graphite-secondary">
                           <FiBriefcase size={16} />
                           <span>Категории товаров</span>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2.5">
                           {profile.product_categories.split(',').map((category, index) => (
                             <span
                               key={index}
-                              className="px-3 py-1 bg-bg-secondary border border-border-light text-xs font-medium text-graphite-secondary rounded-md"
+                              className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
                             >
                               {category.trim()}
                             </span>
@@ -955,11 +1502,45 @@ export default function ProfilePage() {
                 )}
               </div>
 
+              {/* PROFILE_RELATED реклама для мастеров */}
+              {profile.role === 'master' && (
+                <div className="mb-10 sm:mb-12 w-full">
+                  <AdSlot 
+                    type="PROFILE_RELATED" 
+                    context={{ 
+                      masterId: profile.id,
+                      specialization: profile.specialization || profileSpecializations[0]?.name || undefined
+                    }}
+                    className="mb-6"
+                  />
+                </div>
+              )}
+
               {/* Products for Sellers */}
               {profile.role === 'seller' && (
-                <div className="mb-6 sm:mb-8 w-full">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
-                    <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight">Товары продавца</h2>
+                <div className="mb-10 sm:mb-12 w-full">
+                  {/* Статистика продавца */}
+                  <div className="card mb-6">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <div className="text-lg font-semibold text-graphite-secondary">
+                          {profile.seller_reviews_count || 0}
+                        </div>
+                        <div className="text-sm text-text-secondary">Отзывов</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-semibold text-graphite-secondary">{productsCount}</div>
+                        <div className="text-sm text-text-secondary">Товаров</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-semibold text-graphite-secondary">{followersCount}</div>
+                        <div className="text-sm text-text-secondary">Подписчиков</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
+                    <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight">Товары</h2>
                     {isOwnProfile && (
                       <Link
                         href="/products/new"
@@ -974,31 +1555,78 @@ export default function ProfilePage() {
                       Пока нет товаров
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
                       {products.map((product) => {
                         const thumb = product.images && product.images.length > 0 ? product.images[0] : ''
+                        const imagesCount = product.images ? product.images.length : 0
+                        const timeAgo = product.created_at ? format(new Date(product.created_at), 'd MMMM в HH:mm', { locale: ru }) : ''
+                        const isToday = product.created_at ? new Date(product.created_at).toDateString() === new Date().toDateString() : false
+                        const isYesterday = product.created_at ? new Date(product.created_at).toDateString() === new Date(Date.now() - 86400000).toDateString() : false
+                        let timeDisplay = timeAgo
+                        if (isToday) {
+                          timeDisplay = `сегодня в ${format(new Date(product.created_at!), 'HH:mm', { locale: ru })}`
+                        } else if (isYesterday) {
+                          timeDisplay = `вчера в ${format(new Date(product.created_at!), 'HH:mm', { locale: ru })}`
+                        }
+                        
                         return (
                           <Link
                             key={product.id}
                             href={`/products/${product.id}`}
-                            className="card hover:shadow-card-hover transition flex gap-4 items-center"
+                            className="card-glossy overflow-hidden group cursor-pointer flex flex-col !p-0 relative"
                           >
-                            <div className="w-20 h-20 bg-bg-secondary border border-border-color flex items-center justify-center overflow-hidden rounded-lg">
+                            {/* Глянцевый эффект */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
+                            
+                            {/* Изображение товара */}
+                            <div className="w-full h-[180px] bg-bg-secondary relative overflow-hidden rounded-t-[12px] flex-shrink-0 group/image">
                               {thumb ? (
-                                <img src={thumb} alt={product.name} className="w-full h-full object-cover" />
+                                <>
+                                  <img
+                                    src={thumb}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/20 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+                                </>
                               ) : (
-                                <span className="text-3xl">🛒</span>
+                                <div className="w-full h-full flex items-center justify-center text-text-secondary text-4xl bg-bg-secondary">
+                                  <FiShoppingBag size={48} strokeWidth={1.5} />
+                                </div>
                               )}
+                              {/* Иконка сердца (избранное) */}
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                }}
+                                className="absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:bg-white transition-colors z-20"
+                              >
+                                <FiHeart size={16} className="text-text-secondary" />
+                              </button>
+                              {/* Количество фото */}
+                              {imagesCount > 0 && (
+                                <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-white px-2 py-1 text-xs font-medium rounded-lg flex items-center gap-1 z-20">
+                                  <FiCamera size={12} />
+                                  <span>{imagesCount}</span>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-base font-semibold text-graphite-secondary line-clamp-1">
-                                {product.name}
+                              )}
                               </div>
-                              <div className="text-xl font-semibold text-brand-accent mt-1">
+
+                            {/* Информация о товаре */}
+                            <div className="flex flex-col flex-1 p-4 relative z-20">
+                              <div className="text-lg font-semibold text-brand-accent mb-2">
                                 {product.price.toLocaleString('ru-RU')} ₽
                               </div>
-                              <div className="text-sm text-text-secondary line-clamp-2 mt-1">
-                                {product.category || 'Категория не указана'}
+                              <h3 className="font-medium text-sm text-graphite-secondary mb-2 line-clamp-2 leading-tight group-hover:text-brand-accent transition-colors">
+                                {product.name}
+                              </h3>
+                              <div className="flex items-center gap-1.5 text-xs text-text-secondary mt-auto pt-2 border-t border-border-light/40">
+                                <FiMapPin size={12} />
+                                <span>{profile.city || 'Город не указан'}</span>
+                              </div>
+                              <div className="text-xs text-text-secondary mt-1">
+                                {timeDisplay}
                               </div>
                             </div>
                           </Link>
@@ -1006,13 +1634,109 @@ export default function ProfilePage() {
                       })}
                     </div>
                   )}
+
+                  {/* Отзывы о продавце */}
+                  <div className="mt-10 sm:mt-12 px-4 sm:px-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
+                      <div>
+                        <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight mb-1">
+                          Отзывы
+                        </h2>
+                        {profile.seller_rating && profile.seller_reviews_count ? (
+                          <div className="flex items-center gap-2">
+                            <RatingStars rating={profile.seller_rating} size="sm" readonly showValue />
+                            <span className="text-sm text-text-secondary">
+                              ({profile.seller_reviews_count} {profile.seller_reviews_count === 1 ? 'отзыв' : profile.seller_reviews_count < 5 ? 'отзыва' : 'отзывов'})
+                            </span>
+                </div>
+                        ) : (
+                          <p className="text-sm text-text-secondary">Пока нет отзывов</p>
+                        )}
+                      </div>
+                      {currentUser && !isOwnProfile && (
+                        <button
+                          onClick={() => {
+                            setShowReviewForm(true)
+                            setEditingReview(null)
+                          }}
+                          className="btn btn-primary text-sm w-full sm:w-auto"
+                        >
+                          Оставить отзыв
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Форма отзыва (для конкретного товара - будет добавлена на странице товара) */}
+                    {/* Здесь показываем только отзывы о товарах продавца */}
+
+                    {/* Список отзывов */}
+                    {reviewsLoading ? (
+                      <div className="card text-center text-text-secondary py-10">
+                        Загрузка отзывов...
+                      </div>
+                    ) : productReviews.length === 0 ? (
+                      <div className="card text-center text-text-secondary py-10">
+                        Пока нет отзывов о товарах
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {productReviews.map((review) => (
+                          <ReviewCard
+                            key={review.id}
+                            review={review}
+                            reviewType="product"
+                            currentUser={currentUser}
+                            onReply={(reviewId) => setReplyingToReview(replyingToReview === reviewId ? null : reviewId)}
+                            onEdit={(review) => {
+                              setEditingReview(review)
+                              setShowReviewForm(true)
+                            }}
+                            onDelete={async (reviewId) => {
+                              if (confirm('Вы уверены, что хотите удалить отзыв?')) {
+                                try {
+                                  const { error } = await supabase
+                                    .from('product_reviews')
+                                    .delete()
+                                    .eq('id', reviewId)
+                                  if (error) throw error
+                                  const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                                  if (profileId) {
+                                    fetchProductReviews(profileId)
+                                    fetchSellerStats(profileId)
+                                  }
+                                } catch (error) {
+                                  console.error('Error deleting review:', error)
+                                  alert('Ошибка при удалении отзыва')
+                                }
+                              }
+                            }}
+                          />
+                        ))}
+                        {replyingToReview && (
+                          <ReviewReplyForm
+                            reviewId={replyingToReview}
+                            reviewType="product"
+                            currentUserId={currentUser!.id}
+                            onSuccess={() => {
+                              setReplyingToReview(null)
+                              const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                              if (profileId) {
+                                fetchProductReviews(profileId)
+                              }
+                            }}
+                            onCancel={() => setReplyingToReview(null)}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* Portfolio for Masters */}
               {profile.role === 'master' && (
-                <div className="mb-6 sm:mb-8 w-full">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
+                <div className="mb-10 sm:mb-12 w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
                     <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight">Портфолио</h2>
                     <div className="flex items-center gap-2">
                       {isOwnProfile && (
@@ -1032,6 +1756,7 @@ export default function ProfilePage() {
                   />
                 </div>
               )}
+
             </>
           )}
 
@@ -1294,6 +2019,7 @@ export default function ProfilePage() {
                           className="input w-full"
                         />
                       </div>
+
                     </div>
                   </>
                 )}

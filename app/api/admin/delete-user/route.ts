@@ -4,18 +4,10 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 // Читаем Service Role Key - он должен быть в .env.local
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export async function POST(request: NextRequest) {
   try {
-    // Проверяем переменные окружения сразу
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    console.log('[DELETE-USER API] Service key check:', {
-      exists: !!serviceKey,
-      length: serviceKey?.length || 0,
-      firstChars: serviceKey?.substring(0, 30) || 'N/A'
-    })
-
     const body = await request.json()
     const { userId } = body
 
@@ -57,19 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Используем Service Role Key для удаления из auth.users
-    console.log('Checking SUPABASE_SERVICE_ROLE_KEY:', {
-      exists: !!supabaseServiceRoleKey,
-      length: supabaseServiceRoleKey?.length || 0,
-      startsWith: supabaseServiceRoleKey?.substring(0, 20) || 'N/A'
-    })
-
     if (!supabaseServiceRoleKey) {
-      console.error('SUPABASE_SERVICE_ROLE_KEY is missing. Available env vars:', {
-        hasUrl: !!supabaseUrl,
-        hasAnonKey: !!supabaseAnonKey,
-        hasServiceKey: !!supabaseServiceRoleKey,
-        envKeys: Object.keys(process.env).filter(k => k.includes('SUPABASE'))
-      })
       return NextResponse.json(
         { error: 'SUPABASE_SERVICE_ROLE_KEY не настроен. Добавьте его в переменные окружения и перезапустите сервер.' },
         { status: 500 }

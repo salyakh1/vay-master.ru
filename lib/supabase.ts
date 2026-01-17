@@ -38,18 +38,31 @@ export interface User {
   city?: string
   description?: string
   created_at: string
+  // PRO / подписка
+  is_pro?: boolean
+  pro_until?: string
+  // Пробный период PRO (старт)
+  pro_trial_started_at?: string
   // Master fields
   services?: string
   service_location?: 'home' | 'workshop' | 'both'
   experience_years?: number
   specialization?: string
   work_schedule?: string
+  master_lat?: number
+  master_lng?: number
+  service_radius_km?: number
   // Seller fields
   store_address?: string
   work_hours?: string
   delivery_available?: boolean
   delivery_zones?: string
   product_categories?: string
+  // Rating fields
+  master_rating?: number
+  master_reviews_count?: number
+  seller_rating?: number
+  seller_reviews_count?: number
   // Enriched relations
   specializations?: Specialization[]
   services_list?: Service[]
@@ -84,6 +97,8 @@ export interface Product {
   category_id?: string
   in_stock: boolean
   stock_count?: number
+  rating?: number
+  reviews_count?: number
   created_at: string
   seller?: User
   category_ref?: ProductCategory
@@ -91,10 +106,31 @@ export interface Product {
 
 export interface ProductCategory {
   id: string
-  section: 'instruments' | 'autoparts' | 'materials'
+  section: 'instruments' | 'autoparts' | 'materials' | 'furniture'
   name: string
   slug: string
   created_at: string
+}
+
+// Типы рекламы
+export type AdType = 
+  | 'HERO_SPONSORED'      // Верхние промо-блоки
+  | 'INLINE_CONTEXT'      // Контекстная реклама между карточками
+  | 'SPONSORED_CARD'      // Карточка-реклама в списках
+  | 'PROFILE_RELATED'     // Реклама в профиле мастера
+  | 'FOOTER_BRAND'        // Логотипы партнёров
+
+export type PricingModel = 'fixed' | 'cpc' | 'cpa'
+
+// Контекст для показа рекламы
+export interface AdContext {
+  page?: string
+  category?: string[]
+  keywords?: string[]
+  city?: string
+  userId?: string
+  masterId?: string
+  specialization?: string
 }
 
 export interface AdBanner {
@@ -103,6 +139,7 @@ export interface AdBanner {
   description?: string
   image_url: string
   type: 'image' | 'image_text' | 'image_button' | 'master_promo' | 'product_promo' | 'category_promo'
+  ad_type?: AdType // Новый тип рекламы
   target_type?: 'master' | 'product' | 'category' | 'order' | 'external_url' | null
   target_id?: string
   external_url?: string
@@ -117,6 +154,22 @@ export interface AdBanner {
   created_by?: string
   created_at: string
   updated_at: string
+  // Новые поля для контекстной рекламы
+  category?: string[]
+  keywords?: string[]
+  regions?: string[]
+  brand_name?: string
+  pricing_model?: PricingModel
+  price_per_click?: number
+  price_per_action?: number
+  fixed_price?: number
+  impression_limit?: number
+  click_limit?: number
+  current_impressions?: number
+  current_clicks?: number
+  affiliate_url?: string
+  show_badge?: boolean
+  badge_text?: string
 }
 
 export interface Chat {
@@ -149,6 +202,11 @@ export interface Order {
   category: string
   location: string
   city?: string
+  lat?: number
+  lng?: number
+  geocoded_at?: string
+  geocode_label?: string
+  geocode_source?: string
   budget?: number
   images?: string[]
   status: OrderStatus
@@ -168,6 +226,18 @@ export interface OrderResponse {
   status: ResponseStatus
   created_at: string
   master?: User
+  order?: Order
+}
+
+export interface Notification {
+  id: string
+  user_id: string
+  type: 'new_order_match' | 'order_response' | 'order_accepted' | 'order_completed' | 'message' | 'system'
+  order_id?: string
+  title: string
+  message: string
+  read: boolean
+  created_at: string
   order?: Order
 }
 
@@ -194,7 +264,7 @@ export interface PortfolioLike {
 
 export interface PortfolioComment {
   id: string
-  item_id: string
+  portfolio_item_id: string
   user_id: string
   content: string
   created_at: string
@@ -218,3 +288,65 @@ export interface Complaint {
   chat?: Chat
 }
 
+// Система отзывов и рейтингов
+export interface MasterReview {
+  id: string
+  master_id: string
+  reviewer_id: string
+  rating: number // 1-5
+  comment?: string
+  images?: string[]
+  created_at: string
+  updated_at?: string
+  reviewer?: User
+  master?: User
+  replies?: ReviewReply[]
+}
+
+export interface ProductReview {
+  id: string
+  product_id: string
+  reviewer_id: string
+  seller_id: string
+  rating: number // 1-5
+  comment?: string
+  images?: string[]
+  created_at: string
+  updated_at?: string
+  reviewer?: User
+  seller?: User
+  product?: Product
+  replies?: ReviewReply[]
+}
+
+export interface ReviewReply {
+  id: string
+  review_id: string
+  review_type: 'master' | 'product'
+  author_id: string
+  content: string
+  created_at: string
+  updated_at?: string
+  author?: User
+}
+
+export interface Story {
+  id: string
+  user_id: string
+  media: string[] // Массив URL фото/видео (максимум 4 фото или 1 видео)
+  media_type: 'photos' | 'video' // Тип медиа
+  description?: string // Описание истории
+  created_at: string
+  expires_at: string
+  views_count: number
+  is_active: boolean
+  user?: User
+  viewed_by_user?: boolean // Флаг, просмотрена ли история текущим пользователем
+}
+
+export interface StoryView {
+  id: string
+  story_id: string
+  viewer_id: string
+  viewed_at: string
+}

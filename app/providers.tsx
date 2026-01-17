@@ -61,13 +61,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
         // Profile doesn't exist, create it from auth user
         const { data: { user: authUser } } = await supabase.auth.getUser()
         if (authUser) {
+          const role = (authUser.user_metadata?.role || 'client') as any
+          const proTrialStartedAt =
+            role === 'master' || role === 'seller' ? new Date().toISOString() : null
+
           const { data: newProfile, error: createError } = await supabase
             .from('profiles')
             .insert({
               id: authUser.id,
               email: authUser.email || '',
               full_name: authUser.user_metadata?.full_name || 'Пользователь',
-              role: authUser.user_metadata?.role || 'client',
+              role,
+              pro_trial_started_at: proTrialStartedAt,
             })
             .select()
             .single()

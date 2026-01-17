@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 // ID системного пользователя "Администрация VayMaster"
 const ADMIN_SYSTEM_USER_ID = process.env.ADMIN_SYSTEM_USER_ID || '970f2f4c-b3e2-4b7f-af7b-45a45e50356c'
@@ -241,6 +241,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ 
           success: true, 
           message: 'Приветственное сообщение уже было отправлено ранее',
+          chatId: existingChat.id,
           skipped: true 
         })
       }
@@ -300,7 +301,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[welcome-message] Message sent successfully:', insertedMessage?.[0]?.id)
-    return NextResponse.json({ success: true, message: 'Приветственное сообщение отправлено' })
+    return NextResponse.json({ success: true, message: 'Приветственное сообщение отправлено', chatId })
   } catch (error: any) {
     console.error('Error in welcome-message API:', error)
     return NextResponse.json(

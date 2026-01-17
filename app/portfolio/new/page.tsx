@@ -6,6 +6,9 @@ import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { FiX, FiImage, FiVideo } from 'react-icons/fi'
+import ProUpgradeModal from '@/components/ProUpgradeModal'
+import { getMasterAccess } from '@/lib/masterAccess'
+import { getProFeatureFlags, restrictionsDisabledForRole } from '@/lib/proSettings'
 
 export default function NewPortfolioPage() {
   const router = useRouter()
@@ -17,6 +20,7 @@ export default function NewPortfolioPage() {
   const [videoFiles, setVideoFiles] = useState<File[]>([])
   const [videoPreviews, setVideoPreviews] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [showProModal, setShowProModal] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -83,6 +87,28 @@ export default function NewPortfolioPage() {
     if (!title.trim()) {
       alert('Введите название работы')
       return
+    }
+
+    // Лимит: после пробной недели без PRO можно иметь только 3 публикации
+    const access = getMasterAccess(user)
+    const flags = await getProFeatureFlags()
+    const restrictionsDisabled = restrictionsDisabledForRole(user.role, flags)
+
+    if (!restrictionsDisabled && !access.isPro && !access.isTrial) {
+      try {
+        const { count } = await supabase
+          .from('portfolio_items')
+          .select('id', { count: 'exact', head: true })
+          .eq('master_id', user.id)
+
+        if ((count ?? 0) >= 3) {
+          setShowProModal(true)
+          return
+        }
+      } catch (err) {
+        console.error('Error checking portfolio limit:', err)
+        // если проверка не удалась — не блокируем создание
+      }
     }
 
     setSaving(true)
@@ -356,6 +382,14 @@ export default function NewPortfolioPage() {
           </div>
         </div>
       </div>
+
+      <ProUpgradeModal
+        isOpen={showProModal}
+        onClose={() => setShowProModal(false)}
+        title="Лимит публикаций"
+        description="После пробной недели без PRO можно публиковать только 3 работы. Чтобы добавить ещё — оформите PRO."
+        ctaText="Купить PRO мастер"
+      />
     </div>
   )
 }

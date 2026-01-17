@@ -75,6 +75,11 @@ html {
   animation: fadeIn 0.2s ease-out;
 }
 
+/* Карта заказов: скрываем атрибуцию Leaflet (иконку/префикс) */
+.orders-map .leaflet-control-attribution {
+  display: none !important;
+}
+
 /* Glassmorphism эффекты */
 .glass {
   background: rgba(255, 255, 255, 0.7);
@@ -110,12 +115,14 @@ html {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
   transition: left 0.5s;
 }
 
-.glossy:hover::before {
-  left: 100%;
+@media (hover: hover) and (pointer: fine) {
+  .glossy:hover::before {
+    left: 100%;
+  }
 }
 
 /* Блики и отражения */
@@ -131,13 +138,21 @@ html {
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+  /* Более современный мягкий блик, без “плёнки” */
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.10) 35%,
+    rgba(255, 255, 255, 0.0) 70%
+  );
   opacity: 0;
   transition: opacity 0.3s;
 }
 
-.reflection:hover::after {
-  opacity: 1;
+@media (hover: hover) and (pointer: fine) {
+  .reflection:hover::after {
+    opacity: 1;
+  }
 }
 
 /* Градиентные кнопки с бликами */
@@ -163,7 +178,6 @@ html {
 .btn-glossy:hover {
   background-position: 100% 0;
   box-shadow: 0 8px 24px rgba(199, 54, 47, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transform: translateY(-2px);
 }
 
 .btn-glossy:hover::before {
@@ -180,8 +194,8 @@ html {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(17, 17, 17, 0.06);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -196,9 +210,16 @@ html {
   opacity: 0.6;
 }
 
-.card-glossy:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+/* Hover-эффекты только на устройствах с hover (чтобы на телефонах не было “залипания”) */
+@media (hover: hover) and (pointer: fine) {
+  .btn-glossy:hover {
+    transform: translateY(-1px);
+  }
+
+  .card-glossy:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
 }
 
 /* Эффект свечения */
@@ -226,10 +247,26 @@ html {
 }
 
 /* Плавные переходы для всех интерактивных элементов */
-* {
-  transition-property: transform, box-shadow, background-color, border-color, opacity;
-  transition-duration: 0.2s;
+/* Важно: не добавляем transition глобально на всё (даёт “липкий” UI и лаги) */
+a,
+button,
+[role='button'],
+input,
+textarea,
+select {
+  transition-property: transform, box-shadow, background-color, border-color, opacity, color;
+  transition-duration: 0.15s;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Safe area support for fixed bottom navigation */
@@ -246,15 +283,19 @@ html {
 }
 
 .card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-radius: 12px;              /* Увеличенное скругление для глянца */
-  padding: 32px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 24px;
   margin-bottom: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 4px 12px rgba(0, 0, 0, 0.03),
+    0 8px 24px rgba(0, 0, 0, 0.02),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
@@ -266,14 +307,20 @@ html {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
-  opacity: 0.6;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent);
+  opacity: 0.8;
 }
 
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  border-color: rgba(255, 255, 255, 0.6);
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      0 4px 8px rgba(0, 0, 0, 0.06),
+      0 12px 32px rgba(0, 0, 0, 0.08),
+      0 16px 48px rgba(0, 0, 0, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 1);
+    border-color: rgba(17, 17, 17, 0.12);
+  }
 }
 
 .btn {
@@ -317,7 +364,6 @@ html {
 .btn-primary:hover {
   background-position: 100% 0;
   box-shadow: 0 8px 24px rgba(199, 54, 47, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transform: translateY(-2px);
 }
 
 .btn-primary:hover::before {
@@ -354,7 +400,13 @@ html {
 .btn-secondary:hover {
   background-position: 100% 0;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover,
+  .btn-secondary:hover {
+    transform: translateY(-1px);
+  }
 }
 
 .btn-secondary:hover::before {
@@ -380,33 +432,137 @@ html {
   pointer-events: none;
 }
 
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(199, 54, 47, 0.18);
+}
+
 .input {
   width: 100%;
   padding: 18px 20px;                /* Крупные, чёткие инпуты */
   border: 1.5px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 14px;
   font-size: 15px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   color: var(--text-primary);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   line-height: 1.6;
   font-weight: 400;
   font-family: inherit;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    0 4px 12px rgba(0, 0, 0, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .input::placeholder {
   color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.input:hover {
+  border-color: var(--border-hover);
+  box-shadow: 
+    0 2px 6px rgba(0, 0, 0, 0.06),
+    0 6px 16px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
 }
 
 .input:focus {
   outline: none;
   border-color: var(--brand-accent);
-  box-shadow: 0 0 0 3px rgba(199, 54, 47, 0.15), 0 4px 16px rgba(199, 54, 47, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: 
+    0 0 0 4px rgba(199, 54, 47, 0.12),
+    0 4px 20px rgba(199, 54, 47, 0.15),
+    0 8px 24px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
   background: white;
   transform: translateY(-1px);
+}
+
+/* Стили для select, чтобы выглядел как input с placeholder */
+select.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='%239CA3AF' d='M7 10L2 5h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 40px;
+  position: relative;
+  cursor: pointer;
+}
+
+select.input:hover {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='%236B7280' d='M7 10L2 5h10z'/%3E%3C/svg%3E");
+}
+
+select.input:focus {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='%23C7362F' d='M7 10L2 5h10z'/%3E%3C/svg%3E");
+}
+
+select.input option {
+  color: var(--text-primary) !important;
+  background: white;
+  padding: 12px 16px;
+  font-size: 15px;
+}
+
+select.input option[disabled][hidden] {
+  display: none;
+}
+
+/* Убеждаемся, что опция с пустым значением видна и имеет правильный цвет */
+select.input option[value=""] {
+  color: var(--text-muted) !important;
+  display: block;
+}
+
+/* Принудительно показываем текст в select */
+select.input:invalid {
+  color: var(--text-muted);
+}
+
+select.input:not([value=""]) {
+  color: var(--text-primary);
+}
+
+/* Кастомные классы для текста в select */
+.text-text-muted {
+  color: var(--text-muted) !important;
+}
+
+.text-text-primary {
+  color: var(--text-primary) !important;
+}
+
+/* Обертка для select с видимым placeholder */
+.select-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.select-wrapper::after {
+  content: attr(data-placeholder);
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  z-index: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  font-weight: 400;
+}
+
+.select-wrapper.has-value::after {
+  display: none;
+}
+
+.select-wrapper:hover::after {
+  opacity: 0.9;
 }
 
 .textarea {
@@ -436,7 +592,6 @@ html {
   border-color: var(--brand-accent);
   box-shadow: 0 0 0 3px rgba(199, 54, 47, 0.15), 0 4px 16px rgba(199, 54, 47, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   background: white;
-  transform: translateY(-1px);
 }
 
 /* Portfolio Gallery Animations - Instagram Style */
@@ -500,3 +655,12 @@ html {
   animation: slide-out-down 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+/* Story Progress Animation */
+@keyframes storyProgress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}

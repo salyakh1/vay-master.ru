@@ -416,28 +416,37 @@ export default function AdminModerationPage() {
 
       {/* Filters */}
       <div className="card">
-        <div className="flex gap-4 flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchContent()}
-                placeholder="Поиск по названию, описанию..."
-                className="input pl-10"
-              />
-            </div>
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && fetchContent()}
+              placeholder="Поиск по названию, описанию..."
+              className="input pl-10 w-full h-10 text-sm"
+            />
           </div>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input md:w-48">
-            <option value="">Все статусы</option>
-            <option value="pending">На проверке</option>
-            <option value="approved">Одобрено</option>
-            <option value="rejected">Отклонено</option>
-            <option value="hidden">Скрыто</option>
-          </select>
-          <button onClick={fetchContent} className="btn btn-primary">
+          <div className={`relative select-wrapper w-full ${statusFilter ? 'has-value' : ''}`} data-placeholder="Статус">
+            <select 
+              value={statusFilter || ''} 
+              onChange={(e) => setStatusFilter(e.target.value)} 
+              className="input w-full h-10 text-sm appearance-none cursor-pointer"
+              style={{
+                color: !statusFilter ? 'transparent' : 'var(--text-primary)',
+              }}
+            >
+              <option value="" disabled style={{ color: 'var(--text-muted)', display: 'none' }}>
+                Статус
+              </option>
+              <option value="pending">На проверке</option>
+              <option value="approved">Одобрено</option>
+              <option value="rejected">Отклонено</option>
+              <option value="hidden">Скрыто</option>
+            </select>
+          </div>
+          <button onClick={fetchContent} className="btn btn-primary h-10 w-full text-sm">
             Найти
           </button>
         </div>

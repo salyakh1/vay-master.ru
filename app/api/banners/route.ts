@@ -11,13 +11,19 @@ export async function GET(request: NextRequest) {
 
     const now = new Date().toISOString()
 
-    // Получаем активные баннеры
-    const { data, error } = await supabase
+    // Получаем активные баннеры ТОЛЬКО типа HERO_SPONSORED (или без типа для обратной совместимости)
+    // AdBannerSlider предназначен только для Hero рекламы
+    let query = supabase
       .from('ad_banners')
       .select('*')
       .eq('is_active', true)
       .order('priority', { ascending: false })
-      .limit(limit * 2) // Получаем больше, чтобы после фильтрации осталось достаточно
+      .limit(limit * 2)
+
+    // Фильтруем по типу: только HERO_SPONSORED или без типа (для старых баннеров)
+    query = query.or('ad_type.eq.HERO_SPONSORED,ad_type.is.null')
+
+    const { data, error } = await query
 
     if (error) {
       console.error('Error fetching banners:', error)
@@ -26,6 +32,11 @@ export async function GET(request: NextRequest) {
 
     // Фильтруем по странице и датам на стороне сервера
     const filteredBanners = (data || []).filter((banner: any) => {
+      // Проверяем тип - только HERO_SPONSORED или без типа
+      if (banner.ad_type && banner.ad_type !== 'HERO_SPONSORED') {
+        return false
+      }
+
       // Проверяем, содержит ли массив pages нужную страницу
       if (!banner.pages || !Array.isArray(banner.pages) || !banner.pages.includes(page)) {
         return false
@@ -38,6 +49,14 @@ export async function GET(request: NextRequest) {
 
       if (startDate && startDate > nowDate) return false
       if (endDate && endDate < nowDate) return false
+
+      // Проверяем лимиты
+      if (banner.impression_limit && banner.current_impressions >= banner.impression_limit) {
+        return false
+      }
+      if (banner.click_limit && banner.current_clicks >= banner.click_limit) {
+        return false
+      }
 
       return true
     }).slice(0, limit) // Ограничиваем до нужного количества

@@ -8,6 +8,10 @@ import Navbar from '@/components/Navbar'
 import { FiMessageCircle, FiShoppingCart, FiChevronLeft, FiChevronRight, FiArrowLeft, FiUser } from 'react-icons/fi'
 import Link from 'next/link'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
+import ReviewCard from '@/components/ReviewCard'
+import ReviewForm from '@/components/ReviewForm'
+import ReviewReplyForm from '@/components/ReviewReplyForm'
+import RatingStars from '@/components/RatingStars'
 
 export default function ProductPage() {
   const params = useParams()
@@ -21,6 +25,11 @@ export default function ProductPage() {
   const touchEndX = useRef<number>(0)
 
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [productReviews, setProductReviews] = useState<any[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [editingReview, setEditingReview] = useState<any>(null)
+  const [replyingToReview, setReplyingToReview] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -31,8 +40,66 @@ export default function ProductPage() {
   useEffect(() => {
     if (params.id) {
       fetchProduct()
+      fetchProductReviews()
     }
   }, [params.id])
+
+  const fetchProductReviews = async () => {
+    if (!params.id) return
+    try {
+      setReviewsLoading(true)
+      const productId = Array.isArray(params.id) ? params.id[0] : params.id
+      const { data, error } = await supabase
+        .from('product_reviews')
+        .select(`
+          *,
+          reviewer:profiles!reviewer_id(id, full_name, avatar_url, role),
+          seller:profiles!seller_id(id, full_name),
+          product:products!product_id(id, name)
+        `)
+        .eq('product_id', productId)
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      if (error) throw error
+
+      // Получаем ответы на отзывы
+      const reviewIds = data?.map(r => r.id) || []
+      if (reviewIds.length > 0) {
+        const { data: replies } = await supabase
+          .from('review_replies')
+          .select(`
+            *,
+            author:profiles!author_id(id, full_name, avatar_url)
+          `)
+          .eq('review_type', 'product')
+          .in('review_id', reviewIds)
+          .order('created_at', { ascending: true })
+
+        const repliesMap = new Map<string, any[]>()
+        replies?.forEach(reply => {
+          if (!repliesMap.has(reply.review_id)) {
+            repliesMap.set(reply.review_id, [])
+          }
+          repliesMap.get(reply.review_id)!.push(reply)
+        })
+
+        const reviewsWithReplies = data?.map(review => ({
+          ...review,
+          replies: repliesMap.get(review.id) || []
+        })) || []
+
+        setProductReviews(reviewsWithReplies)
+      } else {
+        setProductReviews([])
+      }
+    } catch (error) {
+      console.error('Error fetching product reviews:', error)
+      setProductReviews([])
+    } finally {
+      setReviewsLoading(false)
+    }
+  }
 
   // Keyboard navigation
   useEffect(() => {
@@ -363,6 +430,114 @@ export default function ProductPage() {
             <div className="whitespace-pre-wrap text-gray-700">
               {product.description}
             </div>
+          </div>
+
+          {/* Reviews Section */}
+          <div className="card mt-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
+              <div>
+                <h2 className="text-xl font-semibold mb-1">Отзывы о товаре</h2>
+                {product.rating && product.reviews_count ? (
+                  <div className="flex items-center gap-2">
+                    <RatingStars rating={product.rating} size="sm" readonly showValue />
+                    <span className="text-sm text-gray-500">
+                      ({product.reviews_count} {product.reviews_count === 1 ? 'отзыв' : product.reviews_count < 5 ? 'отзыва' : 'отзывов'})
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Пока нет отзывов</p>
+                )}
+              </div>
+              {user && !isOwner && (
+                <button
+                  onClick={() => {
+                    setShowReviewForm(true)
+                    setEditingReview(null)
+                  }}
+                  className="btn btn-primary text-sm w-full sm:w-auto"
+                >
+                  Оставить отзыв
+                </button>
+              )}
+            </div>
+
+            {/* Форма отзыва */}
+            {showReviewForm && user && !isOwner && (
+              <div className="mb-6">
+                <ReviewForm
+                  targetId={Array.isArray(params.id) ? params.id[0] : params.id}
+                  targetType="product"
+                  sellerId={seller.id}
+                  currentUserId={user.id}
+                  existingReview={editingReview}
+                  onSuccess={() => {
+                    setShowReviewForm(false)
+                    setEditingReview(null)
+                    fetchProductReviews()
+                    fetchProduct()
+                  }}
+                  onCancel={() => {
+                    setShowReviewForm(false)
+                    setEditingReview(null)
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Список отзывов */}
+            {reviewsLoading ? (
+              <div className="text-center text-gray-500 py-10">
+                Загрузка отзывов...
+              </div>
+            ) : productReviews.length === 0 ? (
+              <div className="text-center text-gray-500 py-10">
+                Пока нет отзывов
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {productReviews.map((review) => (
+                  <ReviewCard
+                    key={review.id}
+                    review={review}
+                    reviewType="product"
+                    currentUser={user}
+                    onReply={(reviewId) => setReplyingToReview(replyingToReview === reviewId ? null : reviewId)}
+                    onEdit={(review) => {
+                      setEditingReview(review)
+                      setShowReviewForm(true)
+                    }}
+                    onDelete={async (reviewId) => {
+                      if (confirm('Вы уверены, что хотите удалить отзыв?')) {
+                        try {
+                          const { error } = await supabase
+                            .from('product_reviews')
+                            .delete()
+                            .eq('id', reviewId)
+                          if (error) throw error
+                          fetchProductReviews()
+                          fetchProduct()
+                        } catch (error) {
+                          console.error('Error deleting review:', error)
+                          alert('Ошибка при удалении отзыва')
+                        }
+                      }
+                    }}
+                  />
+                ))}
+                {replyingToReview && user && (
+                  <ReviewReplyForm
+                    reviewId={replyingToReview}
+                    reviewType="product"
+                    currentUserId={user.id}
+                    onSuccess={() => {
+                      setReplyingToReview(null)
+                      fetchProductReviews()
+                    }}
+                    onCancel={() => setReplyingToReview(null)}
+                  />
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

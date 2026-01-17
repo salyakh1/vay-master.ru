@@ -1,24 +1,16 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
-import { supabase } from '@/lib/supabase'
+import { supabase, Specialization } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { FiArrowLeft, FiImage, FiX } from 'react-icons/fi'
 import Link from 'next/link'
+import OrderPaymentModal from '@/components/OrderPaymentModal'
+import OrderLocationPicker from '@/components/OrderLocationPicker'
 
-const categories = [
-  'Строительство',
-  'Ремонт',
-  'Сантехника',
-  'Электрика',
-  'Отделка',
-  'Кровля',
-  'Окна и двери',
-  'Ландшафт',
-  'Другое',
-]
+const ORDER_POST_PRICE_RUB = 199
 
 export default function NewOrderPage() {
   const router = useRouter()
@@ -26,12 +18,15 @@ export default function NewOrderPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
-  const [location, setLocation] = useState('')
-  const [city, setCity] = useState('')
+  const [location, setLocation] = useState<{ city: string; address: string } | null>(null)
   const [budget, setBudget] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [pendingSubmit, setPendingSubmit] = useState(false)
+  const [specializations, setSpecializations] = useState<Specialization[]>([])
+  const [loadingSpecializations, setLoadingSpecializations] = useState(true)
 
   if (authLoading) {
     return (
@@ -40,6 +35,36 @@ export default function NewOrderPage() {
       </div>
     )
   }
+
+  // Загружаем специализации из БД
+  useEffect(() => {
+    const fetchSpecializations = async () => {
+      try {
+        setLoadingSpecializations(true)
+        const { data, error } = await supabase
+          .from('specializations')
+          .select('id, name, slug')
+          .order('name', { ascending: true })
+
+        if (error) {
+          console.error('Error fetching specializations:', error)
+          // Показываем ошибку пользователю
+          setSpecializations([])
+        } else {
+          setSpecializations(data || [])
+        }
+      } catch (error) {
+        console.error('Error fetching specializations:', error)
+        setSpecializations([])
+      } finally {
+        setLoadingSpecializations(false)
+      }
+    }
+
+    if (user) {
+      fetchSpecializations()
+    }
+  }, [user])
 
   if (!user) {
     router.push('/auth/login')
@@ -57,14 +82,8 @@ export default function NewOrderPage() {
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const createOrder = async () => {
     if (!user) return
-
-    if (!title.trim() || !description.trim() || !category || !location.trim()) {
-      alert('Заполните все обязательные поля')
-      return
-    }
 
     setSaving(true)
     try {
@@ -110,13 +129,13 @@ export default function NewOrderPage() {
         title: title.trim(),
         description: description.trim(),
         category,
-        location: location.trim(),
+        location: location?.address?.trim() || '',
         status: 'open',
         images: imageUrls,
       }
 
-      if (city.trim()) {
-        orderData.city = city.trim()
+      if (location?.city?.trim()) {
+        orderData.city = location.city.trim()
       }
 
       if (budget.trim()) {
@@ -142,6 +161,25 @@ export default function NewOrderPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    if (!title.trim() || !description.trim() || !category) {
+      alert('Заполните все обязательные поля')
+      return
+    }
+
+    if (!location?.city?.trim() || !location?.address?.trim()) {
+      alert('Пожалуйста, укажите город и адрес')
+      return
+    }
+
+    // По вашему плану: заказ всегда платный → показываем оплату перед публикацией
+    setPendingSubmit(true)
+    setShowPaymentModal(true)
   }
 
   return (
@@ -193,54 +231,35 @@ export default function NewOrderPage() {
               />
             </div>
 
-            {/* Категория */}
+            {/* Категория (специализация) */}
             <div>
               <label className="block text-sm font-semibold text-graphite-secondary mb-2">
-                Категория *
+                Специализация (категория) *
               </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                required
-                className="input"
-              >
-                <option value="">Выберите категорию</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+              {loadingSpecializations ? (
+                <div className="input text-text-secondary">Загрузка специализаций...</div>
+              ) : (
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  required
+                  className="input"
+                >
+                  <option value="">Выберите специализацию</option>
+                  {specializations.map((spec) => (
+                    <option key={spec.id} value={spec.name}>
+                      {spec.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p className="text-xs text-text-muted mt-1">
+                Выберите специализацию, которая соответствует вашему заказу. Мастера с этой специализацией получат уведомление.
+              </p>
             </div>
 
-            {/* Адрес/Место */}
-            <div>
-              <label className="block text-sm font-semibold text-graphite-secondary mb-2">
-                Адрес выполнения работ *
-              </label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                required
-                className="input"
-                placeholder="Улица, дом, квартира"
-              />
-            </div>
-
-            {/* Город */}
-            <div>
-              <label className="block text-sm font-semibold text-graphite-secondary mb-2">
-                Город
-              </label>
-              <input
-                type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="input"
-                placeholder="Например: Москва"
-              />
-            </div>
+            {/* Место на карте */}
+            <OrderLocationPicker value={location} onChange={setLocation} />
 
             {/* Бюджет */}
             <div>
@@ -326,6 +345,22 @@ export default function NewOrderPage() {
           </form>
         </div>
       </div>
+
+      <OrderPaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => {
+          if (saving) return
+          setShowPaymentModal(false)
+          setPendingSubmit(false)
+        }}
+        priceRub={ORDER_POST_PRICE_RUB}
+        loading={saving}
+        onConfirmPaid={async () => {
+          setShowPaymentModal(false)
+          await createOrder()
+          setPendingSubmit(false)
+        }}
+      />
     </div>
   )
 }

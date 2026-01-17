@@ -1,15 +1,42 @@
 -- Product categories catalog
--- Sections: instruments, autoparts, materials
+-- Sections: instruments, autoparts, materials, furniture
+
+-- Update existing constraint if table already exists
+DO $$
+BEGIN
+  -- Drop old constraint if it exists
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints 
+    WHERE constraint_name = 'product_categories_section_check' 
+    AND table_name = 'product_categories'
+  ) THEN
+    ALTER TABLE public.product_categories DROP CONSTRAINT product_categories_section_check;
+  END IF;
+END$$;
 
 CREATE TABLE IF NOT EXISTS public.product_categories (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  section TEXT NOT NULL CHECK (section IN ('instruments', 'autoparts', 'materials')),
+  section TEXT NOT NULL,
   name TEXT NOT NULL,
   slug TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
   UNIQUE (section, name),
   UNIQUE (slug)
 );
+
+-- Add updated constraint with furniture section
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints 
+    WHERE constraint_name = 'product_categories_section_check' 
+    AND table_name = 'product_categories'
+  ) THEN
+    ALTER TABLE public.product_categories 
+    ADD CONSTRAINT product_categories_section_check 
+    CHECK (section IN ('instruments', 'autoparts', 'materials', 'furniture'));
+  END IF;
+END$$;
 
 CREATE INDEX IF NOT EXISTS idx_product_categories_section ON public.product_categories(section);
 
@@ -136,6 +163,28 @@ VALUES
   ('materials','Электрика (кабель, щиты, розетки)','materials-electric'),
   ('materials','Лестницы, опалубка, инвентарь','materials-scaffolding'),
   ('materials','Мастики, клеи, герметики','materials-adhesives')
+ON CONFLICT DO NOTHING;
+
+-- Seed: furniture
+INSERT INTO public.product_categories (section, name, slug)
+VALUES
+  ('furniture','Гостиная (диваны, кресла, журнальные столы, ТВ-тумбы)','furniture-living-room'),
+  ('furniture','Спальня (кровати, матрасы, шкафы, комоды)','furniture-bedroom'),
+  ('furniture','Кухня (кухонные гарнитуры, столы, стулья)','furniture-kitchen'),
+  ('furniture','Столовая (обеденные столы, стулья, серванты)','furniture-dining-room'),
+  ('furniture','Детская (детские кровати, шкафы, столы)','furniture-kids-room'),
+  ('furniture','Офисная (офисные столы, кресла, шкафы)','furniture-office'),
+  ('furniture','Прихожая (шкафы-купе, вешалки, банкетки)','furniture-hallway'),
+  ('furniture','Ванная (тумбы, зеркала, полки)','furniture-bathroom'),
+  ('furniture','Мягкая мебель (диваны, кресла, пуфы)','furniture-upholstered'),
+  ('furniture','Корпусная мебель (шкафы, комоды, тумбы)','furniture-case'),
+  ('furniture','Столы (письменные, обеденные, журнальные)','furniture-tables'),
+  ('furniture','Стулья и кресла (обеденные, офисные, барные)','furniture-chairs'),
+  ('furniture','Матрасы и основания (матрасы, ортопедические основания)','furniture-mattresses'),
+  ('furniture','Мебель для хранения (стеллажи, полки, комоды)','furniture-storage'),
+  ('furniture','Мебель для сада и террасы (садовые столы, стулья)','furniture-garden'),
+  ('furniture','Мебель для балкона (полки, стеллажи, складная)','furniture-balcony'),
+  ('furniture','Мебель на заказ (индивидуальное изготовление)','furniture-custom')
 ON CONFLICT DO NOTHING;
 
 

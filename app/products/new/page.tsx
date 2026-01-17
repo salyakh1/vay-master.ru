@@ -259,6 +259,7 @@ export default function NewProductPage() {
                       <option value="instruments">Инструменты</option>
                       <option value="autoparts">Автозапчасти</option>
                       <option value="materials">Стройматериалы</option>
+                      <option value="furniture">Мебель</option>
                     </select>
                     <select
                       value={categoryId}

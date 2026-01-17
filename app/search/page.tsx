@@ -9,6 +9,9 @@ import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
 import { FiSearch, FiUser, FiFilter, FiMapPin, FiBriefcase, FiStar, FiCheckCircle } from 'react-icons/fi'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
+import AdSlot from '@/components/AdSlot'
+import StoriesCircle from '@/components/StoriesCircle'
+import { Story } from '@/lib/supabase'
 
 function SearchContent() {
   const router = useRouter()
@@ -27,6 +30,8 @@ function SearchContent() {
   const [selectedService, setSelectedService] = useState<string>('')
   const [showFilters, setShowFilters] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [stories, setStories] = useState<Story[]>([])
+  const [storiesLoading, setStoriesLoading] = useState(false)
 
   // Убираем редирект для неавторизованных - они могут видеть карточки мастеров
 
@@ -55,6 +60,8 @@ function SearchContent() {
     // Загружаем всех мастеров при загрузке страницы (для всех пользователей)
     // Рандомность применяется только к порядку отображения
     fetchRandomProfiles()
+    // Загружаем истории для всех пользователей (включая неавторизованных)
+    fetchStories()
   }, [])
 
   const performSearch = async () => {
@@ -130,6 +137,33 @@ function SearchContent() {
     } catch (error) {
       console.error('Error fetching user city:', error)
       setUserCity('')
+    }
+  }
+
+  const fetchStories = async () => {
+    try {
+      console.log('fetchStories called')
+      setStoriesLoading(true)
+      const params = new URLSearchParams({
+        page: 'search',
+        ...(user?.id && { currentUserId: user.id }),
+      })
+      console.log('Fetching stories with params:', params.toString())
+      const response = await fetch(`/api/stories?${params.toString()}`)
+      console.log('Response status:', response.status)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('API error:', errorData)
+        throw new Error(errorData.error || 'Failed to fetch stories')
+      }
+      const data = await response.json()
+      console.log('Stories fetched:', data.stories?.length || 0, 'stories', data.stories)
+      setStories(data.stories || [])
+    } catch (error) {
+      console.error('Error fetching stories:', error)
+      setStories([])
+    } finally {
+      setStoriesLoading(false)
     }
   }
 
@@ -301,26 +335,25 @@ function SearchContent() {
   return (
     <div className="min-h-screen bg-bg-primary pb-20">
       {user && <Navbar />}
+      {/* Баннеры без отступов по бокам */}
+      <div className="w-full mb-6">
+        <AdBannerSlider page="search" />
+      </div>
       <div className="container mx-auto px-4 py-6">
         <div className="max-w-4xl mx-auto">
-          {/* Баннеры */}
-          <div className="mb-6">
-            <AdBannerSlider page="search" />
-          </div>
-
           <h1 className="text-2xl font-semibold mb-6 text-text-primary">Мастера</h1>
 
           {/* Search Form */}
           <form onSubmit={handleSearch} className="mb-6">
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
+            <div className="flex flex-col gap-3">
+              <div className="relative">
                 <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={16} />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Поиск мастеров..."
-                  className="input pl-10 pr-10 h-10 text-sm"
+                  className="input pl-10 pr-10 h-10 text-sm w-full"
                 />
                 <button
                   type="button"
@@ -330,52 +363,81 @@ function SearchContent() {
                   <FiFilter size={16} />
                 </button>
               </div>
-              <button type="submit" className="btn btn-primary h-10 px-4 text-sm">
+
+              {/* Filters */}
+              {showFilters && (
+                <>
+                  <input
+                    type="text"
+                    value={cityFilter}
+                    onChange={(e) => setCityFilter(e.target.value)}
+                    placeholder="Город"
+                    className="input w-full h-10 text-sm"
+                  />
+                  <div className={`relative select-wrapper w-full ${selectedSpec ? 'has-value' : ''}`} data-placeholder="Специализация">
+                    <select
+                      value={selectedSpec || ''}
+                      onChange={(e) => {
+                        setSelectedSpec(e.target.value)
+                        setSelectedService('')
+                      }}
+                      className="input w-full h-10 text-sm appearance-none cursor-pointer"
+                      style={{
+                        color: !selectedSpec ? 'transparent' : 'var(--text-primary)',
+                      }}
+                    >
+                      <option value="" disabled style={{ color: 'var(--text-muted)', display: 'none' }}>
+                        Специализация
+                      </option>
+                      {specializations.map((spec) => (
+                        <option key={spec.id} value={spec.id} style={{ color: 'var(--text-primary)' }}>
+                          {spec.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={`relative select-wrapper w-full ${selectedService ? 'has-value' : ''}`} data-placeholder="Услуга">
+                    <select
+                      value={selectedService || ''}
+                      onChange={(e) => setSelectedService(e.target.value)}
+                      className="input w-full h-10 text-sm appearance-none cursor-pointer"
+                      style={{
+                        color: !selectedService ? 'transparent' : 'var(--text-primary)',
+                      }}
+                      disabled={filteredServicesForFilter.length === 0}
+                    >
+                      <option value="" disabled style={{ color: 'var(--text-muted)', display: 'none' }}>
+                        Услуга
+                      </option>
+                      {filteredServicesForFilter.map((svc) => (
+                        <option key={svc.id} value={svc.id} style={{ color: 'var(--text-primary)' }}>
+                          {svc.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              <button type="submit" className="btn btn-primary h-10 w-full text-sm">
                 Найти
               </button>
             </div>
-
-            {/* Filters */}
-            {showFilters && (
-              <div className="mt-4 flex gap-4 flex-wrap">
-                <input
-                  type="text"
-                  value={cityFilter}
-                  onChange={(e) => setCityFilter(e.target.value)}
-                  placeholder="Город"
-                  className="input md:w-48"
-                />
-                <select
-                  value={selectedSpec}
-                  onChange={(e) => {
-                    setSelectedSpec(e.target.value)
-                    setSelectedService('')
-                  }}
-                  className="input md:w-64"
-                >
-                  <option value="">Все специализации</option>
-                  {specializations.map((spec) => (
-                    <option key={spec.id} value={spec.id}>
-                      {spec.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  className="input md:w-64"
-                  disabled={filteredServicesForFilter.length === 0}
-                >
-                  <option value="">Все услуги</option>
-                  {filteredServicesForFilter.map((svc) => (
-                    <option key={svc.id} value={svc.id}>
-                      {svc.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
           </form>
+
+          {/* Истории мастеров - под фильтром (видны всем) */}
+          {storiesLoading ? (
+            <div className="mb-6 text-center text-text-secondary text-sm">Загрузка историй...</div>
+          ) : stories.length > 0 ? (
+            <div className="mb-6">
+              <StoriesCircle
+                stories={stories}
+                currentUser={user || null}
+                isOwnProfile={false}
+                onStoryCreated={fetchStories}
+              />
+            </div>
+          ) : null}
 
           {/* Results */}
           {loading ? (
@@ -383,12 +445,12 @@ function SearchContent() {
           ) : !hasFilters ? (
             <>
               {randomProfiles.length > 0 ? (
-                <div className="space-y-4">
-                  <h2 className="text-xl font-semibold text-text-primary">
+                <div className="space-y-6">
+                  <h2 className="text-xl font-semibold text-text-primary mb-2">
                     Мастера вашего города
                   </h2>
-                  <div className="grid grid-cols-2 gap-4">
-                    {randomProfiles.map((master) => {
+                  <div className="grid grid-cols-2 gap-5">
+                    {randomProfiles.map((master, index) => {
                       const MasterCard = (
                         <div className="card-glossy group h-[400px] flex flex-col !p-0 overflow-hidden relative">
                           {/* Глянцевый эффект */}
@@ -411,28 +473,49 @@ function SearchContent() {
                           </div>
 
                           {/* Основная информация */}
-                          <div className="flex flex-col items-center text-center p-4 relative z-20">
-                            <h3 className="font-semibold text-base bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent mb-1 line-clamp-2 leading-tight group-hover:from-brand-accent group-hover:to-brand-accent-hover transition-all">
+                          <div className="flex flex-col items-center text-center p-5 relative z-20">
+                            <h3 className="font-semibold text-base bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent mb-1.5 line-clamp-2 leading-tight group-hover:from-brand-accent group-hover:to-brand-accent-hover transition-all">
                               {master.full_name}
                             </h3>
                             {master.city && (
-                              <div className="flex items-center gap-1 text-xs text-text-secondary mb-2">
+                              <div className="flex items-center gap-1 text-xs text-text-secondary mb-2.5">
                                 <FiMapPin size={12} strokeWidth={2} className="text-brand-accent/60" />
                                 <span>{master.city}</span>
+                              </div>
+                            )}
+                            {/* Рейтинг мастера */}
+                            {master.master_reviews_count && master.master_reviews_count > 0 ? (
+                              <div className="flex items-center gap-1 text-xs text-text-secondary mb-2.5">
+                                {master.master_rating && master.master_rating > 0 ? (
+                                  <>
+                                    <span>⭐</span>
+                                    <span className="font-medium">
+                                      {master.master_rating.toFixed(1)} ({master.master_reviews_count})
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="font-medium">
+                                    ({master.master_reviews_count} {master.master_reviews_count === 1 ? 'отзыв' : master.master_reviews_count < 5 ? 'отзыва' : 'отзывов'})
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-text-secondary mb-2.5">
+                                Без отзывов
                               </div>
                             )}
                           </div>
 
                           {/* Описание */}
                           {master.description && (
-                            <p className="text-xs text-text-secondary mb-3 line-clamp-2 leading-relaxed flex-1 px-4">
+                            <p className="text-xs text-text-secondary mb-3.5 line-clamp-2 leading-relaxed flex-1 px-5">
                               {master.description}
                             </p>
                           )}
 
                           {/* Специализации */}
                           {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-auto pt-3 border-t border-border-light/50 px-4 pb-4 relative z-20">
+                            <div className="flex flex-wrap gap-2 mt-auto pt-4 border-t border-border-light/40 px-5 pb-6 relative z-20">
                               {(master as any).profile_specializations.slice(0, 2).map((item: any) => (
                                 <span
                                   key={item.specialization?.id || item.specialization_id}
@@ -451,7 +534,7 @@ function SearchContent() {
                         </div>
                       )
 
-                      return user ? (
+                      const cardElement = user ? (
                         <Link key={master.id} href={`/profile/${master.id}`}>
                           {MasterCard}
                         </Link>
@@ -460,6 +543,31 @@ function SearchContent() {
                           {MasterCard}
                         </div>
                       )
+
+                      // Показываем INLINE_CONTEXT рекламу каждые 6 карточек (после 5, 11, 17 и т.д.)
+                      const shouldShowAd = index > 0 && (index + 1) % 6 === 0
+
+                      if (shouldShowAd) {
+                        return (
+                          <>
+                            {cardElement}
+                            <div key={`ad-inline-${master.id}-${index}`} className="col-span-2">
+                              <AdSlot 
+                                type="INLINE_CONTEXT" 
+                                context={{ 
+                                  page: 'search',
+                                  category: selectedSpec ? [selectedSpec] : undefined,
+                                  city: cityFilter || userCity || undefined
+                                }}
+                                index={index}
+                                className="my-4"
+                              />
+                            </div>
+                          </>
+                        )
+                      }
+
+                      return cardElement
                     })}
                   </div>
                 </div>
@@ -471,105 +579,138 @@ function SearchContent() {
             </>
           ) : (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-text-primary">
-                  <FiUser />
-                  Мастера ({masters.length})
-                </h2>
-                {masters.length === 0 ? (
-                  <div className="card text-center text-text-secondary py-8">
-                    Мастера не найдены
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {masters.map((master) => {
-                      const MasterCardContent = (
-                        <div className="card-glossy group relative">
-                          {/* Глянцевый эффект */}
-                          <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10 rounded-[12px]"></div>
-                          
-                        <div className="flex items-start gap-4 relative z-20">
-                          {/* Аватар */}
-                          <div className="relative group/avatar">
-                            <div className="w-20 h-20 bg-gradient-to-br from-graphite-primary to-graphite-tertiary border-2 border-white/50 flex items-center justify-center text-white text-xl font-semibold rounded-full flex-shrink-0 shadow-glossy overflow-hidden">
-                              {master.avatar_url ? (
+              <h2 className="text-xl font-semibold text-text-primary flex items-center gap-2 mb-2">
+                <FiUser />
+                Мастера ({masters.length})
+              </h2>
+              {masters.length === 0 ? (
+                <div className="card text-center text-text-secondary py-12">
+                  Мастера не найдены
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-5">
+                  {masters.map((master, index) => {
+                    const MasterCard = (
+                      <div className="card-glossy group h-[400px] flex flex-col !p-0 overflow-hidden relative">
+                        {/* Глянцевый эффект */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10 rounded-[12px]"></div>
+                        
+                        {/* Квадратный аватар на всю ширину */}
+                        <div className="w-full h-[200px] bg-gradient-to-br from-graphite-primary to-graphite-tertiary flex items-center justify-center text-white text-2xl font-semibold rounded-t-[12px] flex-shrink-0 overflow-hidden relative group/image">
+                          {master.avatar_url ? (
+                            <>
+                              <img
+                                src={master.avatar_url}
+                                alt={master.full_name}
+                                className="w-full h-[200px] object-cover transition-all duration-500 group-hover/image:scale-110 group-hover/image:brightness-110"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/20 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+                            </>
+                          ) : (
+                            master.full_name[0]?.toUpperCase() || '?'
+                          )}
+                        </div>
+
+                        {/* Основная информация */}
+                        <div className="flex flex-col items-center text-center p-5 relative z-20">
+                          <h3 className="font-semibold text-base bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent mb-1.5 line-clamp-2 leading-tight group-hover:from-brand-accent group-hover:to-brand-accent-hover transition-all">
+                            {master.full_name}
+                          </h3>
+                          {master.city && (
+                            <div className="flex items-center gap-1 text-xs text-text-secondary mb-2.5">
+                              <FiMapPin size={12} strokeWidth={2} className="text-brand-accent/60" />
+                              <span>{master.city}</span>
+                            </div>
+                          )}
+                          {/* Рейтинг мастера */}
+                          {master.master_reviews_count && master.master_reviews_count > 0 ? (
+                            <div className="flex items-center gap-1 text-xs text-text-secondary mb-2.5">
+                              {master.master_rating && master.master_rating > 0 ? (
                                 <>
-                                  <img
-                                    src={master.avatar_url}
-                                    alt={master.full_name}
-                                    className="w-full h-full object-cover rounded-full transition-all duration-300 group-hover/avatar:scale-110"
-                                  />
-                                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300"></div>
+                                  <span>⭐</span>
+                                  <span className="font-medium">
+                                    {master.master_rating.toFixed(1)} ({master.master_reviews_count})
+                                  </span>
                                 </>
                               ) : (
-                                master.full_name[0]?.toUpperCase() || '?'
+                                <span className="font-medium">
+                                  ({master.master_reviews_count} {master.master_reviews_count === 1 ? 'отзыв' : master.master_reviews_count < 5 ? 'отзыва' : 'отзывов'})
+                                </span>
                               )}
                             </div>
-                          </div>
-
-                          {/* Основная информация */}
-                          <div className="flex-1 min-w-0">
-                            {/* Имя и роль */}
-                            <div className="mb-2">
-                              <h3 className="font-semibold text-lg bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent mb-1 leading-tight group-hover:from-brand-accent group-hover:to-brand-accent-hover transition-all">
-                                {master.full_name}
-                              </h3>
-                              <div className="flex items-center gap-2 text-sm text-text-secondary">
-                                <div className="flex items-center gap-1">
-                                  <FiBriefcase size={14} strokeWidth={2} />
-                                  <span>{roleLabels[master.role as keyof typeof roleLabels]}</span>
-                                </div>
-                                {master.city && (
-                                  <>
-                                    <span>•</span>
-                                    <div className="flex items-center gap-1">
-                                      <FiMapPin size={14} strokeWidth={2} />
-                                      <span>{master.city}</span>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
+                          ) : (
+                            <div className="text-xs text-text-secondary mb-2.5">
+                              Без отзывов
                             </div>
+                          )}
+                        </div>
 
-                            {/* Описание */}
-                            {master.description && (
-                              <p className="text-sm text-text-secondary mb-3 line-clamp-2 leading-relaxed">
-                                {master.description}
-                              </p>
-                            )}
+                        {/* Описание */}
+                        {master.description && (
+                          <p className="text-xs text-text-secondary mb-3.5 line-clamp-2 leading-relaxed flex-1 px-5">
+                            {master.description}
+                          </p>
+                        )}
 
-                            {/* Специализации */}
-                            {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border-light/50">
-                                {(master as any).profile_specializations.map((item: any) => (
-                                  <span
-                                    key={item.specialization?.id || item.specialization_id}
-                                    className="px-3 py-1 bg-gradient-to-br from-brand-accent/15 to-brand-accent/10 text-brand-accent text-xs font-medium rounded-lg border border-brand-accent/30 backdrop-blur-sm shadow-sm flex items-center gap-1 transition-all group-hover:border-brand-accent/50 group-hover:shadow-md"
-                                  >
-                                    <FiCheckCircle size={12} strokeWidth={2.5} />
-                                    {item.specialization?.name}
-                                  </span>
-                                ))}
-                              </div>
+                        {/* Специализации */}
+                        {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-auto pt-4 border-t border-border-light/40 px-5 pb-6 relative z-20">
+                            {(master as any).profile_specializations.slice(0, 2).map((item: any) => (
+                              <span
+                                key={item.specialization?.id || item.specialization_id}
+                                className="px-2 py-0.5 bg-gradient-to-br from-brand-accent/15 to-brand-accent/10 text-brand-accent text-[10px] font-medium rounded-lg border border-brand-accent/30 backdrop-blur-sm shadow-sm transition-all group-hover:border-brand-accent/50 group-hover:shadow-md"
+                              >
+                                {item.specialization?.name}
+                              </span>
+                            ))}
+                            {(master as any).profile_specializations.length > 2 && (
+                              <span className="px-2 py-0.5 text-text-muted text-[10px] font-medium">
+                                +{(master as any).profile_specializations.length - 2}
+                              </span>
                             )}
                           </div>
-                        </div>
-                        </div>
-                      )
+                        )}
+                      </div>
+                    )
 
-                      return user ? (
-                        <Link key={master.id} href={`/profile/${master.id}`}>
-                          {MasterCardContent}
-                        </Link>
-                      ) : (
-                        <div key={master.id} onClick={() => setShowAuthModal(true)} className="cursor-pointer">
-                          {MasterCardContent}
-                        </div>
+                    const cardElement = user ? (
+                      <Link key={master.id} href={`/profile/${master.id}`}>
+                        {MasterCard}
+                      </Link>
+                    ) : (
+                      <div key={master.id} onClick={() => setShowAuthModal(true)} className="cursor-pointer">
+                        {MasterCard}
+                      </div>
+                    )
+
+                    // Показываем INLINE_CONTEXT рекламу каждые 6 карточек (после 5, 11, 17 и т.д.)
+                    const shouldShowAd = index > 0 && (index + 1) % 6 === 0
+
+                    if (shouldShowAd) {
+                      return (
+                        <>
+                          {cardElement}
+                          <div key={`ad-inline-filtered-${master.id}-${index}`} className="col-span-2">
+                            <AdSlot 
+                              type="INLINE_CONTEXT" 
+                              context={{ 
+                                page: 'search',
+                                category: selectedSpec ? [selectedSpec] : undefined,
+                                keywords: query ? [query] : undefined,
+                                city: cityFilter || userCity || undefined
+                              }}
+                              index={index}
+                              className="my-4"
+                            />
+                          </div>
+                        </>
                       )
-                    })}
-                  </div>
-                )}
-              </div>
+                    }
+
+                    return cardElement
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>

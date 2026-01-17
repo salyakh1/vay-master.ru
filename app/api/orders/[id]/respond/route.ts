@@ -17,6 +17,15 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 export const dynamic = 'force-dynamic'
 
+async function getBoolSetting(key: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from('system_settings')
+    .select('value')
+    .eq('key', key)
+    .maybeSingle()
+  return data?.value === true
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -54,7 +63,7 @@ export async function POST(
     // Проверяем профиль пользователя
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('role')
+      .select('*')
       .eq('id', user.id)
       .single()
 
@@ -70,6 +79,49 @@ export async function POST(
         { error: 'Только мастера могут откликаться на заказы' },
         { status: 403 }
       )
+    }
+
+    // Ограничение тарифа: после пробной недели без PRO можно откликаться 1 раз в 3 дня
+    // Trial старт:
+    // - для существующих аккаунтов может быть проставлен pro_trial_started_at (с момента включения системы)
+    // - для новых аккаунтов fallback на created_at (момент регистрации)
+    const trialStartRaw = (profile as any)?.pro_trial_started_at || (profile as any)?.created_at
+    const trialStart = trialStartRaw ? new Date(trialStartRaw) : new Date()
+    const base = Number.isNaN(trialStart.getTime()) ? new Date() : trialStart
+    const trialEnds = new Date(base.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const proUntil = (profile as any)?.pro_until ? new Date((profile as any).pro_until) : null
+    const isPro = (profile as any)?.is_pro === true || (proUntil && proUntil.getTime() > Date.now())
+    const isTrial = Date.now() < trialEnds.getTime()
+
+    const disableMasters = await getBoolSetting('pro_disable_master_restrictions')
+
+    if (!disableMasters && !isPro && !isTrial) {
+      // Берём самый последний отклик мастера по любому заказу
+      const { data: lastResp } = await supabaseAdmin
+        .from('order_responses')
+        .select('created_at')
+        .eq('master_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (lastResp?.created_at) {
+        const last = new Date(lastResp.created_at as any)
+        const nextAllowed = new Date(last.getTime() + 3 * 24 * 60 * 60 * 1000)
+        const remainingMs = nextAllowed.getTime() - Date.now()
+        if (remainingMs > 0) {
+          const remainingSeconds = Math.ceil(remainingMs / 1000)
+          return NextResponse.json(
+            {
+              error: 'Ограничение тарифа: отклик доступен 1 раз в 3 дня. Оформите PRO, чтобы снять лимит.',
+              code: 'RESPOND_COOLDOWN',
+              remainingSeconds,
+              nextAllowedAt: nextAllowed.toISOString(),
+            },
+            { status: 429 }
+          )
+        }
+      }
     }
 
     // Проверяем заказ

@@ -100,12 +100,14 @@ export default function SellerOnboardingPage() {
     instruments: productCategories.filter((cat) => cat.section === 'instruments'),
     autoparts: productCategories.filter((cat) => cat.section === 'autoparts'),
     materials: productCategories.filter((cat) => cat.section === 'materials'),
+    furniture: productCategories.filter((cat) => cat.section === 'furniture'),
   }
 
   const sectionNames = {
     instruments: 'Инструменты',
     autoparts: 'Автозапчасти',
     materials: 'Стройматериалы',
+    furniture: 'Мебель',
   }
 
   if (authLoading || loading) {

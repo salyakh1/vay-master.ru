@@ -242,30 +242,35 @@ export default function AdminMastersPage() {
 
       {/* Filters */}
       <div className="card">
-        <div className="flex gap-4 flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchMasters()}
-                placeholder="Поиск по имени, email, городу..."
-                className="input pl-10"
-              />
-            </div>
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && fetchMasters()}
+              placeholder="Поиск по имени, email, городу..."
+              className="input pl-10 w-full h-10 text-sm"
+            />
           </div>
-          <select
-            value={verificationFilter}
-            onChange={(e) => setVerificationFilter(e.target.value)}
-            className="input md:w-48"
-          >
-            <option value="">Все</option>
-            <option value="verified">Верифицированные</option>
-            <option value="unverified">Не верифицированные</option>
-          </select>
-          <button onClick={fetchMasters} className="btn btn-primary">
+          <div className={`relative select-wrapper w-full ${verificationFilter ? 'has-value' : ''}`} data-placeholder="Верификация">
+            <select
+              value={verificationFilter || ''}
+              onChange={(e) => setVerificationFilter(e.target.value)}
+              className="input w-full h-10 text-sm appearance-none cursor-pointer"
+              style={{
+                color: !verificationFilter ? 'transparent' : 'var(--text-primary)',
+              }}
+            >
+              <option value="" disabled style={{ color: 'var(--text-muted)', display: 'none' }}>
+                Верификация
+              </option>
+              <option value="verified">Верифицированные</option>
+              <option value="unverified">Не верифицированные</option>
+            </select>
+          </div>
+          <button onClick={fetchMasters} className="btn btn-primary h-10 w-full text-sm">
             Найти
           </button>
         </div>
