@@ -21,19 +21,8 @@ export async function POST(
 
     if (error) {
       console.error('Error incrementing banner views:', error)
-      // Fallback: прямой UPDATE
-      const { error: updateError } = await supabase
-        .from('ad_banners')
-        .update({
-          views: supabase.raw('views + 1'),
-          current_impressions: supabase.raw('current_impressions + 1'),
-        })
-        .eq('id', adId)
-
-      if (updateError) {
-        console.error('Error in fallback update:', updateError)
-        return NextResponse.json({ error: 'Failed to track impression' }, { status: 500 })
-      }
+      // В supabase-js v2 нет supabase.raw(). Если RPC не доступен — возвращаем ошибку.
+      return NextResponse.json({ error: 'Failed to track impression' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

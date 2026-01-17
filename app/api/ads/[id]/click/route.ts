@@ -21,19 +21,8 @@ export async function POST(
 
     if (error) {
       console.error('Error incrementing banner clicks:', error)
-      // Fallback: прямой UPDATE
-      const { error: updateError } = await supabase
-        .from('ad_banners')
-        .update({
-          clicks: supabase.raw('clicks + 1'),
-          current_clicks: supabase.raw('current_clicks + 1'),
-        })
-        .eq('id', adId)
-
-      if (updateError) {
-        console.error('Error in fallback update:', updateError)
-        return NextResponse.json({ error: 'Failed to track click' }, { status: 500 })
-      }
+      // В supabase-js v2 нет supabase.raw(). Если RPC не доступен — возвращаем ошибку.
+      return NextResponse.json({ error: 'Failed to track click' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
