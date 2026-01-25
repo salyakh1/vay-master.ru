@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { supabase, Post } from '@/lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -76,12 +77,15 @@ export default function PostCard({ post, currentUserId, onUpdate }: PostCardProp
     <div className="card">
       <div className="flex items-start gap-4 mb-6">
         <Link href={`/profile/${user?.id || post.user_id}`}>
-          <div className="w-12 h-12 border border-border-light bg-graphite-primary flex items-center justify-center text-white text-sm font-semibold cursor-pointer rounded-md">
+          <div className="relative w-12 h-12 border border-border-light bg-graphite-primary flex items-center justify-center text-white text-sm font-semibold cursor-pointer rounded-md overflow-hidden">
             {user?.avatar_url ? (
-              <img
+              <Image
                 src={user.avatar_url}
                 alt={user.full_name}
-                className="w-full h-full object-cover rounded-md"
+                fill
+                className="object-cover rounded-md"
+                sizes="48px"
+                loading="lazy"
               />
             ) : (
               user?.full_name?.[0]?.toUpperCase() || '?'
@@ -109,12 +113,16 @@ export default function PostCard({ post, currentUserId, onUpdate }: PostCardProp
       {post.images && post.images.length > 0 && (
         <div className="grid grid-cols-2 gap-3 mb-6">
           {post.images.map((img, idx) => (
-            <img
-              key={idx}
-              src={img}
-              alt={`Post image ${idx + 1}`}
-              className="w-full h-48 object-cover border border-border-light rounded-md"
-            />
+            <div key={idx} className="relative w-full h-48 border border-border-light rounded-md overflow-hidden">
+              <Image
+                src={img}
+                alt={`Post image ${idx + 1}`}
+                fill
+                className="object-cover rounded-md"
+                sizes="(max-width: 768px) 50vw, 300px"
+                loading="lazy"
+              />
+            </div>
           ))}
         </div>
       )}

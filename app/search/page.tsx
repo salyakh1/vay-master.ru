@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { useAuth } from '../providers'
 import { supabase, User, Specialization, Service } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -32,11 +33,25 @@ function SearchContent() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [stories, setStories] = useState<Story[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
+  const [mastersPage, setMastersPage] = useState(1)
+  const [randomPage, setRandomPage] = useState(1)
+  const [loadingMoreMasters, setLoadingMoreMasters] = useState(false)
+  const [loadingMoreRandom, setLoadingMoreRandom] = useState(false)
+  const [hasMoreMasters, setHasMoreMasters] = useState(true)
+  const [hasMoreRandom, setHasMoreRandom] = useState(true)
+  
+  const ITEMS_PER_PAGE = 20
 
   // Убираем редирект для неавторизованных - они могут видеть карточки мастеров
 
+  // Render-on-Demand: Загружаем справочные данные только при открытии фильтров
   useEffect(() => {
+    if (!showFilters) return // Не загружаем, пока фильтры не открыты
+    
     const fetchReference = async () => {
+      // Предотвращаем повторную загрузку, если данные уже есть
+      if (specializations.length > 0 && services.length > 0) return
+      
       try {
         const [{ data: specData }, { data: svcData }] = await Promise.all([
           supabase.from('specializations').select('*').order('name', { ascending: true }),
@@ -49,9 +64,12 @@ function SearchContent() {
       }
     }
     fetchReference()
-  }, [])
+  }, [showFilters]) // Загружаем только при открытии фильтров
 
   useEffect(() => {
+    setMastersPage(1)
+    setMasters([])
+    setHasMoreMasters(true)
     performSearch()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, cityFilter, selectedSpec, selectedService])
@@ -59,7 +77,7 @@ function SearchContent() {
   useEffect(() => {
     // Загружаем всех мастеров при загрузке страницы (для всех пользователей)
     // Рандомность применяется только к порядку отображения
-    fetchRandomProfiles()
+    fetchRandomProfiles(1, true)
     // Загружаем истории для всех пользователей (включая неавторизованных)
     fetchStories()
   }, [])
@@ -73,7 +91,7 @@ function SearchContent() {
 
     // Если нет фильтров — показываем подборку по городу
     if (!hasFilters) {
-      await fetchRandomProfiles()
+      await fetchRandomProfiles(1, true)
       setMasters([])
       return
     }
@@ -81,7 +99,7 @@ function SearchContent() {
     setLoading(true)
 
     try {
-      await searchMasters()
+      await searchMasters(1, true)
     } catch (error) {
       console.error('Search error:', error)
     } finally {
@@ -89,10 +107,19 @@ function SearchContent() {
     }
   }
 
-  const fetchRandomProfiles = async () => {
+  const fetchRandomProfiles = async (pageNum: number = 1, reset: boolean = false) => {
     try {
-      // Показываем всех мастеров без фильтрации по городу
-      // Фильтрация по городу применяется только при явном выборе фильтра
+      if (reset) {
+        setRandomProfiles([])
+        setRandomPage(1)
+        setHasMoreRandom(true)
+      } else {
+        setLoadingMoreRandom(true)
+      }
+
+      const from = (pageNum - 1) * ITEMS_PER_PAGE
+      const to = from + ITEMS_PER_PAGE - 1
+
       let query = supabase
         .from('profiles')
         .select(`
@@ -102,26 +129,48 @@ function SearchContent() {
           ),
           profile_services (
             service:services (id, name, slug, specialization_id)
-          )
-        `)
+          ),
+          master_rating,
+          master_reviews_count
+        `, { count: 'exact' })
         .eq('role', 'master')
+        .range(from, to)
 
-      // Не применяем фильтр по городу пользователя - показываем всех мастеров
-      // Фильтр по городу будет применяться только если пользователь явно выберет его в фильтрах
-
-      const { data, error } = await query
+      const { data, error, count } = await query
 
       if (error) throw error
       const list = (data as any[]) || []
-      // Перемешиваем список для случайного порядка
-      for (let i = list.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        ;[list[i], list[j]] = [list[j], list[i]]
+      
+      // Перемешиваем только первую страницу для случайного порядка
+      if (reset && pageNum === 1) {
+        for (let i = list.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1))
+          ;[list[i], list[j]] = [list[j], list[i]]
+        }
       }
-      setRandomProfiles(list)
+
+      if (reset) {
+        setRandomProfiles(list)
+      } else {
+        setRandomProfiles(prev => [...prev, ...list])
+      }
+
+      setHasMoreRandom(list.length === ITEMS_PER_PAGE && (count || 0) > pageNum * ITEMS_PER_PAGE)
     } catch (error) {
       console.error('Error fetching random profiles:', error)
-      setRandomProfiles([])
+      if (reset) {
+        setRandomProfiles([])
+      }
+    } finally {
+      setLoadingMoreRandom(false)
+    }
+  }
+
+  const loadMoreRandom = () => {
+    if (!loadingMoreRandom && hasMoreRandom) {
+      const nextPage = randomPage + 1
+      setRandomPage(nextPage)
+      fetchRandomProfiles(nextPage, false)
     }
   }
 
@@ -167,8 +216,19 @@ function SearchContent() {
     }
   }
 
-  const searchMasters = async () => {
+  const searchMasters = async (pageNum: number = 1, reset: boolean = false) => {
     try {
+      if (reset) {
+        setMasters([])
+        setMastersPage(1)
+        setHasMoreMasters(true)
+      } else {
+        setLoadingMoreMasters(true)
+      }
+
+      const from = (pageNum - 1) * ITEMS_PER_PAGE
+      const to = from + ITEMS_PER_PAGE - 1
+
       let profileIds: string[] | null = null
 
       // Если есть текст запроса, ищем по специализациям и услугам
@@ -237,6 +297,7 @@ function SearchContent() {
 
       if (finalProfileIds && finalProfileIds.length === 0) {
         setMasters([])
+        setHasMoreMasters(false)
         return
       }
 
@@ -249,9 +310,12 @@ function SearchContent() {
           ),
           profile_services (
             service:services (id, name, slug, specialization_id)
-          )
-        `)
+          ),
+          master_rating,
+          master_reviews_count
+        `, { count: 'exact' })
         .eq('role', 'master')
+        .range(from, to)
 
       // Если есть текст запроса и не нашли по специализациям/услугам, ищем по имени и описанию
       if (query.trim() && !profileIds) {
@@ -268,13 +332,33 @@ function SearchContent() {
         queryBuilder = queryBuilder.in('id', finalProfileIds)
       }
 
-      const { data, error } = await queryBuilder.limit(50)
+      const { data, error, count } = await queryBuilder
 
       if (error) throw error
-      setMasters((data as any[]) || [])
+      const newMasters = (data as any[]) || []
+      
+      if (reset) {
+        setMasters(newMasters)
+      } else {
+        setMasters(prev => [...prev, ...newMasters])
+      }
+
+      setHasMoreMasters(newMasters.length === ITEMS_PER_PAGE && (count || 0) > pageNum * ITEMS_PER_PAGE)
     } catch (error) {
       console.error('Error searching masters:', error)
-      setMasters([])
+      if (reset) {
+        setMasters([])
+      }
+    } finally {
+      setLoadingMoreMasters(false)
+    }
+  }
+
+  const loadMoreMasters = () => {
+    if (!loadingMoreMasters && hasMoreMasters) {
+      const nextPage = mastersPage + 1
+      setMastersPage(nextPage)
+      searchMasters(nextPage, false)
     }
   }
 
@@ -460,10 +544,13 @@ function SearchContent() {
                           <div className="w-full h-[200px] bg-gradient-to-br from-graphite-primary to-graphite-tertiary flex items-center justify-center text-white text-2xl font-semibold rounded-t-[12px] flex-shrink-0 overflow-hidden relative group/image">
                             {master.avatar_url ? (
                               <>
-                                <img
+                                <Image
                                   src={master.avatar_url}
                                   alt={master.full_name}
-                                  className="w-full h-[200px] object-cover transition-all duration-500 group-hover/image:scale-110 group-hover/image:brightness-110"
+                                  fill
+                                  className="object-cover transition-all duration-500 group-hover/image:scale-110 group-hover/image:brightness-110"
+                                  sizes="(max-width: 768px) 50vw, 400px"
+                                  loading="lazy"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/20 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
                               </>
@@ -473,7 +560,7 @@ function SearchContent() {
                           </div>
 
                           {/* Основная информация */}
-                          <div className="flex flex-col items-center text-center p-5 relative z-20">
+                          <div className="flex flex-col items-center text-center p-5 pb-4 relative z-20">
                             <h3 className="font-semibold text-base bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent mb-1.5 line-clamp-2 leading-tight group-hover:from-brand-accent group-hover:to-brand-accent-hover transition-all">
                               {master.full_name}
                             </h3>
@@ -485,12 +572,12 @@ function SearchContent() {
                             )}
                             {/* Рейтинг мастера */}
                             {master.master_reviews_count && master.master_reviews_count > 0 ? (
-                              <div className="flex items-center gap-1 text-xs text-text-secondary mb-2.5">
+                              <div className="flex items-center gap-1 text-xs text-text-secondary mb-3">
                                 {master.master_rating && master.master_rating > 0 ? (
                                   <>
-                                    <span>⭐</span>
+                                    <FiStar size={12} className="fill-brand-accent text-brand-accent" strokeWidth={0} />
                                     <span className="font-medium">
-                                      {master.master_rating.toFixed(1)} ({master.master_reviews_count})
+                                      {master.master_rating.toFixed(1)} ({master.master_reviews_count} {master.master_reviews_count === 1 ? 'отзыв' : master.master_reviews_count < 5 ? 'отзыва' : 'отзывов'})
                                     </span>
                                   </>
                                 ) : (
@@ -500,37 +587,30 @@ function SearchContent() {
                                 )}
                               </div>
                             ) : (
-                              <div className="text-xs text-text-secondary mb-2.5">
+                              <div className="text-xs text-text-secondary mb-3">
                                 Без отзывов
                               </div>
                             )}
+
+                            {/* Специализации - сразу после рейтинга */}
+                            {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
+                              <div className="flex flex-wrap items-center justify-center gap-1.5 pt-3 border-t border-border-light/40 w-full px-2">
+                                {(master as any).profile_specializations.slice(0, 2).map((item: any) => (
+                                  <span
+                                    key={item.specialization?.id || item.specialization_id}
+                                    className="px-1.5 py-0.5 bg-gradient-to-br from-brand-accent/15 to-brand-accent/10 text-brand-accent text-[9px] font-medium rounded border border-brand-accent/30 backdrop-blur-sm shadow-sm transition-all group-hover:border-brand-accent/50 group-hover:shadow-md whitespace-nowrap"
+                                  >
+                                    {item.specialization?.name}
+                                  </span>
+                                ))}
+                                {(master as any).profile_specializations.length > 2 && (
+                                  <span className="text-[9px] text-text-secondary font-medium">
+                                    ...
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
-
-                          {/* Описание */}
-                          {master.description && (
-                            <p className="text-xs text-text-secondary mb-3.5 line-clamp-2 leading-relaxed flex-1 px-5">
-                              {master.description}
-                            </p>
-                          )}
-
-                          {/* Специализации */}
-                          {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-auto pt-4 border-t border-border-light/40 px-5 pb-6 relative z-20">
-                              {(master as any).profile_specializations.slice(0, 2).map((item: any) => (
-                                <span
-                                  key={item.specialization?.id || item.specialization_id}
-                                  className="px-2 py-0.5 bg-gradient-to-br from-brand-accent/15 to-brand-accent/10 text-brand-accent text-[10px] font-medium rounded-lg border border-brand-accent/30 backdrop-blur-sm shadow-sm transition-all group-hover:border-brand-accent/50 group-hover:shadow-md"
-                                >
-                                  {item.specialization?.name}
-                                </span>
-                              ))}
-                              {(master as any).profile_specializations.length > 2 && (
-                                <span className="px-2 py-0.5 text-text-muted text-[10px] font-medium">
-                                  +{(master as any).profile_specializations.length - 2}
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
                       )
 
@@ -570,6 +650,19 @@ function SearchContent() {
                       return cardElement
                     })}
                   </div>
+                  
+                  {/* Load More Button for Random */}
+                  {hasMoreRandom && (
+                    <div className="mt-8 text-center">
+                      <button
+                        onClick={loadMoreRandom}
+                        disabled={loadingMoreRandom}
+                        className="btn btn-secondary"
+                      >
+                        {loadingMoreRandom ? 'Загрузка...' : 'Загрузить ещё'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-12 text-text-secondary">
@@ -588,6 +681,7 @@ function SearchContent() {
                   Мастера не найдены
                 </div>
               ) : (
+                <>
                 <div className="grid grid-cols-2 gap-5">
                   {masters.map((master, index) => {
                     const MasterCard = (
@@ -599,10 +693,13 @@ function SearchContent() {
                         <div className="w-full h-[200px] bg-gradient-to-br from-graphite-primary to-graphite-tertiary flex items-center justify-center text-white text-2xl font-semibold rounded-t-[12px] flex-shrink-0 overflow-hidden relative group/image">
                           {master.avatar_url ? (
                             <>
-                              <img
+                              <Image
                                 src={master.avatar_url}
                                 alt={master.full_name}
-                                className="w-full h-[200px] object-cover transition-all duration-500 group-hover/image:scale-110 group-hover/image:brightness-110"
+                                fill
+                                className="object-cover transition-all duration-500 group-hover/image:scale-110 group-hover/image:brightness-110"
+                                sizes="(max-width: 768px) 50vw, 400px"
+                                loading="lazy"
                               />
                               <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/20 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
                             </>
@@ -612,7 +709,7 @@ function SearchContent() {
                         </div>
 
                         {/* Основная информация */}
-                        <div className="flex flex-col items-center text-center p-5 relative z-20">
+                        <div className="flex flex-col items-center text-center p-5 pb-4 relative z-20">
                           <h3 className="font-semibold text-base bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent mb-1.5 line-clamp-2 leading-tight group-hover:from-brand-accent group-hover:to-brand-accent-hover transition-all">
                             {master.full_name}
                           </h3>
@@ -624,12 +721,12 @@ function SearchContent() {
                           )}
                           {/* Рейтинг мастера */}
                           {master.master_reviews_count && master.master_reviews_count > 0 ? (
-                            <div className="flex items-center gap-1 text-xs text-text-secondary mb-2.5">
+                            <div className="flex items-center gap-1 text-xs text-text-secondary mb-3">
                               {master.master_rating && master.master_rating > 0 ? (
                                 <>
-                                  <span>⭐</span>
+                                  <FiStar size={12} className="fill-brand-accent text-brand-accent" strokeWidth={0} />
                                   <span className="font-medium">
-                                    {master.master_rating.toFixed(1)} ({master.master_reviews_count})
+                                    {master.master_rating.toFixed(1)} ({master.master_reviews_count} {master.master_reviews_count === 1 ? 'отзыв' : master.master_reviews_count < 5 ? 'отзыва' : 'отзывов'})
                                   </span>
                                 </>
                               ) : (
@@ -639,37 +736,30 @@ function SearchContent() {
                               )}
                             </div>
                           ) : (
-                            <div className="text-xs text-text-secondary mb-2.5">
+                            <div className="text-xs text-text-secondary mb-3">
                               Без отзывов
                             </div>
                           )}
+
+                          {/* Специализации - сразу после рейтинга */}
+                          {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
+                            <div className="flex flex-wrap items-center justify-center gap-1.5 pt-3 border-t border-border-light/40 w-full px-2">
+                              {(master as any).profile_specializations.slice(0, 2).map((item: any) => (
+                                <span
+                                  key={item.specialization?.id || item.specialization_id}
+                                  className="px-1.5 py-0.5 bg-gradient-to-br from-brand-accent/15 to-brand-accent/10 text-brand-accent text-[9px] font-medium rounded border border-brand-accent/30 backdrop-blur-sm shadow-sm transition-all group-hover:border-brand-accent/50 group-hover:shadow-md whitespace-nowrap"
+                                >
+                                  {item.specialization?.name}
+                                </span>
+                              ))}
+                              {(master as any).profile_specializations.length > 2 && (
+                                <span className="text-[9px] text-text-secondary font-medium">
+                                  ...
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
-
-                        {/* Описание */}
-                        {master.description && (
-                          <p className="text-xs text-text-secondary mb-3.5 line-clamp-2 leading-relaxed flex-1 px-5">
-                            {master.description}
-                          </p>
-                        )}
-
-                        {/* Специализации */}
-                        {Array.isArray((master as any).profile_specializations) && (master as any).profile_specializations.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-auto pt-4 border-t border-border-light/40 px-5 pb-6 relative z-20">
-                            {(master as any).profile_specializations.slice(0, 2).map((item: any) => (
-                              <span
-                                key={item.specialization?.id || item.specialization_id}
-                                className="px-2 py-0.5 bg-gradient-to-br from-brand-accent/15 to-brand-accent/10 text-brand-accent text-[10px] font-medium rounded-lg border border-brand-accent/30 backdrop-blur-sm shadow-sm transition-all group-hover:border-brand-accent/50 group-hover:shadow-md"
-                              >
-                                {item.specialization?.name}
-                              </span>
-                            ))}
-                            {(master as any).profile_specializations.length > 2 && (
-                              <span className="px-2 py-0.5 text-text-muted text-[10px] font-medium">
-                                +{(master as any).profile_specializations.length - 2}
-                              </span>
-                            )}
-                          </div>
-                        )}
                       </div>
                     )
 
@@ -710,6 +800,20 @@ function SearchContent() {
                     return cardElement
                   })}
                 </div>
+                
+                {/* Load More Button for Masters */}
+                {hasMoreMasters && (
+                  <div className="mt-8 text-center">
+                    <button
+                      onClick={loadMoreMasters}
+                      disabled={loadingMoreMasters}
+                      className="btn btn-secondary"
+                    >
+                      {loadingMoreMasters ? 'Загрузка...' : 'Загрузить ещё'}
+                    </button>
+                  </div>
+                )}
+                </>
               )}
             </div>
           )}

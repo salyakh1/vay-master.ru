@@ -2,13 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { FiX, FiImage, FiVideo } from 'react-icons/fi'
-import ProUpgradeModal from '@/components/ProUpgradeModal'
 import { getMasterAccess } from '@/lib/masterAccess'
 import { getProFeatureFlags, restrictionsDisabledForRole } from '@/lib/proSettings'
+
+// Dynamic import для модального окна - загружается только при открытии
+const ProUpgradeModal = dynamic(() => import('@/components/ProUpgradeModal'), {
+  ssr: false,
+})
 
 export default function NewPortfolioPage() {
   const router = useRouter()

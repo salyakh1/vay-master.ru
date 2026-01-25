@@ -65,6 +65,49 @@ export async function GET(request: NextRequest) {
       })) || []
 
       return NextResponse.json({ reviews: reviewsWithReplies, count: reviewsWithReplies.length })
+    } else if (targetType === 'seller') {
+      // Прямые отзывы о продавце (аналогично master_reviews)
+      const { data, error } = await supabase
+        .from('seller_reviews')
+        .select(`
+          *,
+          reviewer:profiles!reviewer_id(id, full_name, avatar_url, role),
+          seller:profiles!seller_id(id, full_name)
+        `)
+        .eq('seller_id', targetId)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+
+      if (error) throw error
+
+      // Получаем ответы на отзывы
+      const reviewIds = data?.map(r => r.id) || []
+      const { data: replies } = await supabase
+        .from('review_replies')
+        .select(`
+          *,
+          author:profiles!author_id(id, full_name, avatar_url)
+        `)
+        .eq('review_type', 'seller')
+        .in('review_id', reviewIds)
+        .order('created_at', { ascending: true })
+
+      // Группируем ответы по review_id
+      const repliesMap = new Map<string, any[]>()
+      replies?.forEach(reply => {
+        if (!repliesMap.has(reply.review_id)) {
+          repliesMap.set(reply.review_id, [])
+        }
+        repliesMap.get(reply.review_id)!.push(reply)
+      })
+
+      // Добавляем ответы к отзывам
+      const reviewsWithReplies = data?.map(review => ({
+        ...review,
+        replies: repliesMap.get(review.id) || []
+      })) || []
+
+      return NextResponse.json({ reviews: reviewsWithReplies, count: reviewsWithReplies.length })
     } else if (targetType === 'product') {
       const { data, error } = await supabase
         .from('product_reviews')
@@ -149,6 +192,33 @@ export async function POST(request: NextRequest) {
         .from('master_reviews')
         .insert({
           master_id: targetId,
+          reviewer_id: user.id,
+          rating,
+          comment: comment?.trim() || null,
+          images: images?.length > 0 ? images : null,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        if (error.code === '23505') {
+          return NextResponse.json({ error: 'Вы уже оставили отзыв. Можно отредактировать существующий.' }, { status: 400 })
+        }
+        throw error
+      }
+
+      return NextResponse.json({ review: data })
+    } else if (targetType === 'seller') {
+      // Прямые отзывы о продавце (аналогично master_reviews)
+      // Проверяем, что не оставляем отзыв самому себе
+      if (targetId === user.id) {
+        return NextResponse.json({ error: 'Нельзя оставить отзыв самому себе' }, { status: 400 })
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from('seller_reviews')
+        .insert({
+          seller_id: targetId,
           reviewer_id: user.id,
           rating,
           comment: comment?.trim() || null,

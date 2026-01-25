@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Order } from '@/lib/supabase'
 import { format } from 'date-fns'
@@ -168,21 +169,27 @@ export default function OrderCard({ order, variant = 'list', hideClientIdentity 
         {order.images && order.images.length > 0 && (
           isGrid ? (
             <div className="px-4 pb-3">
-              <div className="w-full aspect-[4/3] overflow-hidden rounded-lg bg-bg-secondary border border-border-light/40">
-                <img
+              <div className="relative w-full aspect-[4/3] overflow-hidden rounded-lg bg-bg-secondary border border-border-light/40">
+                <Image
                   src={order.images[0]}
                   alt="Order image"
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 400px"
+                  loading="lazy"
                 />
               </div>
             </div>
           ) : (
             <div className="mt-4 relative">
-              <div className="w-full aspect-[16/9] overflow-hidden rounded-lg bg-bg-secondary border border-border-light/40">
-                <img
+              <div className="relative w-full aspect-[16/9] overflow-hidden rounded-lg bg-bg-secondary border border-border-light/40">
+                <Image
                   src={order.images[0]}
                   alt="Order image"
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 800px"
+                  loading="lazy"
                 />
               </div>
               {order.images.length > 1 && (

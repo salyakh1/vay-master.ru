@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { User } from '@/lib/supabase'
 import { FiUser, FiCamera, FiMessageCircle, FiEdit2, FiTrash2 } from 'react-icons/fi'
 import { format } from 'date-fns'
@@ -11,7 +12,7 @@ import Link from 'next/link'
 interface ReviewReply {
   id: string
   review_id: string
-  review_type: 'master' | 'product'
+  review_type: 'master' | 'seller' | 'product'
   author_id: string
   content: string
   created_at: string
@@ -36,6 +37,11 @@ type MasterReview = BaseReview & {
   master?: User
 }
 
+type SellerReview = BaseReview & {
+  seller_id: string
+  seller?: User
+}
+
 type ProductReview = BaseReview & {
   product_id: string
   seller_id: string
@@ -44,11 +50,11 @@ type ProductReview = BaseReview & {
 }
 
 interface ReviewCardProps {
-  review: MasterReview | ProductReview
-  reviewType: 'master' | 'product'
+  review: MasterReview | SellerReview | ProductReview
+  reviewType: 'master' | 'seller' | 'product'
   currentUser: User | null
   onReply?: (reviewId: string) => void
-  onEdit?: (review: MasterReview | ProductReview) => void
+  onEdit?: (review: MasterReview | SellerReview | ProductReview) => void
   onDelete?: (reviewId: string) => void
   showReplies?: boolean
 }
@@ -79,6 +85,7 @@ export default function ReviewCard({
 
   const isOwnReview = currentUser?.id === review.reviewer_id
   const canReply = currentUser && !isOwnReview && reviewType === 'master' ? (review as MasterReview).master_id === currentUser.id : false
+  const canReplySeller = currentUser && !isOwnReview && reviewType === 'seller' ? (review as SellerReview).seller_id === currentUser.id : false
   const canReplyProduct = currentUser && !isOwnReview && reviewType === 'product' ? (review as ProductReview).seller_id === currentUser.id : false
 
   return (
@@ -87,11 +94,14 @@ export default function ReviewCard({
         {/* Аватар рецензента */}
         <Link href={`/profile/${review.reviewer_id}`} className="flex-shrink-0">
           {reviewer?.avatar_url ? (
-            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-border-light/60">
-              <img
+            <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-border-light/60">
+              <Image
                 src={reviewer.avatar_url}
                 alt={reviewer.full_name}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover rounded-full"
+                sizes="48px"
+                loading="lazy"
               />
             </div>
           ) : (
@@ -161,12 +171,15 @@ export default function ReviewCard({
               {review.images.slice(0, 3).map((img: string, idx: number) => (
                 <div
                   key={idx}
-                  className="aspect-square rounded-lg overflow-hidden border border-border-light/60 bg-bg-secondary group/image relative"
+                  className="relative aspect-square rounded-lg overflow-hidden border border-border-light/60 bg-bg-secondary group/image"
                 >
-                  <img
+                  <Image
                     src={img}
                     alt={`Фото ${idx + 1}`}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover/image:scale-110"
+                    fill
+                    className="object-cover transition-transform duration-300 group-hover/image:scale-110 rounded-lg"
+                    sizes="(max-width: 768px) 33vw, 150px"
+                    loading="lazy"
                   />
                 </div>
               ))}
@@ -179,7 +192,7 @@ export default function ReviewCard({
           )}
 
           {/* Кнопка ответа (для мастера/продавца) */}
-          {(canReply || canReplyProduct) && onReply && (
+          {(canReply || canReplySeller || canReplyProduct) && onReply && (
             <button
               onClick={() => onReply(review.id)}
               className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-brand-accent transition-colors mt-2"

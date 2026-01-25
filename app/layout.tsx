@@ -1,9 +1,14 @@
 import type { Metadata } from 'next'
 import { Inter, Manrope } from 'next/font/google'
+import dynamic from 'next/dynamic'
 import './globals.css'
 import { Providers } from './providers'
-import ProblemEntryModal from '@/components/ProblemEntryModal'
 import Footer from '@/components/Footer'
+
+// Dynamic import для модального окна - загружается только на главной странице
+const ProblemEntryModal = dynamic(() => import('@/components/ProblemEntryModal'), {
+  ssr: false,
+})
 
 const inter = Inter({ 
   subsets: ['latin', 'cyrillic'],

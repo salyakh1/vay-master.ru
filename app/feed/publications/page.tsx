@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
+import { VariableSizeList as List, FixedSizeGrid as Grid } from 'react-window'
 import { useAuth } from '../../providers'
 import { supabase, PortfolioItem, Product, PortfolioComment } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -37,6 +39,9 @@ export default function PublicationsPage() {
   const router = useRouter()
   const [items, setItems] = useState<UnifiedItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [page, setPage] = useState(1)
   const [contentType, setContentType] = useState<ContentType>('all')
   const [cityFilter, setCityFilter] = useState('')
   const [showFilters, setShowFilters] = useState(false)
@@ -45,6 +50,18 @@ export default function PublicationsPage() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
+  
+  // Refs и размеры для виртуализации
+  const gridContainerRef = useRef<HTMLDivElement>(null)
+  const listContainerRef = useRef<HTMLDivElement>(null)
+  const [gridDimensions, setGridDimensions] = useState({ width: 0, height: 0 })
+  const [listDimensions, setListDimensions] = useState({ width: 0, height: 0 })
+  
+  const GRID_COLUMN_COUNT = 3
+  const GRID_ITEM_SIZE = 200 // Примерный размер квадрата в grid
+  const LIST_ITEM_HEIGHT = 600 // Примерная высота элемента в list view
+
+  const ITEMS_PER_PAGE = 25
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -54,9 +71,33 @@ export default function PublicationsPage() {
 
   useEffect(() => {
     if (user) {
-      fetchAllContent()
+      setPage(1)
+      setItems([])
+      setHasMore(true)
+      fetchAllContent(1, true)
     }
   }, [user, contentType, cityFilter])
+
+  // Обновляем размеры контейнеров
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (gridContainerRef.current && viewMode === 'grid') {
+        setGridDimensions({
+          width: gridContainerRef.current.offsetWidth,
+          height: Math.min(window.innerHeight * 0.7, 800)
+        })
+      }
+      if (listContainerRef.current && viewMode === 'list') {
+        setListDimensions({
+          width: listContainerRef.current.offsetWidth,
+          height: Math.min(window.innerHeight * 0.7, 1000)
+        })
+      }
+    }
+    updateDimensions()
+    window.addEventListener('resize', updateDimensions)
+    return () => window.removeEventListener('resize', updateDimensions)
+  }, [viewMode, items.length])
 
   // Клик по плитке в сетке => переключаемся в ленту и скроллим к выбранному элементу
   useEffect(() => {
@@ -67,9 +108,16 @@ export default function PublicationsPage() {
     })
   }, [viewMode, activeItemId, items.length])
 
-  const fetchAllContent = async () => {
+  const fetchAllContent = async (pageNum: number = 1, reset: boolean = false) => {
     try {
-      setLoading(true)
+      if (reset) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
+      
+      const from = (pageNum - 1) * ITEMS_PER_PAGE
+      const to = from + ITEMS_PER_PAGE - 1
       
       // Загружаем работы мастеров (portfolio_items)
       let portfolioResult: any = { data: [], error: null }
@@ -81,7 +129,7 @@ export default function PublicationsPage() {
             master:profiles(id, full_name, avatar_url, role, city)
           `)
           .order('created_at', { ascending: false })
-          .limit(200)
+          .range(from, to)
       }
       
       // Загружаем товары (products)
@@ -96,7 +144,7 @@ export default function PublicationsPage() {
           `)
           .eq('in_stock', true)
           .order('created_at', { ascending: false })
-          .limit(200)
+          .range(from, to)
       }
       
       if (portfolioResult.error) throw portfolioResult.error
@@ -194,11 +242,30 @@ export default function PublicationsPage() {
       unifiedItems.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )
-      setItems(unifiedItems)
+      
+      if (reset) {
+        setItems(unifiedItems)
+      } else {
+        setItems(prev => [...prev, ...unifiedItems])
+      }
+      
+      // Проверяем, есть ли ещё данные
+      const hasMorePortfolio = contentType !== 'products' && portfolioResult.data?.length === ITEMS_PER_PAGE
+      const hasMoreProducts = contentType !== 'portfolio' && productsResult.data?.length === ITEMS_PER_PAGE
+      setHasMore(hasMorePortfolio || hasMoreProducts)
     } catch (error) {
       console.error('Error fetching all content:', error)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
+    }
+  }
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) {
+      const nextPage = page + 1
+      setPage(nextPage)
+      fetchAllContent(nextPage, false)
     }
   }
 
@@ -487,15 +554,20 @@ export default function PublicationsPage() {
                     className="relative aspect-square overflow-hidden rounded-lg bg-bg-secondary group cursor-pointer"
                   >
                     {thumbnail ? (
-                      <img
-                        src={thumbnail}
-                        alt={
-                          item.type === 'portfolio'
-                            ? item.portfolioItem?.title || 'Работа'
-                            : item.product?.name || 'Товар'
-                        }
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      />
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={thumbnail}
+                          alt={
+                            item.type === 'portfolio'
+                              ? item.portfolioItem?.title || 'Работа'
+                              : item.product?.name || 'Товар'
+                          }
+                          fill
+                          className="object-cover transition-transform duration-300 group-hover:scale-110"
+                          sizes="(max-width: 768px) 33vw, 300px"
+                          loading="lazy"
+                        />
+                      </div>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-text-muted">
                         {item.type === 'portfolio' ? '📷' : '🛍️'}
@@ -547,13 +619,16 @@ export default function PublicationsPage() {
                         <div className="flex items-center gap-3">
                           <Link
                             href={`/profile/${master?.id}`}
-                            className="w-10 h-10 sm:w-12 sm:h-12 bg-graphite-primary text-white flex items-center justify-center text-sm font-semibold rounded-full flex-shrink-0"
+                            className="relative w-10 h-10 sm:w-12 sm:h-12 bg-graphite-primary text-white flex items-center justify-center text-sm font-semibold rounded-full flex-shrink-0 overflow-hidden"
                           >
                             {master?.avatar_url ? (
-                              <img
+                              <Image
                                 src={master.avatar_url}
                                 alt={master.full_name}
-                                className="w-full h-full object-cover rounded-full"
+                                fill
+                                className="object-cover rounded-full"
+                                sizes="(max-width: 640px) 40px, 48px"
+                                loading="lazy"
                               />
                             ) : (
                               master?.full_name?.[0]?.toUpperCase() || 'M'
@@ -752,6 +827,19 @@ export default function PublicationsPage() {
                 }
                 return null
               })}
+              
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="btn btn-secondary"
+                  >
+                    {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

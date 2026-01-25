@@ -34,7 +34,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 })
     }
 
-    const tableName = targetType === 'master' ? 'master_reviews' : 'product_reviews'
+    const tableName = targetType === 'master' ? 'master_reviews' : targetType === 'seller' ? 'seller_reviews' : 'product_reviews'
 
     // Проверяем, что отзыв принадлежит текущему пользователю
     const { data: existingReview, error: checkError } = await supabaseAdmin
@@ -93,7 +93,7 @@ export async function DELETE(
     const searchParams = request.nextUrl.searchParams
     const targetType = searchParams.get('type') || 'master'
 
-    const tableName = targetType === 'master' ? 'master_reviews' : 'product_reviews'
+    const tableName = targetType === 'master' ? 'master_reviews' : targetType === 'seller' ? 'seller_reviews' : 'product_reviews'
 
     // Проверяем, что отзыв принадлежит текущему пользователю
     const { data: existingReview, error: checkError } = await supabaseAdmin

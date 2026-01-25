@@ -137,40 +137,41 @@ export default function ChatsPage() {
         .select('*')
         .in('id', otherUserIds)
 
-      // Получаем последние сообщения и количество непрочитанных для всех чатов
-      // Используем отдельные запросы для каждого чата, но выполняем их параллельно
-      const messagesPromises = chatIds.map(async (chatId) => {
-        const [lastMessageResult, unreadResult] = await Promise.all([
-          supabase
-            .from('messages')
-            .select('*')
-            .eq('chat_id', chatId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from('messages')
-            .select('id', { count: 'exact', head: true })
-            .eq('chat_id', chatId)
-            .eq('read', false)
-            .neq('sender_id', user.id)
-        ])
-        
-        return {
-          chatId,
-          message: lastMessageResult.data,
-          unreadCount: (unreadResult.count ?? 0) as number
+      // Получаем последние сообщения и количество непрочитанных для всех чатов одним запросом
+      // Используем оконные функции для получения последнего сообщения для каждого чата
+      const { data: allMessages, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .in('chat_id', chatIds)
+        .order('created_at', { ascending: false })
+
+      if (messagesError) throw messagesError
+
+      // Получаем непрочитанные сообщения для всех чатов одним запросом
+      const { data: unreadMessages, error: unreadError } = await supabase
+        .from('messages')
+        .select('chat_id, id')
+        .in('chat_id', chatIds)
+        .eq('read', false)
+        .neq('sender_id', user.id)
+
+      if (unreadError) throw unreadError
+
+      // Группируем последние сообщения по chat_id (берем первое для каждого чата, т.к. отсортировано по убыванию)
+      const messagesByChat = new Map<string, Message>()
+      const processedChats = new Set<string>()
+      allMessages?.forEach((msg) => {
+        if (!processedChats.has(msg.chat_id)) {
+          messagesByChat.set(msg.chat_id, msg as Message)
+          processedChats.add(msg.chat_id)
         }
       })
-      
-      const messagesResults = await Promise.all(messagesPromises)
-      const messagesByChat = new Map<string, Message>()
+
+      // Подсчитываем непрочитанные сообщения для каждого чата
       const unreadCountsByChat = new Map<string, number>()
-      messagesResults.forEach(({ chatId, message, unreadCount }) => {
-        if (message) {
-          messagesByChat.set(chatId, message as Message)
-        }
-        unreadCountsByChat.set(chatId, unreadCount)
+      unreadMessages?.forEach((msg) => {
+        const current = unreadCountsByChat.get(msg.chat_id) || 0
+        unreadCountsByChat.set(msg.chat_id, current + 1)
       })
 
       // Создаем map пользователей для быстрого доступа

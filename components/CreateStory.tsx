@@ -1,11 +1,16 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
 import { FiX, FiUpload, FiVideo, FiImage, FiPlus } from 'react-icons/fi'
-import ProUpgradeModal from '@/components/ProUpgradeModal'
 import { getMasterAccess } from '@/lib/masterAccess'
 import { getProFeatureFlags, restrictionsDisabledForRole } from '@/lib/proSettings'
+
+// Dynamic import для модального окна - загружается только при открытии
+const ProUpgradeModal = dynamic(() => import('@/components/ProUpgradeModal'), {
+  ssr: false,
+})
 
 interface CreateStoryProps {
   userId: string

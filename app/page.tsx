@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useAuth } from './providers'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
@@ -45,14 +45,40 @@ export default function Home() {
     clients: 0,
     completedOrders: 0,
   })
-  const [statsLoading, setStatsLoading] = useState(true)
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [statsFetched, setStatsFetched] = useState(false)
+  const statsSectionRef = useRef<HTMLElement>(null)
 
+  // Intersection Observer для ленивой загрузки статистики
   useEffect(() => {
-    fetchStats()
-  }, [])
+    if (statsFetched || !statsSectionRef.current) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !statsFetched) {
+            setStatsFetched(true)
+            fetchStats()
+            observer.disconnect()
+          }
+        })
+      },
+      { rootMargin: '200px' } // Загружаем за 200px до появления секции
+    )
+
+    observer.observe(statsSectionRef.current)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [statsFetched])
 
   const fetchStats = async () => {
+    if (statsLoading) return // Предотвращаем повторные запросы
+    
     try {
+      setStatsLoading(true)
+      
       // Выполняем все запросы параллельно для ускорения
       const [
         { count: totalCount },
@@ -82,7 +108,7 @@ export default function Home() {
     }
   }
 
-  if (loading || statsLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-bg-primary">
         <div className="text-base text-text-secondary">Загрузка...</div>
@@ -622,8 +648,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* 6. БЛОК СТАТИСТИКИ */}
-        <section className="max-w-6xl mx-auto mb-32">
+        {/* 6. БЛОК СТАТИСТИКИ - Загружается только при появлении в viewport */}
+        <section ref={statsSectionRef} className="max-w-6xl mx-auto mb-32">
           <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-semibold text-graphite-secondary mb-4 tracking-tight">
               VAY-MASTER в цифрах
@@ -640,7 +666,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="text-4xl md:text-5xl font-bold text-graphite-secondary mb-3 tracking-tight">
-                {stats.totalUsers.toLocaleString('ru-RU')}
+                {statsLoading ? '...' : stats.totalUsers.toLocaleString('ru-RU')}
               </div>
               <div className="text-base text-text-secondary font-semibold">Пользователей</div>
             </div>
@@ -651,7 +677,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="text-4xl md:text-5xl font-bold text-graphite-secondary mb-3 tracking-tight">
-                {stats.masters.toLocaleString('ru-RU')}
+                {statsLoading ? '...' : stats.masters.toLocaleString('ru-RU')}
               </div>
               <div className="text-base text-text-secondary font-semibold">Мастеров</div>
             </div>
@@ -662,7 +688,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="text-4xl md:text-5xl font-bold text-graphite-secondary mb-3 tracking-tight">
-                {stats.sellers.toLocaleString('ru-RU')}
+                {statsLoading ? '...' : stats.sellers.toLocaleString('ru-RU')}
               </div>
               <div className="text-base text-text-secondary font-semibold">Продавцов</div>
             </div>
@@ -673,7 +699,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="text-4xl md:text-5xl font-bold text-graphite-secondary mb-3 tracking-tight">
-                {stats.completedOrders.toLocaleString('ru-RU')}
+                {statsLoading ? '...' : stats.completedOrders.toLocaleString('ru-RU')}
               </div>
               <div className="text-base text-text-secondary font-semibold">Выполненных заказов</div>
             </div>

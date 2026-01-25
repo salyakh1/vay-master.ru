@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { useAuth } from '@/app/providers'
 import { supabase, PortfolioItem, PortfolioLike, PortfolioComment, User } from '@/lib/supabase'
 import { FiX, FiChevronLeft, FiChevronRight, FiHeart, FiMessageCircle, FiSend } from 'react-icons/fi'
@@ -11,9 +12,35 @@ interface PortfolioGalleryProps {
   items: PortfolioItem[]
   initialIndex: number
   onClose: () => void
+  initialCommentId?: string
+  focusCommentInput?: boolean
 }
 
-export default function PortfolioGallery({ items, initialIndex, onClose }: PortfolioGalleryProps) {
+type TreeComment = PortfolioComment & { user?: User; replies?: TreeComment[] }
+
+const INITIAL_REPLIES_VISIBLE = 10
+
+function collectDescendants(c: TreeComment): TreeComment[] {
+  if (!c.replies?.length) return []
+  return c.replies.flatMap((r) => [r, ...collectDescendants(r)])
+}
+
+function pluralReplies(x: number) {
+  return x === 1 ? 'ответ' : x >= 2 && x <= 4 ? 'ответа' : 'ответов'
+}
+
+function buildTree(flat: (PortfolioComment & { user?: User })[]): TreeComment[] {
+  const roots = flat.filter((c) => !c.parent_comment_id).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  function attach(nodes: (PortfolioComment & { user?: User })[]): TreeComment[] {
+    return nodes.map((n) => {
+      const kids = flat.filter((c) => c.parent_comment_id === n.id).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      return { ...n, replies: attach(kids) }
+    })
+  }
+  return attach(roots)
+}
+
+export default function PortfolioGallery({ items, initialIndex, onClose, initialCommentId, focusCommentInput }: PortfolioGalleryProps) {
   const { user: currentUser } = useAuth()
   const [currentItemIndex, setCurrentItemIndex] = useState(initialIndex)
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0)
@@ -24,6 +51,9 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
   const [showComments, setShowComments] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
+  const [replyingTo, setReplyingTo] = useState<{ id: string; authorName: string } | null>(null)
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({})
+  const [showAllReplies, setShowAllReplies] = useState<Record<string, boolean>>({})
   const [master, setMaster] = useState<User | null>(null)
   
   const touchStartY = useRef<number | null>(null)
@@ -33,8 +63,26 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
   const lastWheelTime = useRef<number>(0)
   const lastItemChangeTime = useRef<number>(0)
   const commentsRef = useRef<HTMLDivElement>(null)
+  const commentInputRef = useRef<HTMLInputElement>(null)
+  const touchStartedInCommentsRef = useRef(false)
 
   const currentItem = items[currentItemIndex]
+
+  useEffect(() => {
+    if (initialCommentId || focusCommentInput) setShowComments(true)
+  }, [initialCommentId, focusCommentInput])
+
+  useEffect(() => {
+    if (!initialCommentId || comments.length === 0) return
+    const el = document.getElementById(`comment-${initialCommentId}`)
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)
+  }, [initialCommentId, comments])
+
+  useEffect(() => {
+    if (!focusCommentInput || !showComments) return
+    const t = setTimeout(() => commentInputRef.current?.focus(), 400)
+    return () => clearTimeout(t)
+  }, [focusCommentInput, showComments])
   
   // Объединяем все медиа (фото и видео) текущей работы в один массив
   const allMedia = currentItem
@@ -79,7 +127,7 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
         .select('id')
         .eq('portfolio_item_id', currentItem.id)
         .eq('user_id', currentUser.id)
-        .single()
+        .maybeSingle()
 
       setLiked(!!likeData)
 
@@ -157,10 +205,12 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
           portfolio_item_id: currentItem.id,
           user_id: currentUser.id,
           content: commentText.trim(),
+          parent_comment_id: replyingTo?.id || null,
         })
 
       if (error) throw error
       setCommentText('')
+      setReplyingTo(null)
       await fetchComments()
       // Прокрутка к последнему комментарию
       setTimeout(() => {
@@ -176,6 +226,12 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
     }
   }
 
+  const handleReplyTo = (commentId: string, authorName: string) => {
+    setReplyingTo({ id: commentId, authorName })
+    setCommentText(`@${authorName} `)
+    setTimeout(() => commentInputRef.current?.focus(), 80)
+  }
+
   const handlePreviousItem = useCallback(() => {
     if (items.length <= 1) return
     
@@ -185,6 +241,7 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
     
     setSlideDirection('down')
     setShowComments(false)
+    setReplyingTo(null)
     setCurrentItemIndex((prev) => (prev > 0 ? prev - 1 : items.length - 1))
     setTimeout(() => setSlideDirection(null), 300)
   }, [items.length])
@@ -248,6 +305,7 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
     const handleWheel = (e: WheelEvent) => {
       if (!currentItem || !containerRef.current) return
       if (!containerRef.current.contains(e.target as Node)) return
+      if (commentsRef.current && commentsRef.current.contains(e.target as Node)) return
 
       e.preventDefault()
       e.stopPropagation()
@@ -314,12 +372,14 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
 
   // Touch handlers - улучшенные для плавной прокрутки как в Instagram
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartedInCommentsRef.current = !!(commentsRef.current && commentsRef.current.contains(e.target as Node))
     touchStartY.current = e.touches[0].clientY
     touchStartX.current = e.touches[0].clientX
     swipeDirection.current = null
   }, [])
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartedInCommentsRef.current) return
     if (touchStartY.current === null || touchStartX.current === null) return
     
     const touchY = e.touches[0].clientY
@@ -348,6 +408,12 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (touchStartY.current === null || touchStartX.current === null) return
+    if (touchStartedInCommentsRef.current) {
+      touchStartY.current = null
+      touchStartX.current = null
+      swipeDirection.current = null
+      return
+    }
 
     const touchY = e.changedTouches[0].clientY
     const touchX = e.changedTouches[0].clientX
@@ -392,9 +458,88 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
 
   const currentMedia = allMedia[currentMediaIndex]
 
-  // Первые 2 комментария для отображения всегда
-  const firstTwoComments = comments.slice(0, 2)
-  const remainingComments = comments.slice(2)
+  const tree = buildTree(comments)
+  const firstTwoComments = tree.slice(0, 2)
+
+  const CommentBlock = ({ comment, level = 0, isFlatReply = false }: { comment: TreeComment; level?: number; isFlatReply?: boolean }) => {
+    const commentUser = comment.user as User | undefined
+    const name = commentUser?.full_name || 'Пользователь'
+    return (
+      <div id={`comment-${comment.id}`} className={`flex gap-3 ${level > 0 ? 'ml-6 mt-2 border-l-2 border-gray-200 pl-3' : ''}`}>
+        <div className="w-8 h-8 bg-gray-200 border border-gray-300 flex items-center justify-center text-gray-700 text-xs font-bold flex-shrink-0 rounded-full overflow-hidden relative">
+          {commentUser?.avatar_url ? (
+            <Image src={commentUser.avatar_url} alt={name} fill className="object-cover rounded-full" sizes="32px" />
+          ) : (
+            (name[0]?.toUpperCase() || '?')
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-gray-900">
+            <span className="font-semibold">{name}</span> {comment.content}
+          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-xs text-gray-500">
+              {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true, locale: ru })}
+            </p>
+            {currentUser && (
+              <button
+                type="button"
+                onClick={() => handleReplyTo(comment.id, name)}
+                className="text-xs text-gray-500 hover:text-brand-accent transition-colors flex items-center gap-1"
+              >
+                <FiMessageCircle size={10} />
+                Ответить
+              </button>
+            )}
+          </div>
+          {!isFlatReply &&
+          (() => {
+            const flatReplies = collectDescendants(comment).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+            const n = flatReplies.length
+            if (n === 0) return null
+            const isExpanded = !!expandedReplies[comment.id]
+            const toShow = showAllReplies[comment.id] ? flatReplies : flatReplies.slice(0, INITIAL_REPLIES_VISIBLE)
+            const moreCount = n - INITIAL_REPLIES_VISIBLE
+            return (
+              <div className="mt-3">
+                {!isExpanded ? (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedReplies((prev) => ({ ...prev, [comment.id]: true }))}
+                    className="text-xs text-gray-500 hover:text-brand-accent transition-colors"
+                  >
+                    Показать {n} {pluralReplies(n)}
+                  </button>
+                ) : (
+                  <>
+                    {toShow.map((r) => (
+                      <CommentBlock key={r.id} comment={r} level={1} isFlatReply />
+                    ))}
+                    {moreCount > 0 && !showAllReplies[comment.id] && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllReplies((prev: Record<string, boolean>) => ({ ...prev, [comment.id]: true }))}
+                        className="text-xs text-gray-500 hover:text-brand-accent transition-colors mt-1"
+                      >
+                        Посмотреть ещё {moreCount} {pluralReplies(moreCount)}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setExpandedReplies((prev) => ({ ...prev, [comment.id]: false }))}
+                      className="text-xs text-gray-500 hover:text-brand-accent transition-colors mt-2"
+                    >
+                      Скрыть ответы
+                    </button>
+                  </>
+                )}
+              </div>
+            )
+          })()}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div 
@@ -413,10 +558,10 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
         <div className="flex items-center justify-between pointer-events-auto">
           <div className="flex items-center gap-3">
             {master && (
-              <div className="w-8 h-8 bg-gradient-to-br from-graphite-primary to-graphite-tertiary border-2 border-white/50 flex items-center justify-center text-white text-sm font-bold rounded-full shadow-glossy overflow-hidden">
+              <div className="w-8 h-8 bg-gradient-to-br from-graphite-primary to-graphite-tertiary border-2 border-white/50 flex items-center justify-center text-white text-sm font-bold rounded-full shadow-glossy overflow-hidden relative">
                 {master.avatar_url ? (
                   <>
-                    <img src={master.avatar_url} alt={master.full_name} className="w-full h-full object-cover rounded-full" />
+                    <Image src={master.avatar_url} alt={master.full_name} fill className="object-cover rounded-full" sizes="32px" />
                     <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 to-transparent opacity-60"></div>
                   </>
                 ) : (
@@ -470,13 +615,18 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
           }`}
         >
           {currentMedia.type === 'image' ? (
-            <img
-              src={currentMedia.url}
-              alt={currentItem.title}
-              className="w-full h-full object-contain select-none pointer-events-none"
-              draggable={false}
-              onDragStart={(e) => e.preventDefault()}
-            />
+            <div className="relative w-full h-full">
+              <Image
+                src={currentMedia.url}
+                alt={currentItem.title}
+                fill
+                className="object-contain select-none pointer-events-none"
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
+                sizes="100vw"
+                priority={currentMediaIndex === 0 && currentItemIndex === initialIndex}
+              />
+            </div>
           ) : (
             <video
               src={currentMedia.url}
@@ -527,11 +677,11 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
       {/* Bottom Section - Глянцевый фон */}
       <div 
         className={`absolute bottom-0 left-0 right-0 z-40 glass-strong border-t border-white/30 transition-all duration-300 shadow-glass ${
-          showComments ? 'h-2/3' : 'h-auto'
+          showComments ? 'h-2/3 flex flex-col min-h-0' : 'h-auto'
         }`}
       >
         {/* Кнопки действий */}
-        <div className="flex items-center gap-4 p-4 border-b border-gray-200 pointer-events-auto">
+        <div className="flex items-center gap-4 p-4 border-b border-gray-200 pointer-events-auto flex-shrink-0">
           <button
             onClick={handleLike}
             className={`flex items-center gap-2 transition-all hover:scale-110 ${
@@ -541,7 +691,11 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
             <FiHeart size={24} fill={liked ? 'currentColor' : 'none'} className={liked ? 'drop-shadow-glow' : ''} />
           </button>
           <button
-            onClick={() => setShowComments(!showComments)}
+            onClick={() => {
+              const next = !showComments
+              setShowComments(next)
+              if (!next) setReplyingTo(null)
+            }}
             className="flex items-center gap-2 text-graphite-secondary hover:text-brand-accent transition-all hover:scale-110"
           >
             <FiMessageCircle size={24} />
@@ -556,7 +710,7 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
         {currentItem.description && (
           <div 
             key={`desc-${currentItemIndex}`}
-            className={`px-4 py-3 border-b border-gray-200 ${
+            className={`px-4 py-3 border-b border-gray-200 flex-shrink-0 ${
               slideDirection === 'up' 
                 ? 'animate-slide-in-up' 
                 : slideDirection === 'down' 
@@ -578,12 +732,14 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
               const commentUser = comment.user as User | undefined
               return (
                 <div key={comment.id} className="flex gap-3">
-                  <div className="w-8 h-8 bg-gray-200 border border-gray-300 flex items-center justify-center text-gray-700 text-xs font-bold flex-shrink-0 rounded-full">
+                  <div className="relative w-8 h-8 bg-gray-200 border border-gray-300 flex items-center justify-center text-gray-700 text-xs font-bold flex-shrink-0 rounded-full overflow-hidden">
                     {commentUser?.avatar_url ? (
-                      <img 
+                      <Image 
                         src={commentUser.avatar_url} 
                         alt={commentUser.full_name} 
-                        className="w-full h-full object-cover rounded-full" 
+                        fill
+                        className="object-cover rounded-full" 
+                        sizes="32px"
                       />
                     ) : (
                       commentUser?.full_name[0]?.toUpperCase() || '?'
@@ -614,55 +770,47 @@ export default function PortfolioGallery({ items, initialIndex, onClose }: Portf
 
         {/* Все комментарии - при нажатии на иконку */}
         {showComments && (
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div 
               ref={commentsRef}
-              className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
+              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-3 touch-pan-y"
+              style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
             >
               {comments.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-8">
                   Пока нет комментариев
                 </p>
               ) : (
-                comments.map((comment) => {
-                  const commentUser = comment.user as User | undefined
-                  return (
-                    <div key={comment.id} className="flex gap-3">
-                      <div className="w-8 h-8 bg-gray-200 border border-gray-300 flex items-center justify-center text-gray-700 text-xs font-bold flex-shrink-0 rounded-full">
-                        {commentUser?.avatar_url ? (
-                          <img 
-                            src={commentUser.avatar_url} 
-                            alt={commentUser.full_name} 
-                            className="w-full h-full object-cover rounded-full" 
-                          />
-                        ) : (
-                          commentUser?.full_name[0]?.toUpperCase() || '?'
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-900">
-                          <span className="font-semibold">{commentUser?.full_name || 'Пользователь'}</span>{' '}
-                          {comment.content}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true, locale: ru })}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })
+                tree.map((c) => <CommentBlock key={c.id} comment={c} level={0} />)
               )}
             </div>
 
-            {/* Форма комментария */}
+            {/* Форма комментария — всегда внизу, не скроллится */}
             {currentUser && (
-              <form onSubmit={handleSubmitComment} className="p-4 border-t border-gray-200">
+              <form onSubmit={handleSubmitComment} className="p-4 border-t border-gray-200 flex-shrink-0">
+                {replyingTo && (
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-600">Ответ для {replyingTo.authorName}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplyingTo(null)
+                        const a = commentText.replace(/^@[^\s]+\s?/, '')
+                        setCommentText(a)
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <input
+                    ref={commentInputRef}
                     type="text"
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
-                    placeholder="Добавить комментарий..."
+                    placeholder={replyingTo ? `Ответ для ${replyingTo.authorName}...` : 'Добавить комментарий...'}
                     className="flex-1 bg-gray-50 border border-gray-300 rounded px-4 py-2 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:border-gray-400"
                   />
                   <button

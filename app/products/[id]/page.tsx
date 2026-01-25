@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { useAuth } from '@/app/providers'
 import { supabase, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -12,11 +13,14 @@ import ReviewCard from '@/components/ReviewCard'
 import ReviewForm from '@/components/ReviewForm'
 import ReviewReplyForm from '@/components/ReviewReplyForm'
 import RatingStars from '@/components/RatingStars'
+import ProductComments from '@/components/ProductComments'
 
 export default function ProductPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
+  const replyTo = searchParams.get('replyTo')
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeImage, setActiveImage] = useState<number>(0)
@@ -259,10 +263,12 @@ export default function ProductPage() {
                 onTouchEnd={handleTouchEnd}
               >
                 {mainImage ? (
-                  <img
+                  <Image
                     src={mainImage}
                     alt={product.name}
-                    className="w-full aspect-square object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
                   />
                 ) : (
                   <div className="w-full aspect-square bg-gray-200 flex items-center justify-center text-6xl">
@@ -306,9 +312,9 @@ export default function ProductPage() {
                         type="button"
                         key={idx}
                         onClick={() => setActiveImage(idx)}
-                        className={`w-16 h-16 border-2 ${idx === activeImage ? 'border-black' : 'border-gray-200'} overflow-hidden flex-shrink-0 transition-colors`}
+                        className={`w-16 h-16 border-2 ${idx === activeImage ? 'border-black' : 'border-gray-200'} overflow-hidden flex-shrink-0 transition-colors relative`}
                       >
-                        <img src={img} alt={`thumb-${idx}`} className="w-full h-full object-cover" />
+                        <Image src={img} alt={`thumb-${idx}`} fill className="object-cover" sizes="64px" />
                       </button>
                     ))}
                   </div>
@@ -539,6 +545,15 @@ export default function ProductPage() {
               </div>
             )}
           </div>
+
+          {/* Комментарии к товару (отдельно от отзывов) */}
+          {product && (
+            <ProductComments
+              productId={product.id}
+              currentUser={user}
+              openReplyToId={replyTo || undefined}
+            />
+          )}
         </div>
       </div>
 

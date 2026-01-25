@@ -268,6 +268,7 @@ export interface PortfolioComment {
   user_id: string
   content: string
   created_at: string
+  parent_comment_id?: string | null
   user?: User
 }
 
@@ -319,10 +320,36 @@ export interface ProductReview {
   replies?: ReviewReply[]
 }
 
+export interface SellerReview {
+  id: string
+  seller_id: string
+  reviewer_id: string
+  rating: number // 1-5
+  comment?: string
+  images?: string[]
+  created_at: string
+  updated_at?: string
+  reviewer?: User
+  seller?: User
+  replies?: ReviewReply[]
+}
+
+export interface ProductComment {
+  id: string
+  product_id: string
+  author_id: string
+  content: string
+  created_at: string
+  updated_at?: string
+  parent_comment_id?: string // Для ответов на комментарии
+  author?: User
+  replies?: ProductComment[] // Вложенные комментарии
+}
+
 export interface ReviewReply {
   id: string
   review_id: string
-  review_type: 'master' | 'product'
+  review_type: 'master' | 'product' | 'seller'
   author_id: string
   content: string
   created_at: string

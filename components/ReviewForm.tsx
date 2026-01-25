@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import Image from 'next/image'
 import { FiX, FiCamera, FiStar } from 'react-icons/fi'
 import RatingStars from './RatingStars'
 import { supabase } from '@/lib/supabase'
 
 interface ReviewFormProps {
-  targetId: string // ID мастера или товара
-  targetType: 'master' | 'product'
+  targetId: string // ID мастера, продавца или товара
+  targetType: 'master' | 'seller' | 'product'
   sellerId?: string // Для отзывов о товарах
   currentUserId: string
   onSuccess?: () => void
@@ -110,6 +111,23 @@ export default function ReviewForm({
           
           if (error) throw error
         }
+      } else if (targetType === 'seller') {
+        reviewData.seller_id = targetId
+
+        if (existingReview) {
+          const { error } = await supabase
+            .from('seller_reviews')
+            .update(reviewData)
+            .eq('id', existingReview.id)
+          
+          if (error) throw error
+        } else {
+          const { error } = await supabase
+            .from('seller_reviews')
+            .insert(reviewData)
+          
+          if (error) throw error
+        }
       } else if (targetType === 'product') {
         reviewData.product_id = targetId
         reviewData.seller_id = sellerId
@@ -192,7 +210,7 @@ export default function ReviewForm({
           <div className="grid grid-cols-3 gap-2 mb-2">
             {images.map((img, idx) => (
               <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border-light/60 group">
-                <img src={img} alt={`Фото ${idx + 1}`} className="w-full h-full object-cover" />
+                <Image src={img} alt={`Фото ${idx + 1}`} fill className="object-cover" sizes="(max-width: 768px) 33vw, 200px" />
                 <button
                   type="button"
                   onClick={() => removeImage(idx)}

@@ -1,13 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useAuth } from '@/app/providers'
 import { supabase, User, PortfolioItem, Specialization, Service, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import PortfolioGrid from '@/components/PortfolioGrid'
-import PortfolioGallery from '@/components/PortfolioGallery'
+
+// Dynamic import для галереи портфолио - загружается только при открытии
+const PortfolioGallery = dynamic(() => import('@/components/PortfolioGallery'), {
+  ssr: false,
+})
 import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock, FiArrowLeft, FiLogOut, FiUser, FiShield, FiHeart, FiShoppingBag, FiChevronDown, FiChevronUp, FiSend } from 'react-icons/fi'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -18,7 +24,12 @@ import ReviewForm from '@/components/ReviewForm'
 import ReviewReplyForm from '@/components/ReviewReplyForm'
 import RatingStars from '@/components/RatingStars'
 import StoriesCircle from '@/components/StoriesCircle'
-import CreateStory from '@/components/CreateStory'
+
+// Dynamic import для создания истории - загружается только при открытии
+const CreateStory = dynamic(() => import('@/components/CreateStory'), {
+  ssr: false,
+})
+
 import { Story } from '@/lib/supabase'
 
 export default function ProfilePage() {
@@ -45,6 +56,7 @@ export default function ProfilePage() {
   const [followersCount, setFollowersCount] = useState<number>(0)
   const [productsCount, setProductsCount] = useState<number>(0)
   const [masterReviews, setMasterReviews] = useState<any[]>([])
+  const [sellerReviews, setSellerReviews] = useState<any[]>([]) // Прямые отзывы о продавце
   const [productReviews, setProductReviews] = useState<any[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [showReviewForm, setShowReviewForm] = useState(false)
@@ -65,6 +77,12 @@ export default function ProfilePage() {
   const [deletePassword, setDeletePassword] = useState('')
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  
+  // Render-on-Demand: состояния для отслеживания загрузки данных по секциям
+  const [portfolioFetched, setPortfolioFetched] = useState(false)
+  const [reviewsFetched, setReviewsFetched] = useState(false)
+  const portfolioSectionRef = useRef<HTMLDivElement>(null)
+  const reviewsSectionRef = useRef<HTMLDivElement>(null)
   
   // Settings form state - common
   const [fullName, setFullName] = useState('')
@@ -97,6 +115,13 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (params.id) {
+      // Render-on-Demand: сбрасываем состояния при смене профиля
+      setPortfolioFetched(false)
+      setReviewsFetched(false)
+      setPortfolioItems([])
+      setMasterReviews([])
+      setProductReviews([])
+      
       // Сначала загружаем профиль, потом остальные данные
       fetchProfile()
       if (currentUser) {
@@ -109,6 +134,78 @@ export default function ProfilePage() {
     // Загружаем справочные данные только один раз
     fetchReferenceData()
   }, [])
+
+  // Render-on-Demand: Intersection Observer для секции портфолио (только для мастеров)
+  useEffect(() => {
+    if (!profile || profile.role !== 'master' || portfolioFetched || !portfolioSectionRef.current) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !portfolioFetched) {
+            setPortfolioFetched(true)
+            fetchPortfolio()
+            observer.disconnect()
+          }
+        })
+      },
+      { rootMargin: '200px' } // Загружаем за 200px до появления секции
+    )
+
+    observer.observe(portfolioSectionRef.current)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [profile, portfolioFetched])
+
+  // Render-on-Demand: Intersection Observer для секции отзывов
+  useEffect(() => {
+    if (!profile || reviewsFetched || !reviewsSectionRef.current) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !reviewsFetched) {
+            setReviewsFetched(true)
+            const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+            if (profileId) {
+              if (profile.role === 'master') {
+                fetchMasterReviews(profileId)
+              } else if (profile.role === 'seller') {
+                // Загружаем и прямые отзывы о продавце, и отзывы о товарах
+                fetchSellerReviews(profileId)
+                fetchProductReviews(profileId)
+              }
+            }
+            observer.disconnect()
+          }
+        })
+      },
+      { rootMargin: '200px' } // Загружаем за 200px до появления секции
+    )
+
+    observer.observe(reviewsSectionRef.current)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [profile, reviewsFetched, params.id])
+
+  // Открытие галереи портфолио по openPortfolio из URL (из /activity)
+  useEffect(() => {
+    const op = searchParams.get('openPortfolio')
+    if (!op || !profile || profile.role !== 'master') return
+    setPortfolioFetched(true)
+    fetchPortfolio()
+  }, [searchParams, profile?.id, profile?.role])
+
+  useEffect(() => {
+    const op = searchParams.get('openPortfolio')
+    if (!op || portfolioItems.length === 0) return
+    const idx = portfolioItems.findIndex((i: PortfolioItem) => i.id === op)
+    if (idx >= 0) setSelectedPortfolioIndex(idx)
+  }, [searchParams, portfolioItems])
 
   const fetchProfile = async () => {
     try {
@@ -136,19 +233,6 @@ export default function ProfilePage() {
       const userData = data as User
       setProfile(userData)
 
-      // Проверяем, есть ли у пользователя админская роль
-      const { data: adminRoleData } = await supabase
-        .from('admin_roles')
-        .select('role')
-        .eq('user_id', params.id)
-        .eq('is_active', true)
-        .maybeSingle()
-
-      if (adminRoleData) {
-        setAdminRole(adminRoleData.role)
-      } else {
-        setAdminRole(null)
-      }
       // Initialize form with profile data - common
       setFullName(userData.full_name || '')
       setPhone(userData.phone || '')
@@ -167,11 +251,32 @@ export default function ProfilePage() {
       setDeliveryZones(userData.delivery_zones || '')
       setProductCategories(userData.product_categories || '')
 
-      // Загружаем связанные данные последовательно, чтобы не перегружать сервер
+      const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+      
+      // Сначала загружаем критичные данные для первого экрана
+      // Админская роль
+      const { data: adminRoleData } = await supabase
+        .from('admin_roles')
+        .select('role')
+        .eq('user_id', params.id)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (adminRoleData) {
+        setAdminRole(adminRoleData.role)
+      } else {
+        setAdminRole(null)
+      }
+      
+      // Специализации и услуги
       await fetchSelections()
       
-      // Загружаем данные в зависимости от роли
-      const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+      // Истории профиля (для всех ролей) - загружаем сразу, они нужны для верхней части
+      if (profileId) {
+        await fetchProfileStories(profileId)
+      }
+
+      // Теперь загружаем остальные данные последовательно (не параллельно)
+      // для уменьшения нагрузки на initial load
       if (userData.role === 'master' && profileId) {
         await fetchPortfolio()
         await fetchMasterReviews(profileId)
@@ -179,10 +284,6 @@ export default function ProfilePage() {
         await fetchSellerProducts()
         await fetchSellerStats(profileId)
         await fetchProductReviews(profileId)
-      }
-      // Загружаем истории профиля
-      if (profileId) {
-        await fetchProfileStories(profileId)
       }
     } catch (error) {
       console.error('Error fetching profile:', error)
@@ -546,6 +647,61 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error fetching profile stories:', error)
       setProfileStories([])
+    }
+  }
+
+  const fetchSellerReviews = async (sellerId: string) => {
+    try {
+      setReviewsLoading(true)
+      // Получаем прямые отзывы о продавце (аналогично master_reviews)
+      const { data, error } = await supabase
+        .from('seller_reviews')
+        .select(`
+          *,
+          reviewer:profiles!reviewer_id(id, full_name, avatar_url, role),
+          seller:profiles!seller_id(id, full_name)
+        `)
+        .eq('seller_id', sellerId)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (error) throw error
+
+      // Получаем ответы на отзывы
+      const reviewIds = data?.map(r => r.id) || []
+      if (reviewIds.length > 0) {
+        const { data: replies } = await supabase
+          .from('review_replies')
+          .select(`
+            *,
+            author:profiles!author_id(id, full_name, avatar_url)
+          `)
+          .eq('review_type', 'seller')
+          .in('review_id', reviewIds)
+          .order('created_at', { ascending: true })
+
+        const repliesMap = new Map<string, any[]>()
+        replies?.forEach(reply => {
+          if (!repliesMap.has(reply.review_id)) {
+            repliesMap.set(reply.review_id, [])
+          }
+          repliesMap.get(reply.review_id)!.push(reply)
+        })
+
+        const reviewsWithReplies = data?.map(review => ({
+          ...review,
+          replies: repliesMap.get(review.id) || []
+        })) || []
+
+        setSellerReviews(reviewsWithReplies)
+      } else {
+        setSellerReviews([])
+      }
+    } catch (error) {
+      console.error('Error fetching seller reviews:', error)
+      setSellerReviews([])
+    } finally {
+      setReviewsLoading(false)
     }
   }
 
@@ -991,11 +1147,14 @@ export default function ProfilePage() {
                   <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 bg-gradient-to-br from-graphite-primary to-graphite-tertiary border-2 sm:border-4 border-white/50 flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-semibold rounded-full shadow-premium overflow-hidden">
                     {profile.avatar_url ? (
                       <>
-                      <img
-                        src={profile.avatar_url}
-                        alt={profile.full_name}
-                          className="w-full h-full object-cover rounded-full transition-all duration-300 group-hover/avatar:scale-110"
-                      />
+                        <Image
+                          src={profile.avatar_url}
+                          alt={profile.full_name}
+                          fill
+                          className="object-cover rounded-full transition-all duration-300 group-hover/avatar:scale-110"
+                          sizes="(max-width: 640px) 80px, (max-width: 768px) 96px, 128px"
+                          priority
+                        />
                         <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                       </>
                     ) : (
@@ -1168,9 +1327,9 @@ export default function ProfilePage() {
                       </div>
                     )}
 
-                    {/* Отзывы о мастере - раскрываемая секция */}
+                    {/* Отзывы о мастере - раскрываемая секция - Render-on-Demand */}
                     {profile.role === 'master' && (
-                      <div className="mt-8 border-t border-border-color/40 pt-6">
+                      <div ref={reviewsSectionRef} className="mt-8 border-t border-border-color/40 pt-6">
                         <button
                           onClick={() => setReviewsExpanded(!reviewsExpanded)}
                           className="w-full flex items-center justify-between text-left"
@@ -1635,8 +1794,8 @@ export default function ProfilePage() {
                     </div>
                   )}
 
-                  {/* Отзывы о продавце */}
-                  <div className="mt-10 sm:mt-12 px-4 sm:px-5">
+                  {/* Отзывы о продавце - Render-on-Demand */}
+                  <div ref={reviewsSectionRef} className="mt-10 sm:mt-12 px-4 sm:px-5">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
                       <div>
                         <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight mb-1">
@@ -1666,76 +1825,144 @@ export default function ProfilePage() {
                       )}
                     </div>
 
-                    {/* Форма отзыва (для конкретного товара - будет добавлена на странице товара) */}
-                    {/* Здесь показываем только отзывы о товарах продавца */}
+                    {/* Форма отзыва о продавце */}
+                    {showReviewForm && currentUser && !isOwnProfile && (
+                      <div className="mb-6">
+                        <ReviewForm
+                          targetId={Array.isArray(params.id) ? params.id[0] : params.id}
+                          targetType="seller"
+                          currentUserId={currentUser.id}
+                          existingReview={editingReview}
+                          onSuccess={() => {
+                            setShowReviewForm(false)
+                            setEditingReview(null)
+                            const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                            if (profileId) {
+                              fetchSellerReviews(profileId)
+                              fetchProfile()
+                            }
+                          }}
+                          onCancel={() => {
+                            setShowReviewForm(false)
+                            setEditingReview(null)
+                          }}
+                        />
+                      </div>
+                    )}
 
-                    {/* Список отзывов */}
-                    {reviewsLoading ? (
-                      <div className="card text-center text-text-secondary py-10">
-                        Загрузка отзывов...
-                      </div>
-                    ) : productReviews.length === 0 ? (
-                      <div className="card text-center text-text-secondary py-10">
-                        Пока нет отзывов о товарах
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {productReviews.map((review) => (
-                          <ReviewCard
-                            key={review.id}
-                            review={review}
-                            reviewType="product"
-                            currentUser={currentUser}
-                            onReply={(reviewId) => setReplyingToReview(replyingToReview === reviewId ? null : reviewId)}
-                            onEdit={(review) => {
-                              setEditingReview(review)
-                              setShowReviewForm(true)
-                            }}
-                            onDelete={async (reviewId) => {
-                              if (confirm('Вы уверены, что хотите удалить отзыв?')) {
-                                try {
-                                  const { error } = await supabase
-                                    .from('product_reviews')
-                                    .delete()
-                                    .eq('id', reviewId)
-                                  if (error) throw error
-                                  const profileId = Array.isArray(params.id) ? params.id[0] : params.id
-                                  if (profileId) {
-                                    fetchProductReviews(profileId)
-                                    fetchSellerStats(profileId)
+                    {/* Список прямых отзывов о продавце */}
+                    {sellerReviews.length > 0 && (
+                      <div className="mb-6">
+                        <h3 className="text-md font-semibold text-graphite-secondary mb-4">Прямые отзывы о продавце</h3>
+                        <div className="space-y-4">
+                          {sellerReviews.map((review) => (
+                            <ReviewCard
+                              key={review.id}
+                              review={review}
+                              reviewType="seller"
+                              currentUser={currentUser}
+                              onReply={(reviewId) => setReplyingToReview(replyingToReview === reviewId ? null : reviewId)}
+                              onEdit={(review) => {
+                                setEditingReview(review)
+                                setShowReviewForm(true)
+                              }}
+                              onDelete={async (reviewId) => {
+                                if (confirm('Вы уверены, что хотите удалить отзыв?')) {
+                                  try {
+                                    const { error } = await supabase
+                                      .from('seller_reviews')
+                                      .delete()
+                                      .eq('id', reviewId)
+                                    if (error) throw error
+                                    const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                                    if (profileId) {
+                                      fetchSellerReviews(profileId)
+                                      fetchProfile()
+                                    }
+                                  } catch (error) {
+                                    console.error('Error deleting review:', error)
+                                    alert('Ошибка при удалении отзыва')
                                   }
-                                } catch (error) {
-                                  console.error('Error deleting review:', error)
-                                  alert('Ошибка при удалении отзыва')
                                 }
-                              }
-                            }}
-                          />
-                        ))}
-                        {replyingToReview && (
-                          <ReviewReplyForm
-                            reviewId={replyingToReview}
-                            reviewType="product"
-                            currentUserId={currentUser!.id}
-                            onSuccess={() => {
-                              setReplyingToReview(null)
-                              const profileId = Array.isArray(params.id) ? params.id[0] : params.id
-                              if (profileId) {
-                                fetchProductReviews(profileId)
-                              }
-                            }}
-                            onCancel={() => setReplyingToReview(null)}
-                          />
-                        )}
+                              }}
+                            />
+                          ))}
+                        </div>
                       </div>
+                    )}
+
+                    {/* Отзывы о товарах продавца */}
+                    {productReviews.length > 0 && (
+                      <div>
+                        <h3 className="text-md font-semibold text-graphite-secondary mb-4">Отзывы о товарах</h3>
+                        <div className="space-y-4">
+                          {productReviews.map((review) => (
+                            <ReviewCard
+                              key={review.id}
+                              review={review}
+                              reviewType="product"
+                              currentUser={currentUser}
+                              onReply={(reviewId) => setReplyingToReview(replyingToReview === reviewId ? null : reviewId)}
+                              onEdit={(review) => {
+                                setEditingReview(review)
+                                setShowReviewForm(true)
+                              }}
+                              onDelete={async (reviewId) => {
+                                if (confirm('Вы уверены, что хотите удалить отзыв?')) {
+                                  try {
+                                    const { error } = await supabase
+                                      .from('product_reviews')
+                                      .delete()
+                                      .eq('id', reviewId)
+                                    if (error) throw error
+                                    const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                                    if (profileId) {
+                                      fetchProductReviews(profileId)
+                                      fetchSellerStats(profileId)
+                                    }
+                                  } catch (error) {
+                                    console.error('Error deleting review:', error)
+                                    alert('Ошибка при удалении отзыва')
+                                  }
+                                }
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Сообщение, если нет отзывов */}
+                    {!reviewsLoading && sellerReviews.length === 0 && productReviews.length === 0 && (
+                      <div className="card text-center text-text-secondary py-10">
+                        Пока нет отзывов
+                      </div>
+                    )}
+
+                    {/* Форма ответа на отзыв */}
+                    {replyingToReview && (
+                      <ReviewReplyForm
+                        reviewId={replyingToReview}
+                        reviewType="seller"
+                        currentUserId={currentUser!.id}
+                        onSuccess={() => {
+                          setReplyingToReview(null)
+                          const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                          if (profileId) {
+                            fetchSellerReviews(profileId)
+                            fetchProductReviews(profileId)
+                          }
+                        }}
+                        onCancel={() => setReplyingToReview(null)}
+                      />
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Portfolio for Masters */}
+              {/* Portfolio for Masters - Render-on-Demand */}
               {profile.role === 'master' && (
-                <div className="mb-10 sm:mb-12 w-full">
+                <div ref={portfolioSectionRef} className="mb-10 sm:mb-12 w-full">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
                     <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight">Портфолио</h2>
                     <div className="flex items-center gap-2">
@@ -1766,6 +1993,8 @@ export default function ProfilePage() {
               items={portfolioItems}
               initialIndex={selectedPortfolioIndex}
               onClose={() => setSelectedPortfolioIndex(null)}
+              initialCommentId={searchParams.get('comment') || undefined}
+              focusCommentInput={searchParams.get('focusComment') === '1'}
             />
           )}
 

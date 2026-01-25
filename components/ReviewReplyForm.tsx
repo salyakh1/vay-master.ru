@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 
 interface ReviewReplyFormProps {
   reviewId: string
-  reviewType: 'master' | 'product'
+  reviewType: 'master' | 'seller' | 'product'
   currentUserId: string
   onSuccess?: () => void
   onCancel?: () => void

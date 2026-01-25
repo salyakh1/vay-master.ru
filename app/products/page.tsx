@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, useMemo, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { VariableSizeList as List } from 'react-window'
 import { useAuth } from '../providers'
 import { supabase, Product, ProductCategory } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -20,6 +21,9 @@ function ProductsContent() {
   const searchParams = useSearchParams()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
   const [categorySection, setCategorySection] = useState('')
   const [categoryId, setCategoryId] = useState('')
@@ -29,6 +33,13 @@ function ProductsContent() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [stories, setStories] = useState<Story[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
+  
+  const ITEMS_PER_PAGE = 20
+  const GRID_COLUMN_COUNT = 2
+  const ITEM_HEIGHT = 350 // Примерная высота карточки товара
+  const AD_HEIGHT = 150 // Высота рекламного блока
+  const listContainerRef = useRef<HTMLDivElement>(null)
+  const [listDimensions, setListDimensions] = useState({ width: 0, height: 0 })
 
   // Убираем редирект для неавторизованных - они могут видеть карточки товаров
 
@@ -38,9 +49,105 @@ function ProductsContent() {
     fetchStories() // Загружаем истории продавцов для всех пользователей (включая неавторизованных)
   }, [])
 
+  // Обновляем размеры list при изменении размера окна и после загрузки товаров
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (listContainerRef.current) {
+        const width = listContainerRef.current.offsetWidth || window.innerWidth - 32 // Fallback на ширину окна
+        setListDimensions({
+          width,
+          height: Math.min(window.innerHeight * 0.6, 600)
+        })
+      }
+    }
+    
+    // Вызываем сразу
+    updateDimensions()
+    
+    // Вызываем с задержкой на случай, если DOM еще не готов
+    const timeoutId = setTimeout(updateDimensions, 100)
+    
+    window.addEventListener('resize', updateDimensions)
+    return () => {
+      clearTimeout(timeoutId)
+      window.removeEventListener('resize', updateDimensions)
+    }
+  }, [])
+
+  // Пересчитываем размеры после загрузки товаров
+  useEffect(() => {
+    if (products.length > 0 && listDimensions.width === 0) {
+      const timeoutId = setTimeout(() => {
+        if (listContainerRef.current) {
+          const width = listContainerRef.current.offsetWidth || window.innerWidth - 32
+          setListDimensions({
+            width,
+            height: Math.min(window.innerHeight * 0.6, 600)
+          })
+        }
+      }, 200)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [products.length, listDimensions.width])
+
+  // Создаем массив строк (каждая строка = 2 товара)
+  const gridRows = useMemo(() => {
+    const rows: Array<{ items: Product[], hasAd: boolean, adProductIndex?: number }> = []
+    for (let i = 0; i < products.length; i += GRID_COLUMN_COUNT) {
+      const rowItems = products.slice(i, i + GRID_COLUMN_COUNT)
+      const productIndex = i + GRID_COLUMN_COUNT - 1 // индекс последнего товара в строке
+      // Показываем рекламу каждые 6 товаров (после 5, 11, 17 и т.д.)
+      const hasAd = productIndex > 0 && (productIndex + 1) % 6 === 0
+      rows.push({ items: rowItems, hasAd, adProductIndex: hasAd ? productIndex : undefined })
+    }
+    return rows
+  }, [products])
+
+  // Функция для получения размера элемента
+  const getItemSize = useCallback((index: number) => {
+    const row = gridRows[index]
+    return row?.hasAd ? ITEM_HEIGHT + AD_HEIGHT : ITEM_HEIGHT
+  }, [gridRows])
+
+  // Row renderer для react-window (каждая строка = 2 карточки)
+  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const row = gridRows[index]
+    if (!row) return <div style={style} />
+
+    return (
+      <div style={style} className="w-full">
+        <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:gap-6 px-0">
+          {row.items.map((product) => (
+            <ProductCard key={product.id} product={product} currentUser={user} />
+          ))}
+          {row.items.length < GRID_COLUMN_COUNT && <div />}
+        </div>
+        {/* Реклама после строки, если нужно */}
+        {row.hasAd && row.adProductIndex !== undefined && (
+          <div className="col-span-2 mt-4 px-0">
+            <AdSlot 
+              type="INLINE_CONTEXT" 
+              context={{ 
+                page: 'products',
+                category: row.items[0]?.category_ref?.section ? [row.items[0].category_ref.section] : undefined,
+                keywords: searchQuery ? [searchQuery] : undefined,
+                city: cityFilter || undefined
+              }}
+              index={row.adProductIndex}
+              className="my-4"
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // Загружаем товары при изменении фильтров
   useEffect(() => {
-    fetchProducts()
+    setPage(1)
+    setProducts([])
+    setHasMore(true)
+    fetchProducts(1, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, categorySection, categoryId, cityFilter])
 
@@ -87,17 +194,29 @@ function ProductsContent() {
     }
   }
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (pageNum: number = 1, reset: boolean = false) => {
     try {
+      if (reset) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
+
+      const from = (pageNum - 1) * ITEMS_PER_PAGE
+      const to = from + ITEMS_PER_PAGE - 1
+
       let query = supabase
         .from('products')
         .select(`
           *,
           seller:profiles(id, full_name, avatar_url, city, phone),
-          category_ref:product_categories(id, name, section, slug)
-        `)
+          category_ref:product_categories(id, name, section, slug),
+          rating,
+          reviews_count
+        `, { count: 'exact' })
         .eq('in_stock', true)
         .order('created_at', { ascending: false })
+        .range(from, to)
 
       if (categorySection) {
         query = query.eq('category_ref.section', categorySection)
@@ -111,7 +230,7 @@ function ProductsContent() {
         query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
       }
 
-      const { data, error } = await query
+      const { data, error, count } = await query
 
       if (error) throw error
 
@@ -124,11 +243,28 @@ function ProductsContent() {
         })
       }
 
-      setProducts(filteredData)
+      if (reset) {
+        setProducts(filteredData)
+      } else {
+        setProducts(prev => [...prev, ...filteredData])
+      }
+
+      // Проверяем, есть ли ещё данные
+      const totalFetched = reset ? filteredData.length : products.length + filteredData.length
+      setHasMore(totalFetched < (count || 0) && filteredData.length === ITEMS_PER_PAGE)
     } catch (error) {
       console.error('Error fetching products:', error)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
+    }
+  }
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) {
+      const nextPage = page + 1
+      setPage(nextPage)
+      fetchProducts(nextPage, false)
     }
   }
 
@@ -262,45 +398,47 @@ function ProductsContent() {
           </div>
         ) : null}
 
-        {/* Products Grid */}
-        {products.length === 0 ? (
+        {/* Products Grid - Virtualized с fallback */}
+        {products.length === 0 && !loading ? (
           <div className="card text-center text-text-secondary py-12">
             Товары не найдены
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
-            {products.map((product, index) => {
-              const cardElement = (
-                <ProductCard key={product.id} product={product} currentUser={user} />
-              )
-
-              // Показываем INLINE_CONTEXT или SPONSORED_CARD рекламу каждые 6 товаров
-              const shouldShowAd = index > 0 && (index + 1) % 6 === 0
-
-              if (shouldShowAd) {
-                return (
-                  <>
-                    {cardElement}
-                    <div key={`ad-products-${product.id}-${index}`} className="col-span-2">
-                      <AdSlot 
-                        type="INLINE_CONTEXT" 
-                        context={{ 
-                          page: 'products',
-                          category: product.category_ref?.section ? [product.category_ref.section] : undefined,
-                          keywords: searchQuery ? [searchQuery] : undefined,
-                          city: cityFilter || undefined
-                        }}
-                        index={index}
-                        className="my-4"
-                      />
-                    </div>
-                  </>
-                )
-              }
-
-              return cardElement
-            })}
-          </div>
+          <>
+            <div ref={listContainerRef} className="w-full" style={{ minHeight: 400 }}>
+              {listDimensions.width > 0 && gridRows.length > 0 ? (
+                <List
+                  height={listDimensions.height}
+                  itemCount={gridRows.length}
+                  itemSize={getItemSize}
+                  width={listDimensions.width}
+                  overscanCount={2}
+                >
+                  {Row}
+                </List>
+              ) : gridRows.length > 0 ? (
+                // Fallback: обычный grid, если размеры еще не вычислены
+                <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
+                  {products.map((product) => (
+                    <ProductCard key={product.id} product={product} currentUser={user} />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="mt-8 text-center">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="btn btn-secondary"
+                >
+                  {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

@@ -15,6 +15,8 @@ import {
   FiMenu,
   FiBookOpen,
   FiHelpCircle,
+  FiActivity,
+  FiMap,
 } from 'react-icons/fi'
 import NotificationBell from './NotificationBell'
 
@@ -203,6 +205,30 @@ export default function Navbar() {
                   >
                     <FiUser size={18} />
                     <span>Профиль</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      router.push('/activity')
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary transition-colors text-left text-graphite-secondary font-medium"
+                  >
+                    <FiActivity size={18} />
+                    <span>Активность</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      router.push('/planner')
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary transition-colors text-left text-graphite-secondary font-medium"
+                  >
+                    <FiMap size={18} />
+                    <span>Планировщик</span>
                   </button>
 
                   <button

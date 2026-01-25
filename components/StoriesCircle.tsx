@@ -1,10 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { Story, User } from '@/lib/supabase'
 import { FiPlus } from 'react-icons/fi'
-import StoryViewer from './StoryViewer'
-import CreateStory from './CreateStory'
+
+// Dynamic imports для просмотра и создания историй - загружаются только при открытии
+const StoryViewer = dynamic(() => import('./StoryViewer'), {
+  ssr: false,
+})
+
+const CreateStory = dynamic(() => import('./CreateStory'), {
+  ssr: false,
+})
 
 interface StoriesCircleProps {
   stories: Story[]

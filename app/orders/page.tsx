@@ -48,6 +48,9 @@ export default function OrdersPage() {
   const searchParams = useSearchParams()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
@@ -58,6 +61,8 @@ export default function OrdersPage() {
   const [filterMode, setFilterMode] = useState<'all' | 'my_specializations'>('all')
   const [mySpecializations, setMySpecializations] = useState<string[]>([])
   const [notificationCount, setNotificationCount] = useState(0)
+  
+  const ITEMS_PER_PAGE = 20
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -129,7 +134,10 @@ export default function OrdersPage() {
 
   useEffect(() => {
     if (user) {
-      fetchOrders()
+      setPage(1)
+      setOrders([])
+      setHasMore(true)
+      fetchOrders(1, true)
     }
   }, [user, searchQuery, selectedCategory, selectedStatus, selectedCity, filterMode, mySpecializations])
 
@@ -145,13 +153,22 @@ export default function OrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (pageNum: number = 1, reset: boolean = false) => {
     try {
-      setLoading(true)
+      if (reset) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
+
+      const from = (pageNum - 1) * ITEMS_PER_PAGE
+      const to = from + ITEMS_PER_PAGE - 1
+
       let query = supabase
         .from('orders')
-        .select(`*, client:profiles!client_id(id, full_name, avatar_url, city, phone)`)
+        .select(`*, client:profiles!client_id(id, full_name, avatar_url, city, phone)`, { count: 'exact' })
         .order('created_at', { ascending: false })
+        .range(from, to)
 
       // Фильтр по специализациям мастера
       if (filterMode === 'my_specializations') {
@@ -159,7 +176,9 @@ export default function OrdersPage() {
           // Если специализаций нет, показываем пустой список
           console.log('No specializations found for master')
           setOrders([])
+          setHasMore(false)
           setLoading(false)
+          setLoadingMore(false)
           return
         }
         
@@ -189,14 +208,32 @@ export default function OrdersPage() {
         query = query.ilike('city', `%${selectedCity}%`)
       }
 
-      const { data, error } = await query
+      const { data, error, count } = await query
 
       if (error) throw error
-      setOrders(data || [])
+      const newOrders = (data || []) as Order[]
+      
+      if (reset) {
+        setOrders(newOrders)
+      } else {
+        setOrders(prev => [...prev, ...newOrders])
+      }
+
+      // Проверяем, есть ли ещё данные
+      setHasMore(newOrders.length === ITEMS_PER_PAGE && (count || 0) > pageNum * ITEMS_PER_PAGE)
     } catch (error) {
       console.error('Error fetching orders:', error)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
+    }
+  }
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore && viewMode !== 'map') {
+      const nextPage = page + 1
+      setPage(nextPage)
+      fetchOrders(nextPage, false)
     }
   }
 
@@ -396,7 +433,7 @@ export default function OrdersPage() {
           {/* Orders List */}
           {viewMode === 'list' && (
             <div className="space-y-5">
-              {orders.length === 0 ? (
+              {orders.length === 0 && !loading ? (
                 <div className="card text-center py-12">
                   <p className="text-base font-medium text-graphite-secondary mb-3">
                     Заказы не найдены
@@ -409,9 +446,24 @@ export default function OrdersPage() {
                   </Link>
                 </div>
               ) : (
-                orders.map((order) => (
-                  <OrderCard key={order.id} order={order} variant="list" hideClientIdentity={hideClientIdentity} />
-                ))
+                <>
+                  {orders.map((order) => (
+                    <OrderCard key={order.id} order={order} variant="list" hideClientIdentity={hideClientIdentity} />
+                  ))}
+                  
+                  {/* Load More Button */}
+                  {hasMore && (
+                    <div className="mt-8 text-center">
+                      <button
+                        onClick={loadMore}
+                        disabled={loadingMore}
+                        className="btn btn-secondary"
+                      >
+                        {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -419,7 +471,7 @@ export default function OrdersPage() {
           {/* Orders Grid */}
           {viewMode === 'grid' && (
             <>
-              {orders.length === 0 ? (
+              {orders.length === 0 && !loading ? (
                 <div className="card text-center py-12">
                   <p className="text-base font-medium text-graphite-secondary mb-3">
                     Заказы не найдены
@@ -432,11 +484,26 @@ export default function OrdersPage() {
                   </Link>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-4 sm:gap-5">
-                  {orders.map((order) => (
-                    <OrderCard key={order.id} order={order} variant="grid" hideClientIdentity={hideClientIdentity} />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 gap-4 sm:gap-5">
+                    {orders.map((order) => (
+                      <OrderCard key={order.id} order={order} variant="grid" hideClientIdentity={hideClientIdentity} />
+                    ))}
+                  </div>
+                  
+                  {/* Load More Button */}
+                  {hasMore && (
+                    <div className="mt-8 text-center">
+                      <button
+                        onClick={loadMore}
+                        disabled={loadingMore}
+                        className="btn btn-secondary"
+                      >
+                        {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

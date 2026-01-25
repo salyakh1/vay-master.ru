@@ -31,12 +31,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 })
     }
 
-    if (reviewType !== 'master' && reviewType !== 'product') {
+    if (reviewType !== 'master' && reviewType !== 'product' && reviewType !== 'seller') {
       return NextResponse.json({ error: 'Invalid reviewType' }, { status: 400 })
     }
 
     // Проверяем, что отзыв существует
-    const tableName = reviewType === 'master' ? 'master_reviews' : 'product_reviews'
+    const tableName = reviewType === 'master' ? 'master_reviews' : reviewType === 'seller' ? 'seller_reviews' : 'product_reviews'
     const { data: review, error: reviewError } = await supabaseAdmin
       .from(tableName)
       .select('master_id, reviewer_id, seller_id')
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
     const canReply = 
       review.reviewer_id === user.id || // Автор отзыва может ответить
       (reviewType === 'master' && review.master_id === user.id) || // Мастер может ответить на свой отзыв
+      (reviewType === 'seller' && review.seller_id === user.id) || // Продавец может ответить на прямой отзыв
       (reviewType === 'product' && review.seller_id === user.id) // Продавец может ответить на отзыв о товаре
 
     if (!canReply) {

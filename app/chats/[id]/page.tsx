@@ -2,14 +2,23 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import { useAuth } from '@/app/providers'
 import { supabase, Message, User } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { FiPlus, FiImage, FiMoreVertical, FiTrash2, FiAlertCircle, FiSend } from 'react-icons/fi'
-import CalculatorModal from '@/components/CalculatorModal'
-import ComplaintModal from '@/components/ComplaintModal'
+
+// Dynamic imports для модальных окон - загружаются только при открытии
+const CalculatorModal = dynamic(() => import('@/components/CalculatorModal'), {
+  ssr: false,
+})
+
+const ComplaintModal = dynamic(() => import('@/components/ComplaintModal'), {
+  ssr: false,
+})
 
 export default function ChatPage() {
   const params = useParams()
@@ -19,15 +28,21 @@ export default function ChatPage() {
   const [otherUser, setOtherUser] = useState<User | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  const [hasOlderMessages, setHasOlderMessages] = useState(true)
+  const [oldestMessageId, setOldestMessageId] = useState<string | null>(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showCalculator, setShowCalculator] = useState(false)
   const [showChatMenu, setShowChatMenu] = useState(false)
   const [showComplaintModal, setShowComplaintModal] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatMenuRef = useRef<HTMLDivElement>(null)
+
+  const MESSAGES_PER_PAGE = 30
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -71,6 +86,67 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const loadOlderMessages = async () => {
+    if (!user || !params.id || !oldestMessageId || loadingOlder || !hasOlderMessages) return
+
+    setLoadingOlder(true)
+    try {
+      // Get oldest message timestamp
+      const oldestMessage = messages[0]
+      if (!oldestMessage) return
+
+      // Load messages before the oldest one
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:profiles(id, full_name, avatar_url)
+        `)
+        .eq('chat_id', params.id)
+        .lt('created_at', oldestMessage.created_at)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGES_PER_PAGE)
+
+      if (error) throw error
+
+      const olderMessages = (data as any) || []
+      if (olderMessages.length > 0) {
+        olderMessages.reverse()
+        
+        // Store scroll position before adding messages
+        const container = messagesContainerRef.current
+        const scrollHeight = container?.scrollHeight || 0
+        
+        // Add older messages at the beginning
+        setMessages(prev => [...olderMessages, ...prev])
+        
+        // Restore scroll position after messages are added
+        requestAnimationFrame(() => {
+          if (container) {
+            const newScrollHeight = container.scrollHeight
+            container.scrollTop = newScrollHeight - scrollHeight
+          }
+        })
+
+        // Check if there are more older messages
+        const { count } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('chat_id', params.id)
+          .lt('created_at', olderMessages[0].created_at)
+        
+        setHasOlderMessages((count || 0) > 0)
+        setOldestMessageId(olderMessages[0].id)
+      } else {
+        setHasOlderMessages(false)
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error)
+    } finally {
+      setLoadingOlder(false)
+    }
+  }
+
   const fetchChat = async () => {
     if (!user || !params.id) return
 
@@ -96,7 +172,7 @@ export default function ChatPage() {
 
       setOtherUser(otherUserData as User)
 
-      // Get messages
+      // Get last messages (most recent first, then reverse for display)
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -104,10 +180,32 @@ export default function ChatPage() {
           sender:profiles(id, full_name, avatar_url)
         `)
         .eq('chat_id', params.id)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(MESSAGES_PER_PAGE)
 
       if (error) throw error
-      setMessages((data as any) || [])
+      
+      const messagesData = (data as any) || []
+      // Reverse to show oldest first (for chat display)
+      messagesData.reverse()
+      setMessages(messagesData)
+      
+      // Check if there are older messages
+      if (messagesData.length > 0) {
+        const oldestId = messagesData[0].id
+        setOldestMessageId(oldestId)
+        
+        // Check if there are more messages before this one
+        const { count } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('chat_id', params.id)
+          .lt('created_at', messagesData[0].created_at)
+        
+        setHasOlderMessages((count || 0) > 0)
+      } else {
+        setHasOlderMessages(false)
+      }
 
       // Автоматически помечаем все непрочитанные сообщения как прочитанные при загрузке чата
       // Используем API endpoint для обхода RLS
@@ -384,12 +482,15 @@ export default function ChatPage() {
         <div className="bg-bg-primary border-b border-border-color px-4 py-3 relative">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 flex-1">
-              <div className="w-12 h-12 bg-text-primary border border-border-color flex items-center justify-center text-white text-sm font-semibold rounded-full">
+              <div className="relative w-12 h-12 bg-text-primary border border-border-color flex items-center justify-center text-white text-sm font-semibold rounded-full overflow-hidden">
                 {otherUser.avatar_url ? (
-                  <img
+                  <Image
                     src={otherUser.avatar_url}
                     alt={otherUser.full_name}
-                    className="w-full h-full rounded-full object-cover"
+                    fill
+                    className="object-cover rounded-full"
+                    sizes="48px"
+                    priority
                   />
                 ) : (
                   otherUser.full_name[0]?.toUpperCase() || '?'
@@ -452,7 +553,20 @@ export default function ChatPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          {/* Load Older Messages Button */}
+          {hasOlderMessages && (
+            <div className="text-center py-2">
+              <button
+                onClick={loadOlderMessages}
+                disabled={loadingOlder}
+                className="text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+              >
+                {loadingOlder ? 'Загрузка...' : 'Загрузить старые сообщения'}
+              </button>
+            </div>
+          )}
+          
           {messages.map((message) => {
             const isOwn = message.sender_id === user.id
             return (
@@ -473,12 +587,16 @@ export default function ChatPage() {
                     </div>
                   )}
                   {message.image_url && (
-                    <img
-                      src={message.image_url}
-                      alt="Message attachment"
-                      className="max-w-full h-auto rounded-lg mb-2"
-                      style={{ maxHeight: '300px' }}
-                    />
+                    <div className="relative w-full rounded-lg mb-2 overflow-hidden" style={{ maxHeight: '300px', minHeight: '200px' }}>
+                      <Image
+                        src={message.image_url}
+                        alt="Message attachment"
+                        fill
+                        className="object-contain rounded-lg"
+                        sizes="(max-width: 768px) 80vw, 400px"
+                        loading="lazy"
+                      />
+                    </div>
                   )}
                   {message.content && (
                   <div className={isOwn ? 'text-white' : 'text-graphite-secondary'}>{message.content}</div>

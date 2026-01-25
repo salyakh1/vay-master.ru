@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { useAuth } from '../providers'
 import { supabase, PortfolioItem, PortfolioComment } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -24,10 +25,15 @@ export default function FeedPage() {
   const router = useRouter()
   const [items, setItems] = useState<ItemWithInteractions[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [page, setPage] = useState(1)
   const [stories, setStories] = useState<Story[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({})
   const [submittingComments, setSubmittingComments] = useState<Record<string, boolean>>({})
+  
+  const ITEMS_PER_PAGE = 20
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -37,7 +43,7 @@ export default function FeedPage() {
 
   useEffect(() => {
     if (user) {
-      fetchItems()
+      fetchItems(1, true)
       fetchStories()
     }
   }, [user])
@@ -53,8 +59,17 @@ export default function FeedPage() {
     return () => window.removeEventListener('focus', handleFocus)
   }, [user])
 
-  const fetchItems = async () => {
+  const fetchItems = async (pageNum: number = 1, reset: boolean = false) => {
     try {
+      if (reset) {
+        setLoading(true)
+        setPage(1)
+        setItems([])
+        setHasMore(true)
+      } else {
+        setLoadingMore(true)
+      }
+
       const { data: subs, error: subsError } = await supabase
         .from('follows')
         .select('following_id')
@@ -65,20 +80,25 @@ export default function FeedPage() {
       if (followingIds.length === 0) {
         setItems([])
         setLoading(false)
+        setLoadingMore(false)
+        setHasMore(false)
         return
       }
+
+      const from = (pageNum - 1) * ITEMS_PER_PAGE
+      const to = from + ITEMS_PER_PAGE - 1
 
       let query = supabase
         .from('portfolio_items')
         .select(`
           *,
           master:profiles(id, full_name, avatar_url, role, city)
-        `)
+        `, { count: 'exact' })
         .in('master_id', followingIds)
         .order('created_at', { ascending: false })
-        .limit(100)
+        .range(from, to)
 
-      const { data, error } = await query
+      const { data, error, count } = await query
       if (error) throw error
       
       const portfolioItems = (data as PortfolioItem[]) || []
@@ -124,19 +144,42 @@ export default function FeedPage() {
           showComments: false,
         }))
         
-        setItems(itemsWithInteractions)
+        if (reset) {
+          setItems(itemsWithInteractions)
+        } else {
+          setItems(prev => [...prev, ...itemsWithInteractions])
+        }
       } else {
-        setItems(portfolioItems.map(item => ({
+        const newItems = portfolioItems.map(item => ({
           ...item,
           liked: false,
           comments: [],
           showComments: false,
-        })))
+        }))
+        
+        if (reset) {
+          setItems(newItems)
+        } else {
+          setItems(prev => [...prev, ...newItems])
+        }
       }
+
+      // Проверяем, есть ли ещё данные
+      const totalFetched = reset ? portfolioItems.length : items.length + portfolioItems.length
+      setHasMore(portfolioItems.length === ITEMS_PER_PAGE && (count || 0) > pageNum * ITEMS_PER_PAGE)
     } catch (error) {
       console.error('Error fetching portfolio items:', error)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
+    }
+  }
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) {
+      const nextPage = page + 1
+      setPage(nextPage)
+      fetchItems(nextPage, false)
     }
   }
 
@@ -318,19 +361,20 @@ export default function FeedPage() {
           ) : null}
 
           <div className="space-y-7 mt-6">
-            {items.length === 0 ? (
+            {items.length === 0 && !loading ? (
               <div className="card text-center text-text-secondary py-12 animate-fade-in">
                 <p className="text-lg font-medium text-graphite-secondary">Пока нет работ от ваших подписок.</p>
               </div>
             ) : (
-              items.map((item) => (
+              <>
+                {items.map((item) => (
                 <div key={item.id} className="bg-bg-card rounded-lg border border-border-light/40 overflow-hidden">
                   {/* Шапка публикации */}
                   <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-graphite-primary text-white flex items-center justify-center text-sm font-semibold rounded-full flex-shrink-0">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-graphite-primary text-white flex items-center justify-center text-sm font-semibold rounded-full flex-shrink-0 relative overflow-hidden">
                         {item.master?.avatar_url ? (
-                          <img src={item.master.avatar_url} alt={item.master.full_name} className="w-full h-full object-cover rounded-full" />
+                          <Image src={item.master.avatar_url} alt={item.master.full_name} fill className="object-cover" sizes="48px" />
                         ) : (
                           item.master?.full_name?.[0]?.toUpperCase() || 'M'
                         )}
@@ -499,7 +543,21 @@ export default function FeedPage() {
                     )}
                   </div>
                 </div>
-              ))
+              ))}
+              
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="btn btn-secondary"
+                  >
+                    {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
+                  </button>
+                </div>
+              )}
+            </>
             )}
           </div>
         </div>

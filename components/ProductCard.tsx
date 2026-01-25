@@ -2,8 +2,9 @@
 
 import { memo, useState } from 'react'
 import { Product, User } from '@/lib/supabase'
-import { FiShoppingBag } from 'react-icons/fi'
+import { FiShoppingBag, FiStar } from 'react-icons/fi'
 import Link from 'next/link'
+import Image from 'next/image'
 import AuthRequiredModal from './AuthRequiredModal'
 
 interface ProductCardProps {
@@ -22,10 +23,12 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
         <div className="w-full aspect-square bg-bg-secondary relative overflow-hidden rounded-t-[12px] flex-shrink-0">
           {product.images && product.images.length > 0 ? (
             <>
-              <img
+              <Image
                 src={product.images[0]}
                 alt={product.name}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 50vw, 33vw"
               />
             </>
           ) : (
@@ -52,23 +55,46 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
             </div>
           </div>
 
-          {/* Цена и количество */}
-          <div className="flex items-baseline justify-between mb-3 pt-3 border-t border-border-light/40">
+          {/* Цена, количество и рейтинг */}
+          <div className="flex items-baseline justify-between mb-3 pt-3 border-t border-border-light/40 gap-3">
             <div className="text-base sm:text-lg font-semibold text-graphite-secondary">
               {product.price.toLocaleString('ru-RU')} ₽
             </div>
-            {product.stock_count !== null && product.stock_count !== undefined && product.stock_count > 0 && (
-              <div className="text-xs text-text-secondary bg-gradient-to-br from-bg-secondary to-bg-primary px-2.5 py-1 font-medium rounded-lg shadow-sm border border-border-light/40">
-                {product.stock_count} шт
-              </div>
-            )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Рейтинг товара */}
+              {(product.reviews_count && product.reviews_count > 0) ? (
+                <div className="flex items-center gap-1 text-xs text-text-secondary">
+                  {product.rating && product.rating > 0 ? (
+                    <>
+                      <FiStar size={12} className="fill-brand-accent text-brand-accent" strokeWidth={0} />
+                      <span className="font-medium whitespace-nowrap">
+                        {product.rating.toFixed(1)} ({product.reviews_count} {product.reviews_count === 1 ? 'отзыв' : product.reviews_count < 5 ? 'отзыва' : 'отзывов'})
+                      </span>
+                    </>
+                  ) : (
+                    <span className="font-medium whitespace-nowrap">
+                      ({product.reviews_count} {product.reviews_count === 1 ? 'отзыв' : product.reviews_count < 5 ? 'отзыва' : 'отзывов'})
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="text-xs text-text-muted whitespace-nowrap">
+                  Без отзывов
+                </div>
+              )}
+              {product.stock_count !== null && product.stock_count !== undefined && product.stock_count > 0 && (
+                <div className="text-xs text-text-secondary bg-gradient-to-br from-bg-secondary to-bg-primary px-2.5 py-1 font-medium rounded-lg shadow-sm border border-border-light/40">
+                  {product.stock_count} шт
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Информация о продавце */}
           <div className="flex items-center gap-2.5 text-xs text-text-secondary pt-3 border-t border-border-light/40 mt-auto">
-            <div className="w-7 h-7 bg-graphite-primary rounded-full overflow-hidden flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
+            <div className="w-7 h-7 bg-graphite-primary rounded-full overflow-hidden flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0 relative">
               {seller?.avatar_url ? (
-                <img src={seller.avatar_url} alt={seller.full_name} className="w-full h-full object-cover" />
+                <Image src={seller.avatar_url} alt={seller.full_name} fill className="object-cover" sizes="28px" />
               ) : (
                 seller?.full_name?.[0]?.toUpperCase() || 'П'
               )}

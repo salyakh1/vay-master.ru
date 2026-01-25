@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import { useAuth } from '@/app/providers'
 import { supabase, Order, OrderResponse, User } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -9,10 +11,20 @@ import { FiMessageCircle, FiMapPin, FiClock, FiUser, FiChevronLeft, FiChevronRig
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import OrderResponseModal from '@/components/OrderResponseModal'
-import AcceptResponseModal from '@/components/AcceptResponseModal'
-import ProUpgradeModal from '@/components/ProUpgradeModal'
 import { formatRemaining, getCooldownRemainingMs, getMasterAccess } from '@/lib/masterAccess'
+
+// Dynamic imports для модальных окон - загружаются только при открытии
+const OrderResponseModal = dynamic(() => import('@/components/OrderResponseModal'), {
+  ssr: false,
+})
+
+const AcceptResponseModal = dynamic(() => import('@/components/AcceptResponseModal'), {
+  ssr: false,
+})
+
+const ProUpgradeModal = dynamic(() => import('@/components/ProUpgradeModal'), {
+  ssr: false,
+})
 
 const statusLabels: Record<string, string> = {
   open: 'Открыт',
@@ -711,11 +723,16 @@ export default function OrderPage() {
                         <div className="flex items-start gap-3 mb-3">
                           <Link href={`/profile/${master?.id}?returnTo=/orders/${params.id}`}>
                             {master?.avatar_url ? (
-                              <img
-                                src={master.avatar_url}
-                                alt={master.full_name}
-                                className="w-12 h-12 object-cover border border-border-color rounded-full flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                              />
+                              <div className="relative w-12 h-12 border border-border-color rounded-full flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity overflow-hidden">
+                                <Image
+                                  src={master.avatar_url}
+                                  alt={master.full_name}
+                                  fill
+                                  className="object-cover rounded-full"
+                                  sizes="48px"
+                                  loading="lazy"
+                                />
+                              </div>
                             ) : (
                               <div className="w-12 h-12 bg-text-primary flex items-center justify-center text-white text-sm font-semibold border border-border-color rounded-full flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
                                 {master?.full_name?.[0]?.toUpperCase() || '?'}
