@@ -6,11 +6,11 @@ import { useRouter } from 'next/navigation'
 import { Order } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { FiMapPin, FiClock } from 'react-icons/fi'
+import { FiMapPin, FiClock, FiBriefcase } from 'react-icons/fi'
 
 interface OrderCardProps {
   order: Order
-  variant?: 'list' | 'grid'
+  variant?: 'list' | 'grid' | 'product-grid'
   hideClientIdentity?: boolean
 }
 
@@ -44,6 +44,7 @@ export default function OrderCard({ order, variant = 'list', hideClientIdentity 
   }
 
   const isGrid = variant === 'grid'
+  const isProductGrid = variant === 'product-grid'
   
   // Формируем адрес из city и location
   const addressParts: string[] = []
@@ -60,6 +61,62 @@ export default function OrderCard({ order, variant = 'list', hideClientIdentity 
     e.preventDefault()
     e.stopPropagation()
     router.push(`/orders?view=map&focus=${order.id}`)
+  }
+
+  // Вариант для product-grid (похож на ProductCard)
+  if (isProductGrid) {
+    return (
+      <Link href={`/orders/${order.id}`} className="block h-full">
+        <div className="relative bg-white rounded-xl overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.08)] border-l-4 border-l-red-500 border border-black/5 h-full flex flex-col">
+          {/* Изображение или иконка заказа */}
+          <div className="relative w-full aspect-square bg-gradient-to-br from-blue-50 to-blue-100 overflow-hidden">
+            {order.images && order.images.length > 0 ? (
+              <Image
+                src={order.images[0]}
+                alt={order.title}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 50vw, 33vw"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-red-600 bg-gradient-to-br from-red-50 to-red-100">
+                <FiBriefcase size={36} strokeWidth={1.5} />
+              </div>
+            )}
+            
+            {/* Бейдж "Заказ" */}
+            <div className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 text-[11px] font-semibold rounded-md">
+              Заказ
+            </div>
+          </div>
+
+          <div className="flex flex-col px-3 pb-3 pt-2 flex-1">
+            <h3 className="text-[14px] font-medium leading-snug line-clamp-2 text-graphite-secondary min-h-[34px]">
+              {order.title.length > 50 ? `${order.title.substring(0, 50)}...` : order.title}
+            </h3>
+            
+            {order.budget ? (
+              <div className="text-[18px] font-bold text-red-600 mt-1">
+                {order.budget.toLocaleString('ru-RU')} ₽
+              </div>
+            ) : (
+              <div className="text-[14px] font-semibold text-red-600 mt-1">
+                Бюджет не указан
+              </div>
+            )}
+
+            <div className="text-[12px] text-text-muted mt-1">
+              {order.category}
+            </div>
+
+            <div className="mt-auto text-[12px] text-[#8a8a8a] leading-snug pt-2">
+              <div className="truncate">{order.city || '—'}</div>
+              <div className="truncate">{timeDisplay}</div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    )
   }
 
   return (

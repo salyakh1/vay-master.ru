@@ -3,14 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
-import { supabase, ProductCategory } from '@/lib/supabase'
+import { supabase, ProductCategory, ProductSubcategory, PRODUCT_CATEGORY_SECTIONS } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 
 export default function SellerOnboardingPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([])
+  const [productSubcategories, setProductSubcategories] = useState<ProductSubcategory[]>([])
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
+  const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -18,17 +20,26 @@ export default function SellerOnboardingPage() {
   const fetchCategories = async () => {
     try {
       setLoading(true)
-      const { data, error: fetchError } = await supabase
+      const { data: categoriesData, error: categoriesError } = await supabase
         .from('product_categories')
         .select('*')
         .order('section', { ascending: true })
         .order('name', { ascending: true })
 
-      if (fetchError) throw fetchError
-      setProductCategories((data as ProductCategory[]) || [])
+      if (categoriesError) throw categoriesError
+
+      const { data: subcategoriesData, error: subcategoriesError } = await supabase
+        .from('product_subcategories')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (subcategoriesError) throw subcategoriesError
+      setProductCategories((categoriesData as ProductCategory[]) || [])
+      setProductSubcategories((subcategoriesData as ProductSubcategory[]) || [])
     } catch (error) {
       console.error('Error fetching product categories:', error)
       setError('Ошибка при загрузке категорий')
+      setProductSubcategories([])
     } finally {
       setLoading(false)
     }
@@ -52,7 +63,26 @@ export default function SellerOnboardingPage() {
   }, [user, authLoading, router])
 
   const toggleCategory = (id: string) => {
-    setSelectedCategoryIds((prev) =>
+    setSelectedCategoryIds((prev) => {
+      const exists = prev.includes(id)
+      const next = exists ? prev.filter((x) => x !== id) : [...prev, id]
+      // Удаляем подкаталоги, которые больше не принадлежат выбранным категориям
+      setSelectedSubcategoryIds((prevSubs) =>
+        prevSubs.filter((subId) => {
+          const sub = productSubcategories.find((s) => s.id === subId)
+          return sub ? next.includes(sub.category_id) : false
+        })
+      )
+      return next
+    })
+  }
+
+  const toggleSubcategory = (id: string) => {
+    const sub = productSubcategories.find((s) => s.id === id)
+    if (sub && !selectedCategoryIds.includes(sub.category_id)) {
+      setSelectedCategoryIds((prev) => [...prev, sub.category_id])
+    }
+    setSelectedSubcategoryIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
   }
@@ -69,21 +99,43 @@ export default function SellerOnboardingPage() {
     setError('')
 
     try {
-      // Получаем названия выбранных категорий
+      // Очищаем старые записи
+      await supabase.from('profile_product_categories').delete().eq('profile_id', user.id)
+      await supabase.from('profile_product_subcategories').delete().eq('profile_id', user.id)
+
+      // Сохраняем категории
+      if (selectedCategoryIds.length > 0) {
+        const categoryPayload = selectedCategoryIds.map((categoryId) => ({
+          profile_id: user.id,
+          category_id: categoryId,
+        }))
+        const { error: categoryError } = await supabase
+          .from('profile_product_categories')
+          .insert(categoryPayload)
+        if (categoryError) throw categoryError
+      }
+
+      // Сохраняем подкаталоги
+      if (selectedSubcategoryIds.length > 0) {
+        const subcategoryPayload = selectedSubcategoryIds.map((subcategoryId) => ({
+          profile_id: user.id,
+          subcategory_id: subcategoryId,
+        }))
+        const { error: subcategoryError } = await supabase
+          .from('profile_product_subcategories')
+          .insert(subcategoryPayload)
+        if (subcategoryError) throw subcategoryError
+      }
+
       const selectedCategoryNames = productCategories
         .filter((cat) => selectedCategoryIds.includes(cat.id))
         .map((cat) => cat.name)
         .join(', ')
 
-      // Сохраняем в профиль
-      const { error: updateError } = await supabase
+      await supabase
         .from('profiles')
-        .update({
-          product_categories: selectedCategoryNames,
-        })
+        .update({ product_categories: selectedCategoryNames })
         .eq('id', user.id)
-
-      if (updateError) throw updateError
 
       // Редирект на главную страницу после выбора категорий
       router.push('/')
@@ -95,20 +147,15 @@ export default function SellerOnboardingPage() {
     }
   }
 
-  // Группируем категории по секциям
-  const categoriesBySection = {
-    instruments: productCategories.filter((cat) => cat.section === 'instruments'),
-    autoparts: productCategories.filter((cat) => cat.section === 'autoparts'),
-    materials: productCategories.filter((cat) => cat.section === 'materials'),
-    furniture: productCategories.filter((cat) => cat.section === 'furniture'),
-  }
+  const categoriesBySection = PRODUCT_CATEGORY_SECTIONS.map((section) => ({
+    id: section.id,
+    label: section.label,
+    categories: productCategories.filter((cat) => cat.section === section.id),
+  }))
 
-  const sectionNames = {
-    instruments: 'Инструменты',
-    autoparts: 'Автозапчасти',
-    materials: 'Стройматериалы',
-    furniture: 'Мебель',
-  }
+  const filteredSubcategories = productSubcategories.filter((sub) =>
+    selectedCategoryIds.includes(sub.category_id)
+  )
 
   if (authLoading || loading) {
     return (
@@ -139,16 +186,16 @@ export default function SellerOnboardingPage() {
             </div>
           )}
 
-          {Object.entries(categoriesBySection).map(([section, categories]) => {
-            if (categories.length === 0) return null
+          {categoriesBySection.map((section) => {
+            if (section.categories.length === 0) return null
 
             return (
-              <div key={section} className="mb-6">
+              <div key={section.id} className="mb-6">
                 <h2 className="text-lg font-semibold mb-3 text-black">
-                  {sectionNames[section as keyof typeof sectionNames]}
+                  {section.label}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto border border-gray-200 p-4 rounded">
-                  {categories.map((category) => (
+                  {section.categories.map((category) => (
                     <label
                       key={category.id}
                       className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 p-2 rounded"
@@ -171,6 +218,42 @@ export default function SellerOnboardingPage() {
             <p className="text-sm text-gray-500 mb-4">
               Выбрано категорий: {selectedCategoryIds.length}
             </p>
+          )}
+
+          {selectedCategoryIds.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-3 text-black">
+                Каталоги (подкатегории)
+              </h2>
+              <p className="text-sm text-gray-500 mb-2">
+                Выберите каталоги внутри выбранных категорий
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto border border-gray-200 p-4 rounded">
+                {filteredSubcategories.length === 0 ? (
+                  <p className="text-sm text-gray-500">Нет каталогов для выбранных категорий</p>
+                ) : (
+                  filteredSubcategories.map((subcategory) => (
+                    <label
+                      key={subcategory.id}
+                      className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedSubcategoryIds.includes(subcategory.id)}
+                        onChange={() => toggleSubcategory(subcategory.id)}
+                        className="w-4 h-4"
+                      />
+                      <span>{subcategory.name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+              {selectedSubcategoryIds.length > 0 && (
+                <p className="text-sm text-gray-500 mt-2">
+                  Выбрано каталогов: {selectedSubcategoryIds.length}
+                </p>
+              )}
+            </div>
           )}
 
           <div className="flex gap-4">

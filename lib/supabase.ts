@@ -86,6 +86,14 @@ export interface PostLike {
   created_at: string
 }
 
+export interface ProductSubcategory {
+  id: string
+  category_id: string
+  name: string
+  slug: string
+  created_at: string
+}
+
 export interface Product {
   id: string
   seller_id: string
@@ -95,6 +103,7 @@ export interface Product {
   images: string[]
   category?: string
   category_id?: string
+  subcategory_id?: string
   in_stock: boolean
   stock_count?: number
   rating?: number
@@ -102,11 +111,32 @@ export interface Product {
   created_at: string
   seller?: User
   category_ref?: ProductCategory
+  subcategory_ref?: ProductSubcategory
 }
+
+export type ProductCategorySection =
+  | 'construction'
+  | 'exterior'
+  | 'engineering'
+  | 'finishing'
+  | 'tools'
+  | 'auto'
+
+export const PRODUCT_CATEGORY_SECTIONS: Array<{
+  id: ProductCategorySection
+  label: string
+}> = [
+  { id: 'construction', label: 'Строительство и материалы' },
+  { id: 'exterior', label: 'Кровля, фасады, участок' },
+  { id: 'engineering', label: 'Инженерия и коммуникации' },
+  { id: 'finishing', label: 'Отделка и интерьер' },
+  { id: 'tools', label: 'Инструменты и расходники' },
+  { id: 'auto', label: 'Автотовары' },
+]
 
 export interface ProductCategory {
   id: string
-  section: 'instruments' | 'autoparts' | 'materials' | 'furniture'
+  section: ProductCategorySection
   name: string
   slug: string
   created_at: string

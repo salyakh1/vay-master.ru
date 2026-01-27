@@ -1,5 +1,195 @@
--- Product categories catalog
--- Sections: instruments, autoparts, materials, furniture
+-- Product categories catalog (v2)
+-- Sections: construction, exterior, engineering, finishing, tools, auto
+
+-- Update existing constraint if table already exists
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'product_categories_section_check'
+    AND table_name = 'product_categories'
+  ) THEN
+    ALTER TABLE public.product_categories DROP CONSTRAINT product_categories_section_check;
+  END IF;
+END$$;
+
+CREATE TABLE IF NOT EXISTS public.product_categories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  section TEXT NOT NULL,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+  UNIQUE (section, name),
+  UNIQUE (slug)
+);
+
+-- Add updated constraint with new sections
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'product_categories_section_check'
+    AND table_name = 'product_categories'
+  ) THEN
+    ALTER TABLE public.product_categories
+    ADD CONSTRAINT product_categories_section_check
+    CHECK (section IN ('construction', 'exterior', 'engineering', 'finishing', 'tools', 'auto'));
+  END IF;
+END$$;
+
+CREATE INDEX IF NOT EXISTS idx_product_categories_section ON public.product_categories(section);
+
+-- Subcategories
+CREATE TABLE IF NOT EXISTS public.product_subcategories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category_id UUID NOT NULL REFERENCES public.product_categories(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+  UNIQUE (category_id, name),
+  UNIQUE (slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_subcategories_category_id ON public.product_subcategories(category_id);
+
+-- Link products to categories/subcategories
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'category_id'
+  ) THEN
+    ALTER TABLE public.products ADD COLUMN category_id UUID REFERENCES public.product_categories(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'subcategory_id'
+  ) THEN
+    ALTER TABLE public.products ADD COLUMN subcategory_id UUID REFERENCES public.product_subcategories(id) ON DELETE SET NULL;
+  END IF;
+END$$;
+
+CREATE INDEX IF NOT EXISTS idx_products_category_id ON public.products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_subcategory_id ON public.products(subcategory_id);
+
+-- Seller preferences (categories and subcategories)
+CREATE TABLE IF NOT EXISTS public.profile_product_categories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  category_id UUID NOT NULL REFERENCES public.product_categories(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+  UNIQUE (profile_id, category_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.profile_product_subcategories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  subcategory_id UUID NOT NULL REFERENCES public.product_subcategories(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+  UNIQUE (profile_id, subcategory_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_profile_product_categories_profile ON public.profile_product_categories(profile_id);
+CREATE INDEX IF NOT EXISTS idx_profile_product_subcategories_profile ON public.profile_product_subcategories(profile_id);
+
+-- RLS
+ALTER TABLE public.product_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.product_subcategories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profile_product_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profile_product_subcategories ENABLE ROW LEVEL SECURITY;
+
+-- Policies: reference data is readable by everyone
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'product_categories' AND policyname = 'product_categories select all') THEN
+    CREATE POLICY "product_categories select all" ON public.product_categories
+      FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'product_subcategories' AND policyname = 'product_subcategories select all') THEN
+    CREATE POLICY "product_subcategories select all" ON public.product_subcategories
+      FOR SELECT USING (true);
+  END IF;
+END$$;
+
+-- Policies: sellers manage only their own selections
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'profile_product_categories' AND policyname = 'profile_product_categories select all') THEN
+    CREATE POLICY "profile_product_categories select all" ON public.profile_product_categories
+      FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'profile_product_categories' AND policyname = 'profile_product_categories insert own') THEN
+    CREATE POLICY "profile_product_categories insert own" ON public.profile_product_categories
+      FOR INSERT WITH CHECK (auth.uid() = profile_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'profile_product_categories' AND policyname = 'profile_product_categories delete own') THEN
+    CREATE POLICY "profile_product_categories delete own" ON public.profile_product_categories
+      FOR DELETE USING (auth.uid() = profile_id);
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'profile_product_subcategories' AND policyname = 'profile_product_subcategories select all') THEN
+    CREATE POLICY "profile_product_subcategories select all" ON public.profile_product_subcategories
+      FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'profile_product_subcategories' AND policyname = 'profile_product_subcategories insert own') THEN
+    CREATE POLICY "profile_product_subcategories insert own" ON public.profile_product_subcategories
+      FOR INSERT WITH CHECK (auth.uid() = profile_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'profile_product_subcategories' AND policyname = 'profile_product_subcategories delete own') THEN
+    CREATE POLICY "profile_product_subcategories delete own" ON public.profile_product_subcategories
+      FOR DELETE USING (auth.uid() = profile_id);
+  END IF;
+END$$;
+
+-- Optional: prevent inserts/updates of reference data from anon users
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'product_categories' AND policyname = 'product_categories insert service_role') THEN
+    CREATE POLICY "product_categories insert service_role" ON public.product_categories
+      FOR INSERT WITH CHECK (auth.role() = 'service_role');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'product_subcategories' AND policyname = 'product_subcategories insert service_role') THEN
+    CREATE POLICY "product_subcategories insert service_role" ON public.product_subcategories
+      FOR INSERT WITH CHECK (auth.role() = 'service_role');
+  END IF;
+END$$;
+
+-- Seed: top-level categories
+INSERT INTO public.product_categories (section, name, slug)
+VALUES
+  ('exterior','Кровля и водостоки','roofing-gutters'),
+  ('exterior','Фасады и облицовка','facades-cladding'),
+  ('exterior','Утеплители и изоляция','insulation'),
+  ('exterior','Гидроизоляция и герметики','waterproofing-sealants'),
+  ('exterior','Заборы, ворота, ограждения','fences-gates'),
+  ('exterior','Благоустройство и ландшафт','landscaping-outdoor'),
+  ('construction','Строительные смеси','building-mixes'),
+  ('construction','Сыпучие материалы','bulk-materials'),
+  ('construction','Кирпич, блоки, ЖБИ','masonry-blocks-jbi'),
+  ('construction','Пиломатериалы и листовые материалы','lumber-panels'),
+  ('construction','Металлоконструкции и сварка (материалы)','metalworks-welding-materials'),
+  ('tools','Крепеж и метизы','fasteners-hardware'),
+  ('tools','Инструменты электро','power-tools'),
+  ('tools','Инструменты ручные','hand-tools'),
+  ('tools','Расходники и оснастка','consumables-accessories'),
+  ('engineering','Сантехника и водоснабжение','plumbing-water-supply'),
+  ('engineering','Канализация и септики','sewer-septic'),
+  ('engineering','Отопление и котельное','heating-boilers'),
+  ('engineering','Вентиляция и кондиционирование','ventilation-ac'),
+  ('engineering','Электрика и освещение','electrical-lighting'),
+  ('engineering','Слаботочка и умный дом','low-voltage-smart-home'),
+  ('finishing','Окна, двери, фурнитура','windows-doors-hardware'),
+  ('finishing','Отделочные материалы','finishing-materials'),
+  ('finishing','Полы и напольные покрытия','flooring'),
+  ('finishing','Плитка и камень','tile-stone'),
+  ('finishing','Мебель, кухонные комплектующие, фурнитура','furniture-kitchen-hardware'),
+  ('auto','Автозапчасти: двигатель/КПП','auto-parts-engine-gearbox'),
+  ('auto','Автозапчасти: ходовая/тормоза','auto-parts-suspension-brakes'),
+  ('auto','Автоэлектрика и электроника','auto-electronics'),
+  ('auto','Автохимия, масла, детейлинг','auto-chemicals-detailing')
+ON CONFLICT DO NOTHING;
+-- Product categories catalog (v2)
+-- Sections: construction, exterior, engineering, finishing, tools, auto
 
 -- Update existing constraint if table already exists
 DO $$
@@ -24,7 +214,7 @@ CREATE TABLE IF NOT EXISTS public.product_categories (
   UNIQUE (slug)
 );
 
--- Add updated constraint with furniture section
+-- Add updated constraint with new sections
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -34,7 +224,7 @@ BEGIN
   ) THEN
     ALTER TABLE public.product_categories 
     ADD CONSTRAINT product_categories_section_check 
-    CHECK (section IN ('instruments', 'autoparts', 'materials', 'furniture'));
+    CHECK (section IN ('construction', 'exterior', 'engineering', 'finishing', 'tools', 'auto'));
   END IF;
 END$$;
 
@@ -76,115 +266,56 @@ BEGIN
   END IF;
 END$$;
 
--- Seed: instruments (from screenshot)
-INSERT INTO public.product_categories (section, name, slug)
-VALUES
-  ('instruments','Аккумуляторный инструмент','instruments-cordless'),
-  ('instruments','Болгарки (УШМ)','instruments-angle-grinders'),
-  ('instruments','Бороздоделы (штроборезы)','instruments-wall-chasers'),
-  ('instruments','Гайковёрты','instruments-impact-wrenches'),
-  ('instruments','Гвоздезабиватели (степлеры)','instruments-nailers'),
-  ('instruments','Генераторы (электростанции)','instruments-generators'),
-  ('instruments','Граверы','instruments-engravers'),
-  ('instruments','Дрели','instruments-drills'),
-  ('instruments','Заклёпочники','instruments-rivet-guns'),
-  ('instruments','Измерительный инструмент','instruments-measuring'),
-  ('instruments','Инструмент и оборудование по видам работ','instruments-by-work'),
-  ('instruments','Инструментальные наборы','instruments-kits'),
-  ('instruments','Клуппы электрические','instruments-electric-threaders'),
-  ('instruments','Компрессоры','instruments-compressors'),
-  ('instruments','Краскопульты','instruments-spray-guns'),
-  ('instruments','Лабораторное оборудование','instruments-lab'),
-  ('instruments','Лобзики','instruments-jigsaws'),
-  ('instruments','Ножницы по металлу','instruments-metal-shears'),
-  ('instruments','Отбойные молотки','instruments-breakers'),
-  ('instruments','Паяльное оборудование','instruments-soldering'),
-  ('instruments','Перфораторы','instruments-rotary-hammers'),
-  ('instruments','Пилы','instruments-saws'),
-  ('instruments','Пистолеты','instruments-guns'),
-  ('instruments','Пневмоинструмент','instruments-pneumatic'),
-  ('instruments','Пневмоподготовка воздуха','instruments-air-prep'),
-  ('instruments','Пневмошуруповёрты','instruments-pneumatic-screwdrivers'),
-  ('instruments','Расходные материалы','instruments-consumables'),
-  ('instruments','Реноваторы многофункциональные','instruments-multitools'),
-  ('instruments','Сварочное оборудование','instruments-welding'),
-  ('instruments','Силовая техника','instruments-power-equipment'),
-  ('instruments','Строительные пылесосы','instruments-vacuums'),
-  ('instruments','Фены (термопистолеты)','instruments-heat-guns'),
-  ('instruments','Фидеры винтов','instruments-screw-feeders'),
-  ('instruments','Фрезеры','instruments-routers'),
-  ('instruments','Шлифмашины','instruments-sanders'),
-  ('instruments','Шуруповёрты','instruments-screwdrivers'),
-  ('instruments','Электрические отвёртки','instruments-electric-screwdrivers'),
-  ('instruments','Электрорубанки','instruments-planers')
-ON CONFLICT DO NOTHING;
+-- Optional: replace existing catalog with new list
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'product_categories'
+  ) THEN
+    DELETE FROM public.product_categories;
+  END IF;
+END$$;
 
--- Seed: autoparts
+-- Seed: new unified catalog
 INSERT INTO public.product_categories (section, name, slug)
 VALUES
-  ('autoparts','Двигатель и ГРМ','autoparts-engine'),
-  ('autoparts','Трансмиссия','autoparts-transmission'),
-  ('autoparts','Топливная система','autoparts-fuel'),
-  ('autoparts','Охлаждение и отопление','autoparts-cooling-heating'),
-  ('autoparts','Выхлоп','autoparts-exhaust'),
-  ('autoparts','Подвеска','autoparts-suspension'),
-  ('autoparts','Тормозная система','autoparts-brakes'),
-  ('autoparts','Рулевое управление','autoparts-steering'),
-  ('autoparts','Электрика и свет','autoparts-electric'),
-  ('autoparts','Кузов и оптика','autoparts-body'),
-  ('autoparts','Салон и интерьер','autoparts-interior'),
-  ('autoparts','Климат','autoparts-climate'),
-  ('autoparts','Фильтры и расходники','autoparts-filters'),
-  ('autoparts','Ремни/цепи/ролики','autoparts-belts'),
-  ('autoparts','Шины и диски','autoparts-wheels'),
-  ('autoparts','Жидкости и автохимия','autoparts-fluids'),
-  ('autoparts','Аксессуары','autoparts-accessories'),
-  ('autoparts','ЭРА-ГЛОНАСС и мультимедиа','autoparts-multimedia')
-ON CONFLICT DO NOTHING;
-
--- Seed: construction materials
-INSERT INTO public.product_categories (section, name, slug)
-VALUES
-  ('materials','Сыпучие (песок, щебень, керамзит)','materials-bulk'),
-  ('materials','Вяжущие и сухие смеси','materials-binders'),
-  ('materials','Кирпич и блоки','materials-bricks-blocks'),
-  ('materials','Бетон и ЖБИ','materials-concrete'),
-  ('materials','Деревоматериалы и листы','materials-wood-panels'),
-  ('materials','Кровля (шифер, металлочерепица, профнастил)','materials-roofing'),
-  ('materials','Утеплители','materials-insulation'),
-  ('materials','Паро- и гидроизоляция','materials-waterproofing'),
-  ('materials','Сайдинг и фасад','materials-siding'),
-  ('materials','Окна, двери, подоконники','materials-windows-doors'),
-  ('materials','Полы (стяжки, покрытия)','materials-floors'),
-  ('materials','Плитка и камень','materials-tile-stone'),
-  ('materials','Отделка (ГКЛ, краски, грунты)','materials-finishing'),
-  ('materials','Крепёж и метизы','materials-fasteners'),
-  ('materials','Инженерка: трубы, арматура, отопление, ВК','materials-mep'),
-  ('materials','Электрика (кабель, щиты, розетки)','materials-electric'),
-  ('materials','Лестницы, опалубка, инвентарь','materials-scaffolding'),
-  ('materials','Мастики, клеи, герметики','materials-adhesives')
-ON CONFLICT DO NOTHING;
-
--- Seed: furniture
-INSERT INTO public.product_categories (section, name, slug)
-VALUES
-  ('furniture','Гостиная (диваны, кресла, журнальные столы, ТВ-тумбы)','furniture-living-room'),
-  ('furniture','Спальня (кровати, матрасы, шкафы, комоды)','furniture-bedroom'),
-  ('furniture','Кухня (кухонные гарнитуры, столы, стулья)','furniture-kitchen'),
-  ('furniture','Столовая (обеденные столы, стулья, серванты)','furniture-dining-room'),
-  ('furniture','Детская (детские кровати, шкафы, столы)','furniture-kids-room'),
-  ('furniture','Офисная (офисные столы, кресла, шкафы)','furniture-office'),
-  ('furniture','Прихожая (шкафы-купе, вешалки, банкетки)','furniture-hallway'),
-  ('furniture','Ванная (тумбы, зеркала, полки)','furniture-bathroom'),
-  ('furniture','Мягкая мебель (диваны, кресла, пуфы)','furniture-upholstered'),
-  ('furniture','Корпусная мебель (шкафы, комоды, тумбы)','furniture-case'),
-  ('furniture','Столы (письменные, обеденные, журнальные)','furniture-tables'),
-  ('furniture','Стулья и кресла (обеденные, офисные, барные)','furniture-chairs'),
-  ('furniture','Матрасы и основания (матрасы, ортопедические основания)','furniture-mattresses'),
-  ('furniture','Мебель для хранения (стеллажи, полки, комоды)','furniture-storage'),
-  ('furniture','Мебель для сада и террасы (садовые столы, стулья)','furniture-garden'),
-  ('furniture','Мебель для балкона (полки, стеллажи, складная)','furniture-balcony'),
-  ('furniture','Мебель на заказ (индивидуальное изготовление)','furniture-custom')
+  -- Exterior
+  ('exterior','Кровля и водостоки','roofing-gutters'),
+  ('exterior','Фасады и облицовка','facades-cladding'),
+  ('exterior','Утеплители и изоляция','insulation'),
+  ('exterior','Гидроизоляция и герметики','waterproofing-sealants'),
+  ('exterior','Заборы, ворота, ограждения','fences-gates'),
+  ('exterior','Благоустройство и ландшафт','landscaping-outdoor'),
+  -- Construction
+  ('construction','Строительные смеси','building-mixes'),
+  ('construction','Сыпучие материалы','bulk-materials'),
+  ('construction','Кирпич, блоки, ЖБИ','masonry-blocks-jbi'),
+  ('construction','Пиломатериалы и листовые материалы','lumber-panels'),
+  ('construction','Металлоконструкции и сварка (материалы)','metalworks-welding-materials'),
+  -- Tools
+  ('tools','Крепеж и метизы','fasteners-hardware'),
+  ('tools','Инструменты электро','power-tools'),
+  ('tools','Инструменты ручные','hand-tools'),
+  ('tools','Расходники и оснастка','consumables-accessories'),
+  -- Engineering
+  ('engineering','Сантехника и водоснабжение','plumbing-water-supply'),
+  ('engineering','Канализация и септики','sewer-septic'),
+  ('engineering','Отопление и котельное','heating-boilers'),
+  ('engineering','Вентиляция и кондиционирование','ventilation-ac'),
+  ('engineering','Электрика и освещение','electrical-lighting'),
+  ('engineering','Слаботочка и умный дом','low-voltage-smart-home'),
+  -- Finishing
+  ('finishing','Окна, двери, фурнитура','windows-doors-hardware'),
+  ('finishing','Отделочные материалы','finishing-materials'),
+  ('finishing','Полы и напольные покрытия','flooring'),
+  ('finishing','Плитка и камень','tile-stone'),
+  ('finishing','Мебель, кухонные комплектующие, фурнитура','furniture-kitchen-hardware'),
+  -- Auto
+  ('auto','Автозапчасти: двигатель/КПП','auto-parts-engine-gearbox'),
+  ('auto','Автозапчасти: ходовая/тормоза','auto-parts-suspension-brakes'),
+  ('auto','Автоэлектрика и электроника','auto-electronics'),
+  ('auto','Автохимия, масла, детейлинг','auto-chemicals-detailing')
 ON CONFLICT DO NOTHING;
 
 

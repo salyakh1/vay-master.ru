@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, Fragment } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '../providers'
@@ -11,8 +11,11 @@ import Link from 'next/link'
 import { FiSearch, FiUser, FiFilter, FiMapPin, FiBriefcase, FiStar, FiCheckCircle } from 'react-icons/fi'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import AdSlot from '@/components/AdSlot'
+import RecommendationsCarousel from '@/components/RecommendationsCarousel'
 import StoriesCircle from '@/components/StoriesCircle'
 import { Story } from '@/lib/supabase'
+import { getProductCategoriesForSpecializations } from '@/lib/specialization-product-mapping'
+import { useMemo } from 'react'
 
 function SearchContent() {
   const router = useRouter()
@@ -41,6 +44,59 @@ function SearchContent() {
   const [hasMoreRandom, setHasMoreRandom] = useState(true)
   
   const ITEMS_PER_PAGE = 20
+
+  // Загружаем специализации мастера и получаем категории товаров
+  const [masterSpecializations, setMasterSpecializations] = useState<Array<{ id: string; slug: string }>>([])
+  const [loadingSpecializations, setLoadingSpecializations] = useState(false)
+  
+  useEffect(() => {
+    const loadMasterSpecializations = async () => {
+      if (user?.role === 'master' && user.id) {
+        setLoadingSpecializations(true)
+        try {
+          const { data, error } = await supabase
+            .from('profile_specializations')
+            .select('specialization:specializations(id, slug)')
+            .eq('profile_id', user.id)
+          
+          if (!error && data) {
+            const specs = (data as any[])
+              .map((item) => item.specialization)
+              .filter(Boolean)
+              .map((spec: any) => ({ id: spec.id, slug: spec.slug }))
+            setMasterSpecializations(specs)
+          } else {
+            setMasterSpecializations([])
+          }
+        } catch (error) {
+          console.error('Error loading master specializations:', error)
+          setMasterSpecializations([])
+        } finally {
+          setLoadingSpecializations(false)
+        }
+      } else {
+        setMasterSpecializations([])
+        setLoadingSpecializations(false)
+      }
+    }
+    loadMasterSpecializations()
+  }, [user])
+
+  // Получаем категории товаров для мастера на основе его специализаций
+  const masterProductCategories = useMemo(() => {
+    if (user?.role !== 'master' || masterSpecializations.length === 0) {
+      return { categorySlugs: undefined, subcategorySlugs: undefined }
+    }
+    
+    const specializationSlugs = masterSpecializations.map((spec) => spec.slug)
+    return getProductCategoriesForSpecializations(specializationSlugs)
+  }, [user, masterSpecializations])
+
+  // Проверка: является ли пользователь мастером с категориями
+  const isMasterWithCategories = user?.role === 'master' && 
+    !loadingSpecializations && 
+    masterProductCategories.categorySlugs && 
+    masterProductCategories.categorySlugs.length > 0
 
   // Убираем редирект для неавторизованных - они могут видеть карточки мастеров
 
@@ -523,6 +579,19 @@ function SearchContent() {
             </div>
           ) : null}
 
+          <RecommendationsCarousel
+            title={
+              isMasterWithCategories
+                ? "Рекомендации под ваши услуги"
+                : "Рекомендации Pro‑товаров"
+            }
+            query={query}
+            categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
+            subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
+            role={user?.role || 'client'}
+            limit={12}
+          />
+
           {/* Results */}
           {loading ? (
             <div className="text-center py-12 text-text-secondary">Поиск...</div>
@@ -647,7 +716,21 @@ function SearchContent() {
                         )
                       }
 
-                      return cardElement
+                      return (
+                        <Fragment key={master.id}>
+                          {cardElement}
+                          {index === 7 && (
+                            <div className="col-span-2">
+                              <RecommendationsCarousel
+                                title="Рекомендации Pro‑товаров"
+                                query={query}
+                                role={user?.role || 'client'}
+                                limit={12}
+                              />
+                            </div>
+                          )}
+                        </Fragment>
+                      )
                     })}
                   </div>
                   
@@ -797,7 +880,21 @@ function SearchContent() {
                       )
                     }
 
-                    return cardElement
+                      return (
+                        <Fragment key={master.id}>
+                          {cardElement}
+                          {index === 7 && (
+                            <div className="col-span-2">
+                              <RecommendationsCarousel
+                                title="Рекомендации Pro‑товаров"
+                                query={query}
+                                role={user?.role || 'client'}
+                                limit={12}
+                              />
+                            </div>
+                          )}
+                        </Fragment>
+                      )
                   })}
                 </div>
                 

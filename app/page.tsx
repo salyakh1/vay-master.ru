@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from './providers'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
@@ -38,6 +39,7 @@ interface Stats {
 
 export default function Home() {
   const { user, loading } = useAuth()
+  const router = useRouter()
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     masters: 0,
@@ -48,6 +50,19 @@ export default function Home() {
   const [statsLoading, setStatsLoading] = useState(false)
   const [statsFetched, setStatsFetched] = useState(false)
   const statsSectionRef = useRef<HTMLElement>(null)
+  const [quickQuery, setQuickQuery] = useState('')
+
+  const quickCategories = [
+    { label: 'Инструменты', query: 'инструменты' },
+    { label: 'Материалы', query: 'материалы' },
+    { label: 'Мебель', query: 'мебель' },
+    { label: 'Автозапчасти', query: 'автозапчасти' },
+  ]
+
+  const handleQuickSearch = () => {
+    const query = quickQuery.trim()
+    router.push(query ? `/products?q=${encodeURIComponent(query)}` : '/products')
+  }
 
   // Intersection Observer для ленивой загрузки статистики
   useEffect(() => {
@@ -248,6 +263,42 @@ export default function Home() {
                   </>
                 )}
               </div>
+
+              {(user.role === 'client') && (
+                <div className="max-w-2xl mx-auto w-full mt-4">
+                  <div className="flex items-center gap-3 bg-white border border-border-light rounded-2xl px-4 py-3 shadow-sm">
+                    <FiSearch size={18} className="text-text-muted" />
+                    <input
+                      value={quickQuery}
+                      onChange={(e) => setQuickQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleQuickSearch()
+                      }}
+                      placeholder="Поиск товаров, материалов или услуг..."
+                      className="flex-1 text-sm md:text-base bg-transparent focus:outline-none text-graphite-secondary"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleQuickSearch}
+                      className="px-4 py-2 text-sm font-semibold rounded-xl bg-brand-accent text-white hover:bg-brand-accent-hover transition-colors"
+                    >
+                      Найти
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2 mt-3">
+                    {quickCategories.map((cat) => (
+                      <button
+                        key={cat.label}
+                        type="button"
+                        onClick={() => router.push(`/products?q=${encodeURIComponent(cat.query)}`)}
+                        className="px-3 py-1.5 text-xs md:text-sm rounded-full border border-border-light text-graphite-secondary hover:bg-bg-secondary transition-colors"
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </section>

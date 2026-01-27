@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
-import { supabase, Product, ProductCategory } from '@/lib/supabase'
+import { supabase, Product, ProductCategory, ProductSubcategory, PRODUCT_CATEGORY_SECTIONS } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 
 export default function EditProductPage() {
@@ -15,8 +15,9 @@ export default function EditProductPage() {
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [categorySection, setCategorySection] = useState('')
+  const [subcategoryId, setSubcategoryId] = useState('')
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([])
+  const [productSubcategories, setProductSubcategories] = useState<ProductSubcategory[]>([])
   const [inStock, setInStock] = useState(true)
   const [stockCount, setStockCount] = useState('')
   const [loading, setLoading] = useState(true)
@@ -31,15 +32,24 @@ export default function EditProductPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const { data, error } = await supabase
+        const { data: categoriesData, error: categoriesError } = await supabase
           .from('product_categories')
           .select('*')
           .order('name', { ascending: true })
-        if (error) throw error
-        setProductCategories((data as ProductCategory[]) || [])
+        if (categoriesError) throw categoriesError
+
+        const { data: subcategoriesData, error: subcategoriesError } = await supabase
+          .from('product_subcategories')
+          .select('*')
+          .order('name', { ascending: true })
+        if (subcategoriesError) throw subcategoriesError
+
+        setProductCategories((categoriesData as ProductCategory[]) || [])
+        setProductSubcategories((subcategoriesData as ProductSubcategory[]) || [])
       } catch (error) {
         console.error('Error fetching product categories:', error)
         setProductCategories([])
+        setProductSubcategories([])
       }
     }
     fetchCategories()
@@ -71,7 +81,7 @@ export default function EditProductPage() {
       setDescription(data.description)
       setPrice(data.price.toString())
       setCategoryId(data.category_id || '')
-      setCategorySection((data as any).category_ref?.section || '')
+      setSubcategoryId(data.subcategory_id || '')
       setInStock(data.in_stock)
       setStockCount(data.stock_count?.toString() || '')
     } catch (error) {
@@ -96,6 +106,7 @@ export default function EditProductPage() {
           price: parseFloat(price),
           category: productCategories.find((c) => c.id === categoryId)?.name || product?.category || '',
           category_id: categoryId || null,
+          subcategory_id: subcategoryId || null,
           in_stock: inStock,
           stock_count: stockCount ? parseInt(stockCount) : null,
         })
@@ -194,40 +205,49 @@ export default function EditProductPage() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Категория *
+                    Категория и каталог *
                   </label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <select
-                      value={categorySection}
+                      value={categoryId}
                       onChange={(e) => {
                         const val = e.target.value
-                        setCategorySection(val)
-                        setCategoryId('')
+                        setCategoryId(val)
+                        setSubcategoryId('')
                       }}
                       required
                       className="input"
                     >
-                      <option value="">Выберите раздел</option>
-                      <option value="instruments">Инструменты</option>
-                      <option value="autoparts">Автозапчасти</option>
-                      <option value="materials">Стройматериалы</option>
-                      <option value="furniture">Мебель</option>
+                      <option value="">Выберите категорию</option>
+                      {PRODUCT_CATEGORY_SECTIONS.map((section) => {
+                        const categories = productCategories.filter((cat) => cat.section === section.id)
+                        if (categories.length === 0) return null
+                        return (
+                          <optgroup key={section.id} label={section.label}>
+                            {categories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )
+                      })}
                     </select>
                     <select
-                      value={categoryId}
-                      onChange={(e) => setCategoryId(e.target.value)}
+                      value={subcategoryId}
+                      onChange={(e) => setSubcategoryId(e.target.value)}
                       required
                       className="input"
-                      disabled={!categorySection}
+                      disabled={!categoryId}
                     >
                       <option value="">
-                        {categorySection ? 'Выберите категорию' : 'Сначала выберите раздел'}
+                        {categoryId ? 'Выберите каталог' : 'Сначала выберите категорию'}
                       </option>
-                      {productCategories
-                        .filter((cat) => !categorySection || cat.section === categorySection)
-                        .map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name}
+                      {productSubcategories
+                        .filter((sub) => !categoryId || sub.category_id === categoryId)
+                        .map((sub) => (
+                          <option key={sub.id} value={sub.id}>
+                            {sub.name}
                           </option>
                         ))}
                     </select>

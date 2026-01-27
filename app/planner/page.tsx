@@ -289,7 +289,7 @@ export default function PlannerPage() {
           `
           )
           .eq('in_stock', true)
-          .eq('category_ref.section', 'materials')
+          .eq('category_ref.section', 'construction')
           .order('created_at', { ascending: false })
           .limit(12)
 

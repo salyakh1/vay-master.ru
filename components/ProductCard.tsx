@@ -17,99 +17,59 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
   const [showAuthModal, setShowAuthModal] = useState(false)
 
   const ProductCardContent = (
-      <div className="card-glossy overflow-hidden group cursor-pointer flex flex-col !p-0 relative h-full">
-        
-        {/* Изображение товара */}
-        <div className="w-full aspect-square bg-bg-secondary relative overflow-hidden rounded-t-[12px] flex-shrink-0">
-          {product.images && product.images.length > 0 ? (
-            <>
-              <Image
-                src={product.images[0]}
-                alt={product.name}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 50vw, 33vw"
-              />
-            </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-text-secondary text-4xl bg-bg-secondary">
-              <FiShoppingBag size={48} strokeWidth={1.5} />
-            </div>
-          )}
-          {!product.in_stock && (
-            <div className="absolute top-3 right-3 bg-graphite-primary/95 backdrop-blur-sm text-white px-3 py-1.5 text-xs font-semibold rounded-lg shadow-glossy border border-white/10">
-              Нет в наличии
-            </div>
-          )}
+    <div className="relative bg-white rounded-xl overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-black/5 h-full flex flex-col">
+      <div className="relative w-full aspect-square bg-[#f2f2f2] overflow-hidden">
+        {product.images && product.images.length > 0 ? (
+          <Image
+            src={product.images[0]}
+            alt={product.name}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 50vw, 33vw"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-text-secondary bg-[#f2f2f2]">
+            <FiShoppingBag size={36} strokeWidth={1.5} />
+          </div>
+        )}
+
+        {!product.in_stock && (
+          <div className="absolute top-2 left-2 bg-black/80 text-white px-2 py-1 text-[11px] font-semibold rounded-md">
+            Нет в наличии
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col px-3 pb-3 pt-2 flex-1">
+        <h3 className="text-[14px] font-medium leading-snug line-clamp-2 text-graphite-secondary min-h-[34px]">
+          {product.name}
+        </h3>
+        <div className="text-[18px] font-bold text-graphite-secondary mt-1">
+          {product.price.toLocaleString('ru-RU')} ₽
         </div>
 
-        {/* Информация о товаре */}
-        <div className="flex flex-col flex-1 p-4 sm:p-5">
-          {/* Название и категория */}
-          <div className="mb-3">
-            <h3 className="font-semibold text-[15px] sm:text-base mb-1.5 line-clamp-2 text-graphite-secondary leading-snug min-h-[42px]">
-              {product.name}
-            </h3>
-            <div className={`text-xs text-text-muted min-h-[16px] ${product.category_ref ? '' : 'opacity-0'}`}>
-              {product.category_ref?.name || '—'}
-            </div>
+        {(product.reviews_count && product.reviews_count > 0) ? (
+          <div className="flex items-center gap-1 text-[12px] text-text-muted mt-1">
+            {product.rating && product.rating > 0 && (
+              <>
+                <FiStar size={12} className="fill-brand-accent text-brand-accent" strokeWidth={0} />
+                <span className="font-medium">{product.rating.toFixed(1)}</span>
+              </>
+            )}
+            <span>
+              {product.reviews_count} {product.reviews_count === 1 ? 'отзыв' : product.reviews_count < 5 ? 'отзыва' : 'отзывов'}
+            </span>
           </div>
+        ) : (
+          <div className="text-[12px] text-text-muted mt-1">Без отзывов</div>
+        )}
 
-          {/* Цена, количество и рейтинг */}
-          <div className="flex items-baseline justify-between mb-3 pt-3 border-t border-border-light/40 gap-3">
-            <div className="text-base sm:text-lg font-semibold text-graphite-secondary">
-              {product.price.toLocaleString('ru-RU')} ₽
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Рейтинг товара */}
-              {(product.reviews_count && product.reviews_count > 0) ? (
-                <div className="flex items-center gap-1 text-xs text-text-secondary">
-                  {product.rating && product.rating > 0 ? (
-                    <>
-                      <FiStar size={12} className="fill-brand-accent text-brand-accent" strokeWidth={0} />
-                      <span className="font-medium whitespace-nowrap">
-                        {product.rating.toFixed(1)} ({product.reviews_count} {product.reviews_count === 1 ? 'отзыв' : product.reviews_count < 5 ? 'отзыва' : 'отзывов'})
-                      </span>
-                    </>
-                  ) : (
-                    <span className="font-medium whitespace-nowrap">
-                      ({product.reviews_count} {product.reviews_count === 1 ? 'отзыв' : product.reviews_count < 5 ? 'отзыва' : 'отзывов'})
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="text-xs text-text-muted whitespace-nowrap">
-                  Без отзывов
-                </div>
-              )}
-              {product.stock_count !== null && product.stock_count !== undefined && product.stock_count > 0 && (
-                <div className="text-xs text-text-secondary bg-gradient-to-br from-bg-secondary to-bg-primary px-2.5 py-1 font-medium rounded-lg shadow-sm border border-border-light/40">
-                  {product.stock_count} шт
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Информация о продавце */}
-          <div className="flex items-center gap-2.5 text-xs text-text-secondary pt-3 border-t border-border-light/40 mt-auto">
-            <div className="w-7 h-7 bg-graphite-primary rounded-full overflow-hidden flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0 relative">
-              {seller?.avatar_url ? (
-                <Image src={seller.avatar_url} alt={seller.full_name} fill className="object-cover" sizes="28px" />
-              ) : (
-                seller?.full_name?.[0]?.toUpperCase() || 'П'
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-graphite-secondary truncate">
-                {seller?.full_name || 'Продавец'}
-              </div>
-              <div className={`text-text-muted truncate min-h-[16px] ${seller?.city ? '' : 'opacity-0'}`}>
-                {seller?.city || '—'}
-              </div>
-            </div>
-          </div>
+        <div className="mt-auto text-[12px] text-[#8a8a8a] leading-snug pt-2">
+          <div className="truncate">{seller?.city || '—'}</div>
+          <div className="truncate">{seller?.full_name || 'Продавец'}</div>
         </div>
       </div>
+    </div>
   )
 
   if (currentUser) {

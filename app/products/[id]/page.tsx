@@ -133,7 +133,8 @@ export default function ProductPage() {
         .select(`
           *,
           seller:profiles(id, full_name, avatar_url, city, phone, description),
-          category_ref:product_categories(id, name, section, slug)
+          category_ref:product_categories(id, name, section, slug),
+          subcategory_ref:product_subcategories(id, name, slug, category_id)
         `)
         .eq('id', params.id)
         .single()

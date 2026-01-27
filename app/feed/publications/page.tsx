@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { VariableSizeList as List, FixedSizeGrid as Grid } from 'react-window'
@@ -14,6 +14,8 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
+import RecommendationsCarousel from '@/components/RecommendationsCarousel'
+import { getProductCategoriesForSpecializations } from '@/lib/specialization-product-mapping'
 
 interface ItemWithInteractions extends PortfolioItem {
   liked?: boolean
@@ -62,6 +64,59 @@ export default function PublicationsPage() {
   const LIST_ITEM_HEIGHT = 600 // Примерная высота элемента в list view
 
   const ITEMS_PER_PAGE = 25
+
+  // Загружаем специализации мастера и получаем категории товаров
+  const [masterSpecializations, setMasterSpecializations] = useState<Array<{ id: string; slug: string }>>([])
+  const [loadingSpecializations, setLoadingSpecializations] = useState(false)
+  
+  useEffect(() => {
+    const loadMasterSpecializations = async () => {
+      if (user?.role === 'master' && user.id) {
+        setLoadingSpecializations(true)
+        try {
+          const { data, error } = await supabase
+            .from('profile_specializations')
+            .select('specialization:specializations(id, slug)')
+            .eq('profile_id', user.id)
+          
+          if (!error && data) {
+            const specs = (data as any[])
+              .map((item) => item.specialization)
+              .filter(Boolean)
+              .map((spec: any) => ({ id: spec.id, slug: spec.slug }))
+            setMasterSpecializations(specs)
+          } else {
+            setMasterSpecializations([])
+          }
+        } catch (error) {
+          console.error('Error loading master specializations:', error)
+          setMasterSpecializations([])
+        } finally {
+          setLoadingSpecializations(false)
+        }
+      } else {
+        setMasterSpecializations([])
+        setLoadingSpecializations(false)
+      }
+    }
+    loadMasterSpecializations()
+  }, [user])
+
+  // Получаем категории товаров для мастера на основе его специализаций
+  const masterProductCategories = useMemo(() => {
+    if (user?.role !== 'master' || masterSpecializations.length === 0) {
+      return { categorySlugs: undefined, subcategorySlugs: undefined }
+    }
+    
+    const specializationSlugs = masterSpecializations.map((spec) => spec.slug)
+    return getProductCategoriesForSpecializations(specializationSlugs)
+  }, [user, masterSpecializations])
+
+  // Проверка: является ли пользователь мастером с категориями
+  const isMasterWithCategories = user?.role === 'master' && 
+    !loadingSpecializations && 
+    masterProductCategories.categorySlugs && 
+    masterProductCategories.categorySlugs.length > 0
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -603,14 +658,13 @@ export default function PublicationsPage() {
           ) : (
             /* List View - Vertical Feed */
             <div className="space-y-7">
-              {items.map((item) => {
+              {items.map((item, index) => {
                 if (item.type === 'portfolio' && item.portfolioItem) {
                   const portfolioItem = item.portfolioItem
                   const master = portfolioItem.master as any
 
-                  return (
+                  const content = (
                     <div
-                      key={item.id}
                       id={`item-${item.id}`}
                       className="bg-bg-card rounded-lg border border-border-light/40 overflow-hidden"
                     >
@@ -818,11 +872,48 @@ export default function PublicationsPage() {
                       </div>
                     </div>
                   )
-                } else if (item.type === 'product' && item.product) {
+
                   return (
-                    <div key={item.id} id={`item-${item.id}`}>
+                    <Fragment key={item.id}>
+                      {content}
+                      {index === 7 && (
+                        <RecommendationsCarousel
+                          title={
+                            isMasterWithCategories
+                              ? "Рекомендации под ваши услуги"
+                              : "Товары от Pro‑продавцов"
+                          }
+                          categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
+                          subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
+                          role={user?.role || 'client'}
+                          limit={12}
+                        />
+                      )}
+                    </Fragment>
+                  )
+                } else if (item.type === 'product' && item.product) {
+                  const content = (
+                    <div id={`item-${item.id}`}>
                       <ProductCard product={item.product} currentUser={user} />
                     </div>
+                  )
+                  return (
+                    <Fragment key={item.id}>
+                      {content}
+                      {index === 7 && (
+                        <RecommendationsCarousel
+                          title={
+                            isMasterWithCategories
+                              ? "Рекомендации под ваши услуги"
+                              : "Товары от Pro‑продавцов"
+                          }
+                          categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
+                          subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
+                          role={user?.role || 'client'}
+                          limit={12}
+                        />
+                      )}
+                    </Fragment>
                   )
                 }
                 return null
