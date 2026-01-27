@@ -293,7 +293,8 @@ function ProductsContent() {
       hasAd: boolean, 
       adProductIndex?: number,
       orderAfter?: Order | null,
-      orderWithNextProduct?: boolean // Флаг: заказ вставляется вместе со следующим товаром
+      orderWithNextProduct?: boolean, // Флаг: заказ вставляется вместе со следующим товаром
+      skipFirstItem?: boolean // Пропустить первый товар (уже использован с заказом)
     }> = []
     
     let orderIndex = 0 // Индекс текущего заказа из cityOrders
