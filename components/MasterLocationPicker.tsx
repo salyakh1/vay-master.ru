@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { FiX, FiNavigation } from 'react-icons/fi'
+import { configureLeafletIcons } from '@/lib/leaflet'
 import 'leaflet/dist/leaflet.css'
 
 // dynamic() ломает типизацию пропсов компонентов react-leaflet — используем any
@@ -43,22 +44,10 @@ export default function MasterLocationPicker({ value, onChange, city }: Props) {
   const markerRef = useRef<any>(null)
   const mapRef = useRef<any>(null)
   const fullscreenMapRef = useRef<any>(null)
-  const leafletConfiguredRef = useRef(false)
   const cityGeocodedRef = useRef(false)
 
   useEffect(() => {
-    // Настраиваем иконки Leaflet
-    if (leafletConfiguredRef.current) return
-    leafletConfiguredRef.current = true
-
-    void import('leaflet').then((L) => {
-      delete (L.Icon.Default.prototype as any)._getIconUrl
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: new URL('leaflet/dist/images/marker-icon-2x.png', import.meta.url).toString(),
-        iconUrl: new URL('leaflet/dist/images/marker-icon.png', import.meta.url).toString(),
-        shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).toString(),
-      })
-    })
+    configureLeafletIcons()
   }, [])
 
   // Инициализация из value

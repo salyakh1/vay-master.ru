@@ -75,17 +75,17 @@ export default function RecommendationsCarousel({
           {title}
         </h2>
       </div>
-      <div className="flex gap-4 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
+      <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
         {loading
           ? Array.from({ length: 6 }).map((_, idx) => (
               <div
                 key={`skeleton-${idx}`}
-                className="min-w-[180px] max-w-[180px] bg-gradient-to-br from-white to-red-50 border-2 border-red-200/50 rounded-2xl overflow-hidden shadow-lg animate-pulse"
+                className="min-w-[128px] max-w-[128px] bg-gradient-to-br from-white to-red-50 border-2 border-red-200/50 rounded-xl overflow-hidden shadow-md animate-pulse"
               >
                 <div className="w-full aspect-square bg-gradient-to-br from-red-100 to-red-200" />
-                <div className="p-3 space-y-2">
-                  <div className="h-3 bg-red-200 rounded" />
-                  <div className="h-4 bg-red-200 rounded w-2/3" />
+                <div className="p-2 space-y-1.5">
+                  <div className="h-2.5 bg-red-200 rounded" />
+                  <div className="h-3 bg-red-200 rounded w-2/3" />
                 </div>
               </div>
             ))
@@ -93,10 +93,10 @@ export default function RecommendationsCarousel({
               <Link
                 key={product.id}
                 href={`/products/${product.id}`}
-                className="group min-w-[180px] max-w-[180px] bg-gradient-to-br from-white via-red-50/30 to-white border-2 border-red-300/40 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 snap-start hover:scale-105 hover:border-red-400/60"
+                className="group min-w-[128px] max-w-[128px] bg-gradient-to-br from-white via-red-50/30 to-white border-2 border-red-300/40 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 snap-start hover:scale-105 hover:border-red-400/60"
               >
                 {/* Градиентный акцент сверху */}
-                <div className="relative h-1 bg-gradient-to-r from-red-500 via-red-400 to-red-500" />
+                <div className="relative h-0.5 bg-gradient-to-r from-red-500 via-red-400 to-red-500" />
                 
                 <div className="w-full aspect-square bg-gradient-to-br from-red-50 to-red-100/50 relative overflow-hidden">
                   {product.images && product.images.length > 0 ? (
@@ -106,28 +106,27 @@ export default function RecommendationsCarousel({
                         alt={product.name}
                         fill
                         className="object-cover group-hover:scale-110 transition-transform duration-300"
-                        sizes="180px"
+                        sizes="128px"
                       />
-                      {/* Overlay для эффекта */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-red-400">
-                      <FiShoppingBag size={32} strokeWidth={1.5} />
+                      <FiShoppingBag size={24} strokeWidth={1.5} />
                     </div>
                   )}
                 </div>
                 
-                <div className="p-3 bg-white/80 backdrop-blur-sm">
-                  <div className="text-[13px] font-medium text-graphite-secondary line-clamp-2 leading-snug min-h-[36px] group-hover:text-red-600 transition-colors">
+                <div className="p-2 bg-white/80 backdrop-blur-sm">
+                  <div className="text-[11px] font-medium text-graphite-secondary line-clamp-2 leading-snug min-h-[28px] group-hover:text-red-600 transition-colors">
                     {product.name}
                   </div>
-                  <div className="flex items-baseline justify-between mt-2">
-                    <div className="text-[16px] font-bold text-red-600">
+                  <div className="flex items-baseline justify-between mt-1">
+                    <div className="text-[13px] font-bold text-red-600">
                       {product.price.toLocaleString('ru-RU')} ₽
                     </div>
                     {product.reviews_count && product.reviews_count > 0 && product.rating ? (
-                      <div className="flex items-center gap-1 text-[10px] text-text-muted">
+                      <div className="flex items-center gap-0.5 text-[9px] text-text-muted">
                         <span className="text-red-500">★</span>
                         <span>{product.rating.toFixed(1)}</span>
                       </div>

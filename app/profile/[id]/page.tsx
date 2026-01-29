@@ -24,6 +24,10 @@ import ReviewForm from '@/components/ReviewForm'
 import ReviewReplyForm from '@/components/ReviewReplyForm'
 import RatingStars from '@/components/RatingStars'
 import StoriesCircle from '@/components/StoriesCircle'
+import SellerAddressPicker from '@/components/SellerAddressPicker'
+import MasterRadiusPicker from '@/components/MasterRadiusPicker'
+import StoresMap from '@/components/StoresMap'
+import StoreLocationMapModal from '@/components/StoreLocationMapModal'
 
 // Dynamic import для создания истории - загружается только при открытии
 const CreateStory = dynamic(() => import('@/components/CreateStory'), {
@@ -108,6 +112,9 @@ export default function ProfilePage() {
   
   // Seller fields
   const [storeAddress, setStoreAddress] = useState('')
+  const [showStoresMap, setShowStoresMap] = useState(false)
+  const [showStoreLocationMap, setShowStoreLocationMap] = useState(false)
+  const [showCatalogModal, setShowCatalogModal] = useState(false)
   const [workHours, setWorkHours] = useState('')
   const [deliveryAvailable, setDeliveryAvailable] = useState(false)
   const [deliveryZones, setDeliveryZones] = useState('')
@@ -908,8 +915,11 @@ export default function ProfilePage() {
       const updateData: any = {
         full_name: fullName,
         phone: phone || null,
-        city: city || null,
         description: description || null,
+      }
+      // Город только для не-продавцов: у продавца локация задаётся адресом магазина
+      if (profile.role !== 'seller') {
+        updateData.city = city || null
       }
 
       // Add master-specific fields
@@ -921,9 +931,10 @@ export default function ProfilePage() {
         updateData.work_schedule = workSchedule || null
       }
 
-      // Add seller-specific fields
+      // Add seller-specific fields (город для продавца не из формы — только адрес магазина)
       if (profile.role === 'seller') {
         updateData.store_address = storeAddress || null
+        // city для продавца не обновляем из формы — локация задаётся адресом магазина
         updateData.work_hours = workHours || null
         updateData.delivery_available = deliveryAvailable
         updateData.delivery_zones = deliveryZones || null
@@ -1206,7 +1217,8 @@ export default function ProfilePage() {
                       <p className="text-text-secondary mb-5 text-base leading-relaxed">{profile.description}</p>
                     )}
                     <div className="flex flex-wrap gap-4 text-sm text-text-secondary">
-                      {profile.city && (
+                      {/* У продавцов адрес только в блоке «Адрес магазина» ниже — здесь не дублируем */}
+                      {profile.role !== 'seller' && profile.city && (
                         <div className="flex items-center gap-1">
                           <FiMapPin size={14} />
                           <span>{profile.city}</span>
@@ -1638,25 +1650,79 @@ export default function ProfilePage() {
 
                 {/* Seller-specific information */}
                 {profile.role === 'seller' && (
-                  <div className="mt-10 pt-8 border-t border-border-color/40">
-                    {profile.product_categories && (
+                  <div className="mt-10 pt-8 px-4 sm:px-5 border-t border-border-color/40">
+                    {profile.store_address && (
                       <div className="mb-6">
-                        <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-graphite-secondary">
-                          <FiBriefcase size={16} />
-                          <span>Категории товаров</span>
+                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
+                          <FiMapPin size={16} className="text-brand-accent" />
+                          <span>Адрес магазина</span>
                         </div>
-                        <div className="flex flex-wrap gap-2.5">
-                          {profile.product_categories.split(',').map((category, index) => (
-                            <span
-                              key={index}
-                              className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
-                            >
-                              {category.trim()}
-                            </span>
-                          ))}
-                        </div>
+                        {profile.seller_lat != null && profile.seller_lng != null ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowStoreLocationMap(true)}
+                            className="text-sm text-text-secondary text-left underline decoration-brand-accent/60 underline-offset-2 hover:decoration-brand-accent hover:text-brand-accent transition-colors"
+                          >
+                            {profile.store_address}
+                          </button>
+                        ) : (
+                          <p className="text-sm text-text-secondary">{profile.store_address}</p>
+                        )}
                       </div>
                     )}
+                    <div className="mb-6">
+                      <button
+                        type="button"
+                        onClick={() => setShowCatalogModal(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-bg-secondary border border-border-light/60 rounded-lg text-sm font-medium text-graphite-secondary hover:bg-border-light/30 hover:border-border-light transition-colors"
+                      >
+                        <FiBriefcase size={16} className="text-brand-accent" />
+                        <span>Каталог</span>
+                        {profile.product_categories && (
+                          <span className="text-xs text-text-secondary">
+                            ({profile.product_categories.split(',').filter(Boolean).length})
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Модальное окно: категории и каталог товаров */}
+                {showCatalogModal && profile.role === 'seller' && (
+                  <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50" onClick={() => setShowCatalogModal(false)}>
+                    <div className="bg-bg-card rounded-xl shadow-xl max-w-md w-full max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-border-light/70">
+                        <h3 className="text-lg font-semibold text-graphite-secondary flex items-center gap-2">
+                          <FiBriefcase size={20} className="text-brand-accent" />
+                          Категории и каталог
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowCatalogModal(false)}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                          aria-label="Закрыть"
+                        >
+                          <FiX className="w-5 h-5" />
+                        </button>
+                      </div>
+                      <div className="p-4 overflow-y-auto flex-1">
+                        {profile.product_categories ? (
+                          <div className="flex flex-wrap gap-2.5">
+                            {profile.product_categories.split(',').map((category, index) => (
+                              <span
+                                key={index}
+                                className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
+                              >
+                                {category.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-text-secondary">Нет выбранных категорий</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1700,14 +1766,26 @@ export default function ProfilePage() {
 
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
                     <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight">Товары</h2>
-                    {isOwnProfile && (
-                      <Link
-                        href="/products/new"
-                        className="btn btn-primary text-sm w-full sm:w-auto"
-                      >
-                        Добавить товар
-                      </Link>
-                    )}
+                    <div className="flex gap-2">
+                      {isOwnProfile && profile.role === 'seller' && profile.seller_lat != null && profile.seller_lng != null && (
+                        <button
+                          type="button"
+                          onClick={() => setShowStoresMap(true)}
+                          className="btn btn-secondary text-sm w-full sm:w-auto flex items-center gap-2"
+                        >
+                          <FiMapPin size={16} />
+                          Показать на карте
+                        </button>
+                      )}
+                      {isOwnProfile && (
+                        <Link
+                          href="/products/new"
+                          className="btn btn-primary text-sm w-full sm:w-auto"
+                        >
+                          Добавить товар
+                        </Link>
+                      )}
+                    </div>
                   </div>
                   {products.length === 0 ? (
                     <div className="card text-center text-text-secondary py-10">
@@ -1782,7 +1860,7 @@ export default function ProfilePage() {
                               </h3>
                               <div className="flex items-center gap-1.5 text-xs text-text-secondary mt-auto pt-2 border-t border-border-light/40">
                                 <FiMapPin size={12} />
-                                <span>{profile.city || 'Город не указан'}</span>
+                                <span>{profile.store_address || profile.city || 'Адрес не указан'}</span>
                               </div>
                               <div className="text-xs text-text-secondary mt-1">
                                 {timeDisplay}
@@ -2162,17 +2240,20 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                <div className="w-full">
-                  <label className="block text-sm font-medium mb-2">
-                    Город
-                  </label>
-                  <input
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="input w-full"
-                  />
-                </div>
+                {/* Город только для не-продавцов: у продавца адрес магазина задаётся в блоке «Адрес магазина» ниже */}
+                {profile.role !== 'seller' && (
+                  <div className="w-full">
+                    <label className="block text-sm font-medium mb-2">
+                      Город
+                    </label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="input w-full"
+                    />
+                  </div>
+                )}
 
                 <div className="w-full">
                   <label className="block text-sm font-medium mb-2">
@@ -2237,6 +2318,10 @@ export default function ProfilePage() {
                       </div>
 
                       <div className="mt-4 w-full">
+                        <MasterRadiusPicker />
+                      </div>
+
+                      <div className="mt-4 w-full">
                         <label className="block text-sm font-medium mb-2">
                           График работы
                         </label>
@@ -2253,24 +2338,19 @@ export default function ProfilePage() {
                   </>
                 )}
 
-                {/* Seller-specific fields */}
+                {/* Seller-specific fields: точный адрес магазина вместо города — для карты и «Товары рядом» */}
                 {profile.role === 'seller' && (
                   <>
                     <div className="border-t border-gray-200 pt-6 mt-6">
                       <h3 className="text-base font-bold mb-4">Информация для продавца</h3>
-                      
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Адрес магазина/склада
-                        </label>
-                        <input
-                          type="text"
-                          value={storeAddress}
-                          onChange={(e) => setStoreAddress(e.target.value)}
-                          placeholder="Полный адрес вашего магазина или склада"
-                          className="input"
-                        />
-                      </div>
+                      <p className="text-sm text-text-secondary mb-4">
+                        Укажите точный адрес магазина или склада. По нему вас найдут на карте, а мастерам в радиусе будут показываться ваши товары в блоке «Товары рядом».
+                      </p>
+                      <SellerAddressPicker
+                        onSave={() => {
+                          fetchProfile()
+                        }}
+                      />
 
                       <div className="mt-4">
                         <label className="block text-sm font-medium mb-2">
@@ -2567,7 +2647,7 @@ export default function ProfilePage() {
                   </div>
                 )}
         </div>
-              </div>
+      </div>
 
       {/* Avatar Modal */}
       {showAvatarModal && (
@@ -2796,11 +2876,63 @@ export default function ProfilePage() {
                   </button>
                 </div>
               </form>
-          </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Auth Required Modal - показывается в условии if (!profile) выше */}
+      {/* Одна метка: адрес магазина на карте (клик по адресу) */}
+      {showStoreLocationMap && profile?.role === 'seller' && profile.seller_lat != null && profile.seller_lng != null && (
+        <StoreLocationMapModal
+          isOpen={true}
+          onClose={() => setShowStoreLocationMap(false)}
+          lat={profile.seller_lat}
+          lng={profile.seller_lng}
+          address={profile.store_address || profile.city || 'Адрес магазина'}
+          title="Адрес магазина"
+        />
+      )}
+
+      {/* Stores Map Modal */}
+      {showStoresMap && profile && currentUser && (
+        <div className="fixed inset-0 z-[9999] bg-bg-primary flex flex-col">
+          <div className="h-14 px-4 flex items-center justify-between border-b border-border-light/70 bg-bg-card">
+            <h2 className="text-lg font-semibold">Карта магазинов</h2>
+            <button
+              onClick={() => setShowStoresMap(false)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Закрыть"
+            >
+              <FiX className="w-6 h-6" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <StoresMap
+              masterLocation={
+                (() => {
+                  if (!currentUser || currentUser.role !== 'master') return null
+                  // После проверки currentUser гарантированно не null
+                  const lat = currentUser!.master_lat
+                  const lng = currentUser!.master_lng
+                  const radius = currentUser!.service_radius_km
+                  if (
+                    typeof lat === 'number' && 
+                    typeof lng === 'number' &&
+                    typeof radius === 'number'
+                  ) {
+                    return {
+                      lat,
+                      lng,
+                      radiusKm: radius,
+                    }
+                  }
+                  return null
+                })()
+              }
+              className="h-full"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

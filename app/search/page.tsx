@@ -155,7 +155,7 @@ function SearchContent() {
     setLoading(true)
 
     try {
-      await searchMasters(1, true)
+      await searchMastersViaApi(1, true)
     } catch (error) {
       console.error('Search error:', error)
     } finally {
@@ -272,7 +272,8 @@ function SearchContent() {
     }
   }
 
-  const searchMasters = async (pageNum: number = 1, reset: boolean = false) => {
+  // Единый API поиска мастеров (геокод + зона обслуживания + спец/услуги на сервере)
+  const searchMastersViaApi = async (pageNum: number = 1, reset: boolean = false) => {
     try {
       if (reset) {
         setMasters([])
@@ -282,129 +283,27 @@ function SearchContent() {
         setLoadingMoreMasters(true)
       }
 
-      const from = (pageNum - 1) * ITEMS_PER_PAGE
-      const to = from + ITEMS_PER_PAGE - 1
+      const params = new URLSearchParams()
+      if (query.trim()) params.set('q', query.trim())
+      if (cityFilter.trim()) params.set('city', cityFilter.trim())
+      if (selectedSpec) params.set('spec', selectedSpec)
+      if (selectedService) params.set('service', selectedService)
+      params.set('page', String(pageNum))
 
-      let profileIds: string[] | null = null
+      const res = await fetch(`/api/search/masters?${params.toString()}`)
+      if (!res.ok) throw new Error('Ошибка поиска')
+      const { masters: newMasters, hasMore } = await res.json()
 
-      // Если есть текст запроса, ищем по специализациям и услугам
-      if (query.trim()) {
-        const searchQuery = query.trim()
-        
-        // Ищем специализации по частичному совпадению
-        const { data: specData } = await supabase
-          .from('specializations')
-          .select('id')
-          .ilike('name', `%${searchQuery}%`)
-        
-        // Ищем услуги по частичному совпадению
-        const { data: serviceData } = await supabase
-          .from('services')
-          .select('id')
-          .ilike('name', `%${searchQuery}%`)
-
-        const specIds = (specData || []).map(s => s.id)
-        const serviceIds = (serviceData || []).map(s => s.id)
-
-        // Получаем profile_id из найденных специализаций
-        let profileIdsFromSpecs: string[] = []
-        if (specIds.length > 0) {
-          const { data: profileSpecsData } = await supabase
-            .from('profile_specializations')
-            .select('profile_id')
-            .in('specialization_id', specIds)
-          profileIdsFromSpecs = (profileSpecsData || []).map(p => p.profile_id as string)
-        }
-
-        // Получаем profile_id из найденных услуг
-        let profileIdsFromServices: string[] = []
-        if (serviceIds.length > 0) {
-          const { data: profileServicesData } = await supabase
-            .from('profile_services')
-            .select('profile_id')
-            .in('service_id', serviceIds)
-          profileIdsFromServices = (profileServicesData || []).map(p => p.profile_id as string)
-        }
-
-        // Объединяем все найденные profile_id
-        const allProfileIds = Array.from(new Set([...profileIdsFromSpecs, ...profileIdsFromServices]))
-        
-        if (allProfileIds.length > 0) {
-          profileIds = allProfileIds
-        } else {
-          // Если не нашли по специализациям/услугам, ищем по имени и описанию
-          profileIds = null // Будем искать по имени и описанию ниже
-        }
-      }
-
-      // Если выбрана специализация или услуга, получаем profile_id
-      const filteredIds = await fetchProfileIdsByFilters()
-      
-      // Объединяем результаты поиска и фильтров
-      let finalProfileIds: string[] | null = null
-      if (profileIds && filteredIds) {
-        // Пересечение: мастера должны соответствовать и поиску, и фильтрам
-        finalProfileIds = profileIds.filter(id => filteredIds.includes(id))
-      } else if (profileIds) {
-        finalProfileIds = profileIds
-      } else if (filteredIds) {
-        finalProfileIds = filteredIds
-      }
-
-      if (finalProfileIds && finalProfileIds.length === 0) {
-        setMasters([])
-        setHasMoreMasters(false)
-        return
-      }
-
-      let queryBuilder = supabase
-        .from('profiles')
-        .select(`
-          *,
-          profile_specializations (
-            specialization:specializations (id, name, slug)
-          ),
-          profile_services (
-            service:services (id, name, slug, specialization_id)
-          ),
-          master_rating,
-          master_reviews_count
-        `, { count: 'exact' })
-        .eq('role', 'master')
-        .range(from, to)
-
-      // Если есть текст запроса и не нашли по специализациям/услугам, ищем по имени и описанию
-      if (query.trim() && !profileIds) {
-        queryBuilder = queryBuilder.or(`full_name.ilike.%${query.trim()}%,description.ilike.%${query.trim()}%`)
-      }
-
-      // Фильтр по городу: применяется только если пользователь явно выбрал его в фильтрах
-      if (cityFilter && cityFilter.trim()) {
-        queryBuilder = queryBuilder.ilike('city', `%${cityFilter.trim()}%`)
-      }
-
-      // Применяем фильтр по profile_id (из поиска или фильтров)
-      if (finalProfileIds) {
-        queryBuilder = queryBuilder.in('id', finalProfileIds)
-      }
-
-      const { data, error, count } = await queryBuilder
-
-      if (error) throw error
-      const newMasters = (data as any[]) || []
-      
       if (reset) {
-        setMasters(newMasters)
+        setMasters(newMasters || [])
       } else {
-        setMasters(prev => [...prev, ...newMasters])
+        setMasters((prev) => [...prev, ...(newMasters || [])])
+        setMastersPage(pageNum)
       }
-
-      setHasMoreMasters(newMasters.length === ITEMS_PER_PAGE && (count || 0) > pageNum * ITEMS_PER_PAGE)
+      setHasMoreMasters(!!hasMore)
     } catch (error) {
       console.error('Error searching masters:', error)
-      if (reset) {
-        setMasters([])
-      }
+      if (reset) setMasters([])
     } finally {
       setLoadingMoreMasters(false)
     }
@@ -414,7 +313,7 @@ function SearchContent() {
     if (!loadingMoreMasters && hasMoreMasters) {
       const nextPage = mastersPage + 1
       setMastersPage(nextPage)
-      searchMasters(nextPage, false)
+      searchMastersViaApi(nextPage, false)
     }
   }
 

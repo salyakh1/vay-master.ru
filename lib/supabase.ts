@@ -54,6 +54,8 @@ export interface User {
   service_radius_km?: number
   // Seller fields
   store_address?: string
+  seller_lat?: number
+  seller_lng?: number
   work_hours?: string
   delivery_available?: boolean
   delivery_zones?: string

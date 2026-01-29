@@ -132,7 +132,7 @@ export default function ProductPage() {
         .from('products')
         .select(`
           *,
-          seller:profiles(id, full_name, avatar_url, city, phone, description),
+          seller:profiles(id, full_name, avatar_url, city, store_address, phone, description),
           category_ref:product_categories(id, name, section, slug),
           subcategory_ref:product_subcategories(id, name, slug, category_id)
         `)
@@ -413,8 +413,8 @@ export default function ProductPage() {
                       <div className="font-semibold text-lg">
                         {seller.full_name}
                       </div>
-                      {seller.city && (
-                        <div className="text-sm text-gray-500">{seller.city}</div>
+                      {(seller.store_address || seller.city) && (
+                        <div className="text-sm text-gray-500">{seller.store_address || seller.city}</div>
                       )}
                     </div>
                   </div>

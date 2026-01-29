@@ -437,7 +437,7 @@ export default function ProblemResultPage() {
                         )}
                         {product.seller && (
                           <div className="text-xs text-gray-500">
-                            {product.seller.city || 'Город не указан'}
+                            {product.seller.store_address || product.seller.city || 'Адрес не указан'}
                           </div>
                         )}
                       </div>

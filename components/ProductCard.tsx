@@ -65,7 +65,7 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
         )}
 
         <div className="mt-auto text-[12px] text-[#8a8a8a] leading-snug pt-2">
-          <div className="truncate">{seller?.city || '—'}</div>
+          <div className="truncate">{seller?.store_address || seller?.city || '—'}</div>
           <div className="truncate">{seller?.full_name || 'Продавец'}</div>
         </div>
       </div>

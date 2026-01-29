@@ -26,6 +26,8 @@ const ProUpgradeModal = dynamic(() => import('@/components/ProUpgradeModal'), {
   ssr: false,
 })
 
+const StoreLocationMapModal = dynamic(() => import('@/components/StoreLocationMapModal'), { ssr: false })
+
 const statusLabels: Record<string, string> = {
   open: 'Открыт',
   new: 'Новый',
@@ -60,6 +62,7 @@ export default function OrderPage() {
   const [showProModal, setShowProModal] = useState(false)
   const [proCountdownText, setProCountdownText] = useState<string | undefined>(undefined)
   const [disableMasterRestrictions, setDisableMasterRestrictions] = useState(false)
+  const [showOrderMapModal, setShowOrderMapModal] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -530,7 +533,7 @@ export default function OrderPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => router.push(`/orders?view=map&focus=${order.id}`)}
+                        onClick={() => setShowOrderMapModal(true)}
                         className="inline-flex items-center gap-2 text-sm font-semibold text-brand-accent hover:underline"
                         title="Открыть этот заказ на карте"
                       >
@@ -835,6 +838,17 @@ export default function OrderPage() {
         countdownText={proCountdownText}
         ctaText="Купить PRO мастер"
       />
+
+      {showOrderMapModal && order?.lat != null && order?.lng != null && (
+        <StoreLocationMapModal
+          isOpen={true}
+          onClose={() => setShowOrderMapModal(false)}
+          lat={order.lat}
+          lng={order.lng}
+          address={(order as any).geocode_label || `Координаты: ${order.lat.toFixed(6)}, ${order.lng.toFixed(6)}`}
+          title="Место выполнения работ"
+        />
+      )}
     </div>
   )
 }

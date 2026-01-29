@@ -42,6 +42,8 @@ import {
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import StoriesCircle from '@/components/StoriesCircle'
 import RecommendationsCarousel from '@/components/RecommendationsCarousel'
+import NearbyProductsCarousel from '@/components/NearbyProductsCarousel'
+import StoresMap from '@/components/StoresMap'
 import { Story } from '@/lib/supabase'
 import { getProductCategoriesForSpecializations } from '@/lib/specialization-product-mapping'
 
@@ -143,6 +145,7 @@ function ProductsContent() {
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
   const [cityFilter, setCityFilter] = useState('')
+  const [cityFilterInput, setCityFilterInput] = useState('')
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([])
   const [productSubcategories, setProductSubcategories] = useState<ProductSubcategory[]>([])
   const [showFilters, setShowFilters] = useState(false)
@@ -150,6 +153,51 @@ function ProductsContent() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [stories, setStories] = useState<Story[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
+  const [showStoresMap, setShowStoresMap] = useState(false)
+  // Локация для блока «Товары рядом» у пользователей без зоны (не мастер или мастер без радиуса)
+  const [nearbyViewLocation, setNearbyViewLocation] = useState<{ lat: number; lng: number } | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const s = localStorage.getItem('vay_nearby_view')
+      if (!s) return null
+      const { lat, lng } = JSON.parse(s) as { lat?: number; lng?: number }
+      if (typeof lat === 'number' && typeof lng === 'number') return { lat, lng }
+    } catch {}
+    return null
+  })
+  const [nearbyGeoloading, setNearbyGeoloading] = useState(false)
+  const DEFAULT_NEARBY_RADIUS_KM = 10
+
+  const hasMasterZone =
+    user?.role === 'master' &&
+    user.master_lat != null &&
+    user.master_lng != null &&
+    user.service_radius_km != null
+
+  const nearbyCenter = hasMasterZone
+    ? { lat: user!.master_lat!, lng: user!.master_lng!, radiusKm: user!.service_radius_km! }
+    : nearbyViewLocation
+      ? { lat: nearbyViewLocation.lat, lng: nearbyViewLocation.lng, radiusKm: DEFAULT_NEARBY_RADIUS_KM }
+      : null
+
+  const requestNearbyGeolocation = () => {
+    if (!navigator.geolocation) return
+    setNearbyGeoloading(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        setNearbyViewLocation({ lat, lng })
+        try {
+          localStorage.setItem('vay_nearby_view', JSON.stringify({ lat, lng }))
+        } catch {}
+        setNearbyGeoloading(false)
+      },
+      () => setNearbyGeoloading(false),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+    )
+  }
   
   const ITEMS_PER_PAGE = 20
   const GRID_COLUMN_COUNT = 2
@@ -342,7 +390,18 @@ function ProductsContent() {
     return rows
   }, [products, user, cityOrders])
 
-  // Загружаем товары при изменении фильтров
+  // Город применяется только при закрытии модалки — во время ввода запросы не уходят
+  const applyCityAndCloseFilters = () => {
+    setCityFilter(cityFilterInput)
+    setShowFilters(false)
+  }
+
+  // При открытии модалки синхронизируем инпут с текущим cityFilter
+  useEffect(() => {
+    if (showFilters) setCityFilterInput(cityFilter)
+  }, [showFilters]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Загружаем товары при изменении фильтров (город меняется только после закрытия модалки)
   useEffect(() => {
     setPage(1)
     setProducts([])
@@ -413,6 +472,25 @@ function ProductsContent() {
       const from = (pageNum - 1) * ITEMS_PER_PAGE
       const to = from + ITEMS_PER_PAGE - 1
 
+      // Фильтр по городу в БД: сначала id продавцов по city/store_address
+      let sellerIds: string[] | null = null
+      if (cityFilter && cityFilter.trim()) {
+        const q = cityFilter.trim()
+        const { data: sellerRows } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'seller')
+          .or(`city.ilike.%${q}%,store_address.ilike.%${q}%`)
+        sellerIds = (sellerRows || []).map((r: { id: string }) => r.id)
+        if (sellerIds.length === 0) {
+          if (reset) setProducts([])
+          setHasMore(false)
+          setLoading(false)
+          setLoadingMore(false)
+          return
+        }
+      }
+
       let query = supabase
         .from('products')
         .select(`
@@ -426,6 +504,10 @@ function ProductsContent() {
         .eq('in_stock', true)
         .order('created_at', { ascending: false })
         .range(from, to)
+
+      if (sellerIds && sellerIds.length > 0) {
+        query = query.in('seller_id', sellerIds)
+      }
 
       if (categoryId) {
         query = query.eq('category_id', categoryId)
@@ -443,24 +525,15 @@ function ProductsContent() {
 
       if (error) throw error
 
-      // Filter by city on client side (since we can't filter joined tables directly in Supabase)
-      let filteredData = (data || []) as Product[]
-      if (cityFilter && cityFilter.trim()) {
-        filteredData = filteredData.filter((product: any) => {
-          const seller = product.seller
-          return seller?.city && seller.city.toLowerCase().includes(cityFilter.toLowerCase())
-        })
-      }
+      const list = (data || []) as Product[]
 
       if (reset) {
-        setProducts(filteredData)
+        setProducts(list)
       } else {
-        setProducts(prev => [...prev, ...filteredData])
+        setProducts(prev => [...prev, ...list])
       }
 
-      // Проверяем, есть ли ещё данные
-      const totalFetched = reset ? filteredData.length : products.length + filteredData.length
-      setHasMore(totalFetched < (count || 0) && filteredData.length === ITEMS_PER_PAGE)
+      setHasMore(list.length === ITEMS_PER_PAGE && (count || 0) > pageNum * ITEMS_PER_PAGE)
     } catch (error) {
       console.error('Error fetching products:', error)
     } finally {
@@ -516,10 +589,8 @@ function ProductsContent() {
             className="w-full input pr-10 h-10 text-sm"
           />
           <button
-            onClick={() => {
-              setFilterStep('categories')
-              setShowFilters(true)
-            }}
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
             className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors ${
               showFilters ? 'bg-brand-accent text-white' : 'text-text-secondary hover:text-graphite-secondary hover:bg-bg-secondary'
             }`}
@@ -529,7 +600,7 @@ function ProductsContent() {
           </button>
         </div>
 
-        {/* Filters - Fullscreen modal */}
+        {/* Полноэкранная модалка фильтров: город + категория/каталог */}
         {showFilters && (
           <div 
             className="fixed inset-0 z-50 bg-black/40"
@@ -555,6 +626,7 @@ function ProductsContent() {
                     setCategoryId('')
                     setSubcategoryId('')
                     setCityFilter('')
+                    setCityFilterInput('')
                     setFilterStep('categories')
                   }}
                   className="text-xs text-text-secondary hover:text-graphite-secondary font-medium"
@@ -564,16 +636,20 @@ function ProductsContent() {
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 py-4">
+                {/* Город продавца — внутри модалки */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-graphite-secondary mb-2">Город продавца</label>
+                  <input
+                    type="text"
+                    value={cityFilterInput}
+                    onChange={(e) => setCityFilterInput(e.target.value)}
+                    placeholder="Введите город"
+                    className="input w-full h-10 text-sm"
+                  />
+                </div>
+
                 {filterStep === 'categories' && (
-                  <>
-                    <input
-                      type="text"
-                      value={cityFilter}
-                      onChange={(e) => setCityFilter(e.target.value)}
-                      placeholder="Город продавца"
-                      className="input w-full h-10 text-sm mb-4"
-                    />
-                    <div className="space-y-4">
+                  <div className="space-y-4">
                       {PRODUCT_CATEGORY_SECTIONS.map((section) => {
                         const categories = productCategories.filter((cat) => cat.section === section.id)
                         if (categories.length === 0) return null
@@ -616,7 +692,6 @@ function ProductsContent() {
                         )
                       })}
                     </div>
-                  </>
                 )}
 
                 {filterStep === 'subcategories' && (
@@ -655,7 +730,7 @@ function ProductsContent() {
                             key={sub.id}
                             onClick={() => {
                               setSubcategoryId(sub.id)
-                              setShowFilters(false)
+                              applyCityAndCloseFilters()
                             }}
                             className={`border rounded-xl p-3 text-left text-sm transition-all ${
                               subcategoryId === sub.id
@@ -684,9 +759,7 @@ function ProductsContent() {
                   </button>
                 ) : filterStep === 'subcategories' ? (
                   <button
-                    onClick={() => {
-                      setShowFilters(false)
-                    }}
+                    onClick={applyCityAndCloseFilters}
                     className="btn btn-primary w-full h-12 text-base font-semibold"
                     disabled={!categoryId}
                   >
@@ -694,10 +767,10 @@ function ProductsContent() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => setShowFilters(false)}
-                    className="btn btn-secondary w-full h-12 text-base font-semibold"
+                    onClick={applyCityAndCloseFilters}
+                    className="btn btn-primary w-full h-12 text-base font-semibold"
                   >
-                    Закрыть
+                    Поиск
                   </button>
                 )}
               </div>
@@ -718,6 +791,31 @@ function ProductsContent() {
             />
           </div>
         ) : null}
+
+        {/* Товары рядом: для всех — зона мастера или геолокация пользователя */}
+        {nearbyCenter ? (
+          <NearbyProductsCarousel
+            masterLat={nearbyCenter.lat}
+            masterLng={nearbyCenter.lng}
+            radiusKm={10}
+            limit={12}
+            onShowMap={() => setShowStoresMap(true)}
+          />
+        ) : (
+          <div className="mb-6 card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <p className="text-text-secondary text-sm sm:text-base">
+              Товары и магазины рядом с вами — укажите местоположение, чтобы видеть предложения в радиусе.
+            </p>
+            <button
+              type="button"
+              onClick={requestNearbyGeolocation}
+              disabled={nearbyGeoloading}
+              className="btn btn-primary whitespace-nowrap"
+            >
+              {nearbyGeoloading ? 'Определяем…' : 'Использовать моё местоположение'}
+            </button>
+          </div>
+        )}
 
         <RecommendationsCarousel
           title={
@@ -810,6 +908,36 @@ function ProductsContent() {
           </>
         )}
       </div>
+
+      {/* Stores Map Modal */}
+      {showStoresMap && (
+        <div className="fixed inset-0 z-[9999] bg-bg-primary flex flex-col">
+          <div className="h-14 px-4 flex items-center justify-between border-b border-border-light/70 bg-bg-card">
+            <h2 className="text-lg font-semibold">Карта магазинов</h2>
+            <button
+              onClick={() => setShowStoresMap(false)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Закрыть"
+            >
+              <FiX className="w-6 h-6" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <StoresMap
+              masterLocation={
+                nearbyCenter
+                  ? {
+                      lat: nearbyCenter.lat,
+                      lng: nearbyCenter.lng,
+                      radiusKm: 10,
+                    }
+                  : null
+              }
+              className="h-full"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Auth Required Modal */}
       <AuthRequiredModal 

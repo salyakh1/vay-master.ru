@@ -7,7 +7,6 @@ import { supabase, Order } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import OrderCard from '@/components/OrderCard'
 import AdBannerSlider from '@/components/AdBannerSlider'
-import OrdersMap from '@/components/OrdersMap'
 import Link from 'next/link'
 import { FiSearch, FiPlus, FiList, FiGrid, FiMap } from 'react-icons/fi'
 import { getMasterAccess } from '@/lib/masterAccess'
@@ -55,8 +54,7 @@ export default function OrdersPage() {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
-  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'map'>('list')
-  const [focusOrderId, setFocusOrderId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [disableMasterRestrictions, setDisableMasterRestrictions] = useState(false)
   const [filterMode, setFilterMode] = useState<'all' | 'my_specializations'>('all')
   const [mySpecializations, setMySpecializations] = useState<string[]>([])
@@ -141,17 +139,6 @@ export default function OrdersPage() {
     }
   }, [user, searchQuery, selectedCategory, selectedStatus, selectedCity, filterMode, mySpecializations])
 
-  useEffect(() => {
-    const view = searchParams.get('view')
-    const focus = searchParams.get('focus')
-    if (view === 'map') {
-      setViewMode('map')
-      setFocusOrderId(focus || null)
-    } else {
-      setFocusOrderId(null)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
 
   const fetchOrders = async (pageNum: number = 1, reset: boolean = false) => {
     try {
@@ -230,7 +217,7 @@ export default function OrdersPage() {
   }
 
   const loadMore = () => {
-    if (!loadingMore && hasMore && viewMode !== 'map') {
+    if (!loadingMore && hasMore) {
       const nextPage = page + 1
       setPage(nextPage)
       fetchOrders(nextPage, false)
@@ -417,17 +404,6 @@ export default function OrdersPage() {
               <FiGrid size={18} />
               Сетка
             </button>
-            <button
-              onClick={() => setViewMode('map')}
-              className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center gap-2 ${
-                viewMode === 'map'
-                  ? 'bg-brand-accent text-white'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
-              }`}
-            >
-              <FiMap size={18} />
-              Карта
-            </button>
           </div>
 
           {/* Orders List */}
@@ -508,26 +484,6 @@ export default function OrdersPage() {
             </>
           )}
 
-          {/* Orders Map */}
-          {viewMode === 'map' && (
-            <>
-              {orders.length === 0 ? (
-                <div className="card text-center py-12">
-                  <p className="text-base font-medium text-graphite-secondary mb-3">
-                    Заказы не найдены
-                  </p>
-                  <p className="text-sm text-text-secondary mb-6">
-                    Попробуйте изменить фильтры или создайте новый заказ
-                  </p>
-                  <Link href="/orders/new" className="btn btn-primary">
-                    Создать заказ
-                  </Link>
-                </div>
-              ) : (
-                <OrdersMap orders={orders} focusOrderId={focusOrderId || undefined} />
-              )}
-            </>
-          )}
         </div>
       </div>
     </div>
