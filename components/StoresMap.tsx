@@ -158,7 +158,7 @@ export default function StoresMap({ masterLocation, onSellerClick, className = '
 
       if (error) throw error
 
-      setSellerProducts((prev) => ({ ...prev, [sellerId]: (data || []) as Product[] }))
+      setSellerProducts((prev) => ({ ...prev, [sellerId]: (data || []) as unknown as Product[] }))
     } catch (error) {
       console.error('Error fetching seller products:', error)
     } finally {
