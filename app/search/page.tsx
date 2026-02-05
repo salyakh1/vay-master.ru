@@ -188,17 +188,19 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     const run = () => {
       if (cancelled) return
       setLoadingMasterCategories(true)
-      supabase
-        .from('profile_subcategories')
-        .select('subcategory:subcategories(id, slug, category:categories(id, slug))')
-        .eq('profile_id', user.id)
+      void Promise.resolve(
+        supabase
+          .from('profile_subcategories')
+          .select('subcategory:subcategories(id, slug, category:categories(id, slug))')
+          .eq('profile_id', user.id)
+      )
         .then(({ data, error }) => {
           if (cancelled) return
           if (!error && data) {
             const slugs = (data as any[])
               .map((item: any) => item.subcategory?.category?.slug)
               .filter(Boolean) as string[]
-            setMasterCategorySlugs([...new Set(slugs)])
+            setMasterCategorySlugs(Array.from(new Set(slugs)))
           } else {
             setMasterCategorySlugs([])
           }
@@ -494,7 +496,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
           .select('profile_id')
           .in('subcategory_id', subIds)
         if (error) throw error
-        return [...new Set((data || []).map((row) => row.profile_id as string))]
+        return Array.from(new Set((data || []).map((row) => row.profile_id as string)))
       }
       return null
     } catch (error) {

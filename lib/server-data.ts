@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 /** Серверный клиент для RSC (без кэша сессии). */
 function getServerSupabase() {
-  return createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } })
+  return createClient(supabaseUrl!, supabaseAnonKey!, { auth: { persistSession: false } })
 }
 
 /** Баннеры для первой отрисовки (SSR). Логика как в /api/banners. */

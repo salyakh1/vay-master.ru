@@ -91,9 +91,8 @@ export default function OrdersPage() {
             const names = (data || [])
               .map((item: any) => item.subcategory?.category?.name)
               .filter((name: string | undefined): name is string => !!name)
-            setMySpecializations([...new Set(names)])
-          })
-          .catch(() => setMySpecializations([]))
+            setMySpecializations(Array.from(new Set(names)))
+          }, () => setMySpecializations([]))
 
         fetch('/api/notifications/count')
           .then((r) => r.json())
