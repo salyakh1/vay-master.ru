@@ -426,27 +426,65 @@ export const SPECIALIZATION_TO_PRODUCT_CATEGORIES: Record<string, {
   },
 }
 
+/** Маппинг категорий мастеров (верхний уровень) на категории товаров */
+export const CATEGORY_SLUG_TO_PRODUCT_CATEGORIES: Record<string, { categories: string[]; subcategories?: string[] }> = {
+  stroika: { categories: ['masonry-blocks-jbi', 'building-mixes', 'bulk-materials', 'lumber-panels', 'roofing-gutters', 'fasteners-hardware', 'power-tools', 'hand-tools'] },
+  'otdelka-remont': { categories: ['building-mixes', 'finishing-materials', 'tile-stone', 'flooring', 'plumbing-water-supply', 'electrical-lighting', 'power-tools', 'hand-tools'] },
+  autoservice: { categories: ['auto-parts-engine-gearbox', 'auto-parts-suspension-brakes', 'auto-electronics', 'auto-chemicals-detailing', 'power-tools', 'hand-tools'] },
+  gruzoperevozki: { categories: [] },
+  spectehnika: { categories: ['power-tools', 'hand-tools'] },
+  blagoustrojstvo: { categories: ['landscaping-outdoor', 'bulk-materials', 'fences-gates', 'hand-tools'] },
+  'hudozhestvennaya-kovka': { categories: ['metalworks-welding-materials', 'power-tools', 'hand-tools'] },
+  'prom-alpinizm': { categories: ['power-tools', 'hand-tools', 'fasteners-hardware'] },
+  'otkachka-kanalizacii': { categories: ['sewer-septic', 'plumbing-water-supply'] },
+  vodosnabzhenie: { categories: ['plumbing-water-supply', 'electrical-lighting', 'power-tools'] },
+  klining: { categories: [] },
+  'master-na-chas': { categories: ['power-tools', 'hand-tools', 'fasteners-hardware'] },
+  'ohrana-bezopasnost': { categories: ['low-voltage-smart-home', 'electrical-lighting'] },
+  'vyvoz-musora': { categories: [] },
+  gruzchiki: { categories: [] },
+  raznorabochye: { categories: ['power-tools', 'hand-tools', 'building-mixes', 'bulk-materials'] },
+  avtopodbor: { categories: [] },
+  avtoperevozki: { categories: [] },
+  'remont-tehniki': { categories: ['power-tools', 'hand-tools'] },
+  'dizajn-proektirovanie': { categories: [] },
+  specoborudovanie: { categories: ['power-tools', 'metalworks-welding-materials', 'consumables-accessories', 'building-mixes', 'hand-tools'] },
+}
+
+export function getProductCategoriesForCategorySlugs(
+  categorySlugs: string[]
+): { categorySlugs: string[]; subcategorySlugs: string[] } {
+  const categorySlugsSet = new Set<string>()
+  const subcategorySlugsSet = new Set<string>()
+  for (const slug of categorySlugs) {
+    const mapping = CATEGORY_SLUG_TO_PRODUCT_CATEGORIES[slug]
+    if (mapping) {
+      mapping.categories.forEach((c) => categorySlugsSet.add(c))
+      if (mapping.subcategories) mapping.subcategories.forEach((s) => subcategorySlugsSet.add(s))
+    }
+  }
+  return { categorySlugs: Array.from(categorySlugsSet), subcategorySlugs: Array.from(subcategorySlugsSet) }
+}
+
 /**
- * Получить категории и подкатегории товаров для специализаций мастера
- * @param specializationSlugs - массив slug специализаций мастера
+ * Получить категории и подкатегории товаров для специализаций мастера (по slug специализаций или категорий)
+ * @param specializationSlugs - массив slug специализаций или категорий мастера
  * @returns объект с массивами categorySlugs и subcategorySlugs
  */
 export function getProductCategoriesForSpecializations(
   specializationSlugs: string[]
 ): { categorySlugs: string[]; subcategorySlugs: string[] } {
+  const byCategory = getProductCategoriesForCategorySlugs(specializationSlugs)
+  if (byCategory.categorySlugs.length > 0 || byCategory.subcategorySlugs.length > 0) return byCategory
   const categorySlugsSet = new Set<string>()
   const subcategorySlugsSet = new Set<string>()
-
   for (const slug of specializationSlugs) {
     const mapping = SPECIALIZATION_TO_PRODUCT_CATEGORIES[slug]
     if (mapping) {
       mapping.categories.forEach((cat) => categorySlugsSet.add(cat))
-      if (mapping.subcategories) {
-        mapping.subcategories.forEach((subcat) => subcategorySlugsSet.add(subcat))
-      }
+      if (mapping.subcategories) mapping.subcategories.forEach((subcat) => subcategorySlugsSet.add(subcat))
     }
   }
-
   return {
     categorySlugs: Array.from(categorySlugsSet),
     subcategorySlugs: Array.from(subcategorySlugsSet),

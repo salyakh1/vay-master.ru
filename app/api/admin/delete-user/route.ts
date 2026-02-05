@@ -124,8 +124,8 @@ export async function POST(request: NextRequest) {
     await supabaseAdmin.from('follows').delete().eq('follower_id', userId)
     await supabaseAdmin.from('follows').delete().eq('following_id', userId)
 
-    // Удаляем специализации и услуги профиля
-    await supabaseAdmin.from('profile_specializations').delete().eq('profile_id', userId)
+    // Удаляем подкатегории, услуги профиля (категории → подкатегории → услуги)
+    await supabaseAdmin.from('profile_subcategories').delete().eq('profile_id', userId)
     await supabaseAdmin.from('profile_services').delete().eq('profile_id', userId)
 
     // Удаляем admin roles если есть
@@ -134,8 +134,8 @@ export async function POST(request: NextRequest) {
     // Удаляем user restrictions если есть
     await supabaseAdmin.from('user_restrictions').delete().eq('user_id', userId)
 
-    // Удаляем жалобы если есть
-    await supabaseAdmin.from('complaints').delete().eq('reporter_id', userId)
+    // Удаляем жалобы если есть (в БД колонка complainer_id, не reporter_id)
+    await supabaseAdmin.from('complaints').delete().eq('complainer_id', userId)
     await supabaseAdmin.from('complaints').delete().eq('reported_user_id', userId)
 
     // Удаляем профиль

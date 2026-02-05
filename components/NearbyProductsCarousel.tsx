@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+'use client'
+
+import { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiShoppingBag, FiMapPin } from 'react-icons/fi'
@@ -21,6 +23,8 @@ export default function NearbyProductsCarousel({
 }: NearbyProductsCarouselProps) {
   const [items, setItems] = useState<(Product & { distance_km?: number })[]>([])
   const [loading, setLoading] = useState(false)
+  const [shouldLoad, setShouldLoad] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const url = useMemo(() => {
     const params = new URLSearchParams()
@@ -108,6 +112,7 @@ export default function NearbyProductsCarousel({
                         fill
                         className="object-cover group-hover:scale-110 transition-transform duration-300"
                         sizes="112px"
+                        loading="lazy"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </>

@@ -27,12 +27,16 @@ interface MasterWithStats {
   portfolio_count?: number
 }
 
+const PAGE_SIZE = 20
+
 export default function AdminMastersPage() {
   const { user: currentUser } = useAuth()
   const [masters, setMasters] = useState<MasterWithStats[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [verificationFilter, setVerificationFilter] = useState<string>('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [selectedMaster, setSelectedMaster] = useState<MasterWithStats | null>(null)
 
   useEffect(() => {
@@ -40,85 +44,83 @@ export default function AdminMastersPage() {
     if (currentUser) {
       logAdminAction(currentUser.id, 'view_masters', 'masters')
     }
-  }, [currentUser, verificationFilter])
+  }, [currentUser, verificationFilter, page])
 
-  const fetchMasters = async () => {
+  const fetchMasters = async (pageOverride?: number) => {
+    const currentPage = pageOverride ?? page
     try {
       setLoading(true)
-      // Fetch masters with specializations and services
-      let query = supabase
+      let countQuery = supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'master')
+      let dataQuery = supabase
         .from('profiles')
         .select(`
           *,
-          profile_specializations (
-            specialization:specializations (id, name, slug)
+          profile_subcategories (
+            subcategory:subcategories (id, name, slug, category:categories (id, name, slug))
           ),
           profile_services (
-            service:services (id, name, slug, specialization_id)
+            service:services (id, name, slug, subcategory_id)
           )
         `)
         .eq('role', 'master')
         .order('created_at', { ascending: false })
-        .limit(100)
+        .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1)
 
       if (searchQuery) {
-        query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,city.ilike.%${searchQuery}%`)
+        const or = `full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,city.ilike.%${searchQuery}%`
+        countQuery = countQuery.or(or)
+        dataQuery = dataQuery.or(or)
       }
 
-      const { data: mastersData, error: mastersError } = await query
+      const [{ count }, { data: mastersData, error: mastersError }] = await Promise.all([
+        countQuery,
+        dataQuery,
+      ])
       if (mastersError) throw mastersError
+      setTotalCount(count ?? 0)
 
-      // Fetch verification status for each master
       const masterIds = (mastersData || []).map((m: any) => m.id)
-      const { data: verificationsData } = await supabase
-        .from('master_verification')
-        .select('*')
-        .in('master_id', masterIds)
+      if (masterIds.length === 0) {
+        setMasters([])
+        return
+      }
 
-      // Fetch order responses stats
-      const { data: responsesData } = await supabase
-        .from('order_responses')
-        .select('master_id, status')
-        .in('master_id', masterIds)
+      const [verificationsData, responsesData, portfolioData] = await Promise.all([
+        supabase.from('master_verification').select('*').in('master_id', masterIds),
+        supabase.from('order_responses').select('master_id, status').in('master_id', masterIds),
+        supabase.from('portfolio_items').select('master_id').in('master_id', masterIds),
+      ])
 
-      // Fetch portfolio counts
-      const { data: portfolioData } = await supabase
-        .from('portfolio_items')
-        .select('master_id')
-        .in('master_id', masterIds)
-
-      // Combine data
       const mastersWithStats = (mastersData || []).map((master: any) => {
-        const verification = verificationsData?.find((v) => v.master_id === master.id)
-        const responses = responsesData?.filter((r) => r.master_id === master.id) || []
-        const portfolioCount = portfolioData?.filter((p) => p.master_id === master.id).length || 0
-
-        const specializations = (master.profile_specializations || [])
-          .map((ps: any) => ps.specialization)
+        const verification = verificationsData.data?.find((v: any) => v.master_id === master.id)
+        const responses = responsesData.data?.filter((r: any) => r.master_id === master.id) || []
+        const portfolioCount = portfolioData.data?.filter((p: any) => p.master_id === master.id).length || 0
+        const specializations = (master.profile_subcategories || [])
+          .map((ps: any) => ps.subcategory)
           .filter(Boolean)
         const services = (master.profile_services || [])
           .map((ps: any) => ps.service)
           .filter(Boolean)
-
         return {
           ...master,
           verification,
           specializations,
           services,
           responses_count: responses.length,
-          accepted_responses_count: responses.filter((r) => r.status === 'accepted').length,
+          accepted_responses_count: responses.filter((r: any) => r.status === 'accepted').length,
           portfolio_count: portfolioCount,
         } as MasterWithStats
       })
 
-      // Filter by verification status
       let filtered = mastersWithStats
       if (verificationFilter === 'verified') {
         filtered = mastersWithStats.filter((m) => m.verification?.is_verified)
       } else if (verificationFilter === 'unverified') {
         filtered = mastersWithStats.filter((m) => !m.verification?.is_verified)
       }
-
       setMasters(filtered)
     } catch (error) {
       console.error('Error fetching masters:', error)
@@ -166,7 +168,7 @@ export default function AdminMastersPage() {
       })
 
       alert(verified ? 'Мастер верифицирован' : 'Верификация отменена')
-      fetchMasters()
+      fetchMasters(page)
       if (selectedMaster?.id === masterId) {
         const updated = masters.find((m) => m.id === masterId)
         if (updated) setSelectedMaster(updated)
@@ -199,8 +201,8 @@ export default function AdminMastersPage() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm text-text-secondary">Всего мастеров</div>
-              <div className="text-2xl font-bold text-text-primary">{masters.length}</div>
+              <div className="text-sm text-text-secondary">Всего в выборке</div>
+              <div className="text-2xl font-bold text-text-primary">{totalCount}</div>
             </div>
             <FiUsers className="text-text-secondary" size={24} />
           </div>
@@ -249,7 +251,7 @@ export default function AdminMastersPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchMasters()}
+              onKeyDown={(e) => e.key === 'Enter' && (setPage(1), fetchMasters(1))}
               placeholder="Поиск по имени, email, городу..."
               className="input pl-10 w-full h-10 text-sm"
             />
@@ -270,11 +272,20 @@ export default function AdminMastersPage() {
               <option value="unverified">Не верифицированные</option>
             </select>
           </div>
-          <button onClick={fetchMasters} className="btn btn-primary h-10 w-full text-sm">
+          <button
+            onClick={() => { setPage(1); fetchMasters(1); }}
+            className="btn btn-primary h-10 w-full text-sm"
+          >
             Найти
           </button>
         </div>
       </div>
+
+      {totalCount > 0 && (
+        <div className="text-sm text-text-secondary">
+          Показано {masters.length} из {totalCount}
+        </div>
+      )}
 
       {/* Masters List */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -338,6 +349,28 @@ export default function AdminMastersPage() {
             </div>
           ))}
         </div>
+
+        {totalCount > PAGE_SIZE && (
+          <div className="lg:col-span-2 flex items-center justify-between gap-4 mt-4">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="btn btn-outline text-sm disabled:opacity-50"
+            >
+              ← Назад
+            </button>
+            <span className="text-sm text-text-secondary">
+              Страница {page} из {Math.ceil(totalCount / PAGE_SIZE)}
+            </span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= Math.ceil(totalCount / PAGE_SIZE) || loading}
+              className="btn btn-outline text-sm disabled:opacity-50"
+            >
+              Вперёд →
+            </button>
+          </div>
+        )}
 
         {/* Master Details */}
         {selectedMaster && (

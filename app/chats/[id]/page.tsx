@@ -42,7 +42,8 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatMenuRef = useRef<HTMLDivElement>(null)
 
-  const MESSAGES_PER_PAGE = 30
+  // Переписка грузится только при переходе в этот чат; первая порция — по экрану
+  const MESSAGES_PER_PAGE = 20
 
   useEffect(() => {
     if (!authLoading && !user) {

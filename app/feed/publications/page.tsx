@@ -13,9 +13,14 @@ import { FiHeart, FiMessageCircle, FiSend, FiFilter, FiX } from 'react-icons/fi'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
-import RecommendationsCarousel from '@/components/RecommendationsCarousel'
 import { getProductCategoriesForSpecializations } from '@/lib/specialization-product-mapping'
+
+const RecommendationsCarousel = dynamic(() => import('@/components/RecommendationsCarousel'), {
+  ssr: false,
+  loading: () => <div className="h-[200px] bg-bg-secondary rounded-xl animate-pulse" aria-hidden />,
+})
 
 interface ItemWithInteractions extends PortfolioItem {
   liked?: boolean
@@ -60,36 +65,42 @@ export default function PublicationsPage() {
   const [listDimensions, setListDimensions] = useState({ width: 0, height: 0 })
   
   const GRID_COLUMN_COUNT = 3
-  const GRID_ITEM_SIZE = 200 // Примерный размер квадрата в grid
-  const LIST_ITEM_HEIGHT = 600 // Примерная высота элемента в list view
+  const GRID_GAP = 8
+  const LIST_ITEM_HEIGHT_PORTFOLIO = 580
+  const LIST_ITEM_HEIGHT_PRODUCT = 340
+  const LIST_ROW_GAP = 28
+  const getItemSize = useCallback(
+    (index: number) =>
+      (items[index]?.type === 'portfolio' ? LIST_ITEM_HEIGHT_PORTFOLIO : LIST_ITEM_HEIGHT_PRODUCT) + LIST_ROW_GAP,
+    [items]
+  )
 
-  const ITEMS_PER_PAGE = 25
+  const ITEMS_PER_PAGE = 12
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
 
   // Загружаем специализации мастера и получаем категории товаров
   const [masterSpecializations, setMasterSpecializations] = useState<Array<{ id: string; slug: string }>>([])
   const [loadingSpecializations, setLoadingSpecializations] = useState(false)
   
   useEffect(() => {
-    const loadMasterSpecializations = async () => {
+    const loadMasterCategories = async () => {
       if (user?.role === 'master' && user.id) {
         setLoadingSpecializations(true)
         try {
           const { data, error } = await supabase
-            .from('profile_specializations')
-            .select('specialization:specializations(id, slug)')
+            .from('profile_subcategories')
+            .select('subcategory:subcategories(id, slug, category:categories(id, slug))')
             .eq('profile_id', user.id)
-          
           if (!error && data) {
-            const specs = (data as any[])
-              .map((item) => item.specialization)
-              .filter(Boolean)
-              .map((spec: any) => ({ id: spec.id, slug: spec.slug }))
-            setMasterSpecializations(specs)
+            const slugs = (data as any[])
+              .map((item) => item.subcategory?.category?.slug)
+              .filter(Boolean) as string[]
+            setMasterSpecializations(Array.from(new Set(slugs)).map((slug) => ({ id: slug, slug })))
           } else {
             setMasterSpecializations([])
           }
         } catch (error) {
-          console.error('Error loading master specializations:', error)
+          console.error('Error loading master categories:', error)
           setMasterSpecializations([])
         } finally {
           setLoadingSpecializations(false)
@@ -99,23 +110,20 @@ export default function PublicationsPage() {
         setLoadingSpecializations(false)
       }
     }
-    loadMasterSpecializations()
+    loadMasterCategories()
   }, [user])
 
-  // Получаем категории товаров для мастера на основе его специализаций
   const masterProductCategories = useMemo(() => {
     if (user?.role !== 'master' || masterSpecializations.length === 0) {
       return { categorySlugs: undefined, subcategorySlugs: undefined }
     }
-    
-    const specializationSlugs = masterSpecializations.map((spec) => spec.slug)
-    return getProductCategoriesForSpecializations(specializationSlugs)
+    const categorySlugs = masterSpecializations.map((s) => s.slug)
+    return getProductCategoriesForSpecializations(categorySlugs)
   }, [user, masterSpecializations])
 
-  // Проверка: является ли пользователь мастером с категориями
-  const isMasterWithCategories = user?.role === 'master' && 
-    !loadingSpecializations && 
-    masterProductCategories.categorySlugs && 
+  const isMasterWithCategories = user?.role === 'master' &&
+    !loadingSpecializations &&
+    masterProductCategories.categorySlugs &&
     masterProductCategories.categorySlugs.length > 0
 
   useEffect(() => {
@@ -133,34 +141,39 @@ export default function PublicationsPage() {
     }
   }, [user, contentType, cityFilter])
 
-  // Обновляем размеры контейнеров
+  const listHeight = typeof window !== 'undefined' ? Math.min(window.innerHeight * 0.75, 900) : 600
+  const gridHeight = typeof window !== 'undefined' ? Math.min(window.innerHeight * 0.75, 800) : 600
+
   useEffect(() => {
     const updateDimensions = () => {
       if (gridContainerRef.current && viewMode === 'grid') {
         setGridDimensions({
           width: gridContainerRef.current.offsetWidth,
-          height: Math.min(window.innerHeight * 0.7, 800)
+          height: gridHeight
         })
       }
       if (listContainerRef.current && viewMode === 'list') {
         setListDimensions({
           width: listContainerRef.current.offsetWidth,
-          height: Math.min(window.innerHeight * 0.7, 1000)
+          height: listHeight
         })
       }
     }
     updateDimensions()
     window.addEventListener('resize', updateDimensions)
     return () => window.removeEventListener('resize', updateDimensions)
-  }, [viewMode, items.length])
+  }, [viewMode, items.length, gridHeight, listHeight])
 
-  // Клик по плитке в сетке => переключаемся в ленту и скроллим к выбранному элементу
+  const listRef = useRef<List>(null)
+  // Клик по плитке в сетке => переключаемся в ленту и скроллим к выбранному элементу (виртуализация)
   useEffect(() => {
-    if (viewMode !== 'list' || !activeItemId) return
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`item-${activeItemId}`)
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
+    if (viewMode !== 'list' || !activeItemId || items.length === 0) return
+    const idx = items.findIndex((i) => i.id === activeItemId)
+    if (idx >= 0) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToItem(idx, 'start')
+      })
+    }
   }, [viewMode, activeItemId, items.length])
 
   const fetchAllContent = async (pageNum: number = 1, reset: boolean = false) => {
@@ -323,6 +336,17 @@ export default function PublicationsPage() {
       fetchAllContent(nextPage, false)
     }
   }
+
+  useEffect(() => {
+    const el = loadMoreSentinelRef.current
+    if (!el || !hasMore || loadingMore) return
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0]?.isIntersecting) loadMore() },
+      { rootMargin: '300px', threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, page, items.length])
 
   const handleLike = async (itemId: string) => {
     if (!user) {
@@ -589,349 +613,256 @@ export default function PublicationsPage() {
               </p>
             </div>
           ) : viewMode === 'grid' ? (
-            /* Grid View - 3x3 */
-            <div className="grid grid-cols-3 gap-1 sm:gap-2 w-full">
-              {items.map((item) => {
-                const thumbnail =
-                  item.type === 'portfolio' && item.portfolioItem?.images?.[0]
-                    ? item.portfolioItem.images[0]
-                    : item.type === 'product' && item.product?.images?.[0]
-                    ? item.product.images[0]
-                    : null
-
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveItemId(item.id)
-                      setViewMode('list')
-                    }}
-                    className="relative aspect-square overflow-hidden rounded-lg bg-bg-secondary group cursor-pointer"
-                  >
-                    {thumbnail ? (
-                      <div className="relative w-full h-full">
-                        <Image
-                          src={thumbnail}
-                          alt={
-                            item.type === 'portfolio'
-                              ? item.portfolioItem?.title || 'Работа'
-                              : item.product?.name || 'Товар'
-                          }
-                          fill
-                          className="object-cover transition-transform duration-300 group-hover:scale-110"
-                          sizes="(max-width: 768px) 33vw, 300px"
-                          loading="lazy"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-text-muted">
-                        {item.type === 'portfolio' ? '📷' : '🛍️'}
-                      </div>
-                    )}
-                    {/* Overlay with info */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="absolute bottom-0 left-0 right-0 p-2 text-white text-xs">
-                        {item.type === 'portfolio' && item.portfolioItem?.likes_count ? (
-                          <div className="flex items-center gap-1">
-                            <FiHeart size={12} className="fill-current" />
-                            <span>{item.portfolioItem.likes_count}</span>
-                          </div>
-                        ) : item.type === 'product' && item.product?.price ? (
-                          <div className="font-semibold">
-                            {item.product.price.toLocaleString('ru-RU')} ₽
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                    {/* Multiple images indicator */}
-                    {item.type === 'portfolio' &&
-                      item.portfolioItem?.images &&
-                      item.portfolioItem.images.length > 1 && (
-                        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-1.5 py-0.5 rounded">
-                          {item.portfolioItem.images.length}
-                        </div>
-                      )}
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            /* List View - Vertical Feed */
-            <div className="space-y-7">
-              {items.map((item, index) => {
-                if (item.type === 'portfolio' && item.portfolioItem) {
-                  const portfolioItem = item.portfolioItem
-                  const master = portfolioItem.master as any
-
-                  const content = (
-                    <div
-                      id={`item-${item.id}`}
-                      className="bg-bg-card rounded-lg border border-border-light/40 overflow-hidden"
-                    >
-                      {/* Header */}
-                      <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3">
-                        <div className="flex items-center gap-3">
-                          <Link
-                            href={`/profile/${master?.id}`}
-                            className="relative w-10 h-10 sm:w-12 sm:h-12 bg-graphite-primary text-white flex items-center justify-center text-sm font-semibold rounded-full flex-shrink-0 overflow-hidden"
-                          >
-                            {master?.avatar_url ? (
+            /* Grid View - виртуализированная сетка 3 колонки */
+            <div
+              ref={gridContainerRef}
+              style={{ height: gridDimensions.height || gridHeight, minHeight: 300 }}
+              className="w-full"
+            >
+              {gridDimensions.width > 0 && (
+                <Grid
+                  width={gridDimensions.width}
+                  height={gridDimensions.height || gridHeight}
+                  columnCount={GRID_COLUMN_COUNT}
+                  rowCount={Math.ceil(items.length / GRID_COLUMN_COUNT) || 1}
+                  columnWidth={Math.floor((gridDimensions.width - GRID_GAP * (GRID_COLUMN_COUNT - 1)) / GRID_COLUMN_COUNT)}
+                  rowHeight={Math.floor((gridDimensions.width - GRID_GAP * (GRID_COLUMN_COUNT - 1)) / GRID_COLUMN_COUNT) + GRID_GAP}
+                  itemData={{ items, setActiveItemId, setViewMode }}
+                  onScroll={({ scrollTop }) => {
+                    const rowH = Math.floor((gridDimensions.width - GRID_GAP * (GRID_COLUMN_COUNT - 1)) / GRID_COLUMN_COUNT) + GRID_GAP
+                    const totalH = Math.ceil(items.length / GRID_COLUMN_COUNT) * rowH
+                    if (totalH > 0 && scrollTop + (gridDimensions.height || gridHeight) >= totalH - 200 && hasMore && !loadingMore) {
+                      loadMore()
+                    }
+                  }}
+                >
+                  {({ columnIndex, rowIndex, style, data }) => {
+                    const index = rowIndex * GRID_COLUMN_COUNT + columnIndex
+                    const item = data.items[index]
+                    if (!item) return <div style={style} />
+                    const thumbnail =
+                      item.type === 'portfolio' && item.portfolioItem?.images?.[0]
+                        ? item.portfolioItem.images[0]
+                        : item.type === 'product' && item.product?.images?.[0]
+                        ? item.product.images[0]
+                        : null
+                    return (
+                      <div style={{ ...style, padding: GRID_GAP / 2, boxSizing: 'border-box' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            data.setActiveItemId(item.id)
+                            data.setViewMode('list')
+                          }}
+                          className="relative w-full h-full min-h-[80px] overflow-hidden rounded-lg bg-bg-secondary group cursor-pointer block"
+                        >
+                          {thumbnail ? (
+                            <div className="relative w-full h-full">
                               <Image
-                                src={master.avatar_url}
-                                alt={master.full_name}
+                                src={thumbnail}
+                                alt={item.type === 'portfolio' ? item.portfolioItem?.title || 'Работа' : item.product?.name || 'Товар'}
                                 fill
-                                className="object-cover rounded-full"
-                                sizes="(max-width: 640px) 40px, 48px"
+                                className="object-cover transition-transform duration-300 group-hover:scale-110"
+                                sizes="(max-width: 768px) 33vw, 300px"
                                 loading="lazy"
                               />
-                            ) : (
-                              master?.full_name?.[0]?.toUpperCase() || 'M'
-                            )}
-                          </Link>
-                          <div className="flex-1 min-w-0">
-                            <Link
-                              href={`/profile/${master?.id}`}
-                              className="font-semibold text-base text-graphite-secondary truncate hover:text-brand-accent transition-colors"
-                            >
-                              {master?.full_name || 'Мастер'}
-                            </Link>
-                            {master?.city && (
-                              <div className="text-sm text-text-secondary truncate">
-                                {master.city}
-                              </div>
-                            )}
+                            </div>
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-text-muted">
+                              {item.type === 'portfolio' ? '📷' : '🛍️'}
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            <div className="absolute bottom-0 left-0 right-0 p-2 text-white text-xs">
+                              {item.type === 'portfolio' && item.portfolioItem?.likes_count ? (
+                                <span className="flex items-center gap-1"><FiHeart size={12} className="fill-current" />{item.portfolioItem.likes_count}</span>
+                              ) : item.type === 'product' && item.product?.price ? (
+                                <span className="font-semibold">{item.product.price.toLocaleString('ru-RU')} ₽</span>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
+                          {item.type === 'portfolio' && item.portfolioItem?.images && item.portfolioItem.images.length > 1 && (
+                            <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-1.5 py-0.5 rounded">
+                              {item.portfolioItem.images.length}
+                            </div>
+                          )}
+                        </button>
                       </div>
-
-                      {/* Images/Video */}
-                      {portfolioItem.images && portfolioItem.images.length > 0 ? (
-                        <PostImageSlider
-                          images={portfolioItem.images}
-                          alt={portfolioItem.title}
-                          className="w-full"
-                        />
-                      ) : portfolioItem.videos && portfolioItem.videos.length > 0 ? (
-                        <div className="w-full">
-                          <video src={portfolioItem.videos[0]} controls className="w-full" />
-                        </div>
-                      ) : null}
-
-                      {/* Interaction Buttons */}
-                      <div className="px-4 sm:px-5 pt-3 pb-2">
-                        <div className="flex items-center gap-4 mb-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleLike(item.id)
-                            }}
-                            className={`transition-colors ${
-                              portfolioItem.liked
-                                ? 'text-brand-accent'
-                                : 'text-graphite-secondary'
-                            }`}
-                          >
-                            <FiHeart
-                              size={24}
-                              className={portfolioItem.liked ? 'fill-current' : ''}
-                            />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              const nextOpen = !portfolioItem.showComments
-                              setCommentsOpen(item.id, nextOpen)
-                              if (nextOpen) fetchAllComments(item.id)
-                            }}
-                            className="text-graphite-secondary transition-colors"
-                          >
-                            <FiMessageCircle size={24} />
-                          </button>
-                        </div>
-
-                        {/* Likes Count */}
-                        {portfolioItem.likes_count > 0 && (
-                          <div className="text-sm font-semibold text-graphite-secondary mb-2">
-                            {portfolioItem.likes_count}{' '}
-                            {portfolioItem.likes_count === 1
-                              ? 'лайк'
-                              : portfolioItem.likes_count < 5
-                              ? 'лайка'
-                              : 'лайков'}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Content */}
-                      <div className="px-4 sm:px-5 pb-3">
-                        {portfolioItem.title && (
-                          <div className="font-semibold text-base sm:text-lg text-graphite-secondary tracking-tight mb-1.5">
-                            {portfolioItem.title}
-                          </div>
-                        )}
-                        {portfolioItem.description && (
-                          <p className="text-sm sm:text-base text-text-secondary leading-relaxed whitespace-pre-wrap mb-2">
-                            {portfolioItem.description}
-                          </p>
-                        )}
-
-                        {/* Comments */}
-                        {portfolioItem.comments && portfolioItem.comments.length > 0 && (
-                          <div className="mb-2" onClick={(e) => e.stopPropagation()}>
-                            {!portfolioItem.showComments &&
-                              portfolioItem.comments_count &&
-                              portfolioItem.comments_count > portfolioItem.comments.length && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setCommentsOpen(item.id, true)
-                                    fetchAllComments(item.id)
-                                  }}
-                                  className="text-sm text-text-secondary hover:text-text-primary mb-2"
-                                >
-                                  Показать все комментарии ({portfolioItem.comments_count})
-                                </button>
-                              )}
-
-                            {portfolioItem.showComments ? (
-                              <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
-                                {portfolioItem.comments.map((comment) => (
-                                  <div key={comment.id} className="flex gap-2">
-                                    <div className="flex-1">
-                                      <span className="font-semibold text-sm text-graphite-secondary mr-2">
-                                        {comment.user?.full_name || 'Пользователь'}
-                                      </span>
-                                      <span className="text-sm text-text-secondary">
-                                        {comment.content}
-                                      </span>
-                                      <div className="text-xs text-text-muted mt-0.5">
-                                        {format(new Date(comment.created_at), 'd MMMM', {
-                                          locale: ru,
-                                        })}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="space-y-2 mb-2">
-                                {portfolioItem.comments.slice(-2).map((comment) => (
-                                  <div key={comment.id} className="flex gap-2">
-                                    <div className="flex-1">
-                                      <span className="font-semibold text-sm text-graphite-secondary mr-2">
-                                        {comment.user?.full_name || 'Пользователь'}
-                                      </span>
-                                      <span className="text-sm text-text-secondary">
-                                        {comment.content}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Comment Form */}
-                        {user && (
-                          <form
-                            onSubmit={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleSubmitComment(item.id)
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-2 pt-2 border-t border-border-light/40"
-                          >
-                            <input
-                              type="text"
-                              value={commentTexts[item.id] || ''}
-                              onChange={(e) =>
-                                setCommentTexts({ ...commentTexts, [item.id]: e.target.value })
-                              }
-                              placeholder="Добавить комментарий..."
-                              className="flex-1 text-sm bg-transparent border-none outline-none text-text-secondary placeholder-text-muted"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <button
-                              type="submit"
-                              disabled={
-                                !commentTexts[item.id]?.trim() || submittingComments[item.id]
-                              }
-                              className={`transition-colors ${
-                                commentTexts[item.id]?.trim() && !submittingComments[item.id]
-                                  ? 'text-brand-accent'
-                                  : 'text-text-muted'
-                              }`}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <FiSend size={18} />
-                            </button>
-                          </form>
-                        )}
-                      </div>
-                    </div>
-                  )
-
-                  return (
-                    <Fragment key={item.id}>
-                      {content}
-                      {index === 7 && (
-                        <RecommendationsCarousel
-                          title={
-                            isMasterWithCategories
-                              ? "Рекомендации под ваши услуги"
-                              : "Товары от Pro‑продавцов"
-                          }
-                          categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
-                          subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
-                          role={user?.role || 'client'}
-                          limit={12}
-                        />
-                      )}
-                    </Fragment>
-                  )
-                } else if (item.type === 'product' && item.product) {
-                  const content = (
-                    <div id={`item-${item.id}`}>
-                      <ProductCard product={item.product} currentUser={user} />
-                    </div>
-                  )
-                  return (
-                    <Fragment key={item.id}>
-                      {content}
-                      {index === 7 && (
-                        <RecommendationsCarousel
-                          title={
-                            isMasterWithCategories
-                              ? "Рекомендации под ваши услуги"
-                              : "Товары от Pro‑продавцов"
-                          }
-                          categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
-                          subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
-                          role={user?.role || 'client'}
-                          limit={12}
-                        />
-                      )}
-                    </Fragment>
-                  )
-                }
-                return null
-              })}
-              
-              {/* Load More Button */}
-              {hasMore && (
-                <div className="mt-8 text-center">
-                  <button
-                    onClick={loadMore}
-                    disabled={loadingMore}
-                    className="btn btn-secondary"
-                  >
-                    {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
-                  </button>
-                </div>
+                    )
+                  }}
+                </Grid>
               )}
             </div>
+          ) : (
+            /* List View - виртуализированный вертикальный список */
+            <>
+              <div className="mb-7">
+                <RecommendationsCarousel
+                  title={
+                    isMasterWithCategories
+                      ? "Рекомендации под ваши услуги"
+                      : "Товары от Pro‑продавцов"
+                  }
+                  categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
+                  subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
+                  role={user?.role || 'client'}
+                  limit={12}
+                />
+              </div>
+              <div
+                ref={listContainerRef}
+                style={{ height: listHeight, minHeight: 400 }}
+                className="w-full"
+              >
+                {listDimensions.width > 0 && items.length > 0 && (
+                  <List
+                    ref={listRef}
+                    width={listDimensions.width}
+                    height={listHeight}
+                    itemCount={items.length}
+                    itemSize={getItemSize}
+                    itemData={{
+                      items,
+                      handleLike,
+                      setCommentsOpen,
+                      fetchAllComments,
+                      commentTexts,
+                      setCommentTexts,
+                      submittingComments,
+                      handleSubmitComment,
+                      user,
+                    }}
+                    onScroll={({ scrollOffset }) => {
+                      let total = 0
+                      for (let i = 0; i < items.length; i++) total += getItemSize(i)
+                      if (total > 0 && scrollOffset + listHeight >= total - 400 && hasMore && !loadingMore) {
+                        loadMore()
+                      }
+                    }}
+                  >
+                    {({ index, style, data }) => {
+                      const item = data.items[index]
+                      if (!item) return <div style={style} />
+                      if (item.type === 'portfolio' && item.portfolioItem) {
+                        const portfolioItem = item.portfolioItem
+                        const master = portfolioItem.master as any
+                        return (
+                          <div style={style} className="pb-7">
+                            <div
+                              id={`item-${item.id}`}
+                              className="bg-bg-card rounded-lg border border-border-light/40 overflow-hidden"
+                            >
+                              <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3">
+                                <div className="flex items-center gap-3">
+                                  <Link href={`/profile/${master?.id}`} className="relative w-10 h-10 sm:w-12 sm:h-12 bg-graphite-primary text-white flex items-center justify-center text-sm font-semibold rounded-full flex-shrink-0 overflow-hidden">
+                                    {master?.avatar_url ? (
+                                      <Image src={master.avatar_url} alt={master.full_name} fill className="object-cover rounded-full" sizes="(max-width: 640px) 40px, 48px" loading="lazy" />
+                                    ) : (
+                                      master?.full_name?.[0]?.toUpperCase() || 'M'
+                                    )}
+                                  </Link>
+                                  <div className="flex-1 min-w-0">
+                                    <Link href={`/profile/${master?.id}`} className="font-semibold text-base text-graphite-secondary truncate hover:text-brand-accent transition-colors">
+                                      {master?.full_name || 'Мастер'}
+                                    </Link>
+                                    {master?.city && <div className="text-sm text-text-secondary truncate">{master.city}</div>}
+                                  </div>
+                                </div>
+                              </div>
+                              {portfolioItem.images && portfolioItem.images.length > 0 ? (
+                                <PostImageSlider images={portfolioItem.images} alt={portfolioItem.title} className="w-full" />
+                              ) : portfolioItem.videos && portfolioItem.videos.length > 0 ? (
+                                <div className="w-full"><video src={portfolioItem.videos[0]} controls className="w-full" /></div>
+                              ) : null}
+                              <div className="px-4 sm:px-5 pt-3 pb-2">
+                                <div className="flex items-center gap-4 mb-2">
+                                  <button onClick={(e) => { e.stopPropagation(); data.handleLike(item.id) }} className={portfolioItem.liked ? 'text-brand-accent' : 'text-graphite-secondary'}>
+                                    <FiHeart size={24} className={portfolioItem.liked ? 'fill-current' : ''} />
+                                  </button>
+                                  <button onClick={(e) => { e.stopPropagation(); const nextOpen = !portfolioItem.showComments; data.setCommentsOpen(item.id, nextOpen); if (nextOpen) data.fetchAllComments(item.id) }} className="text-graphite-secondary">
+                                    <FiMessageCircle size={24} />
+                                  </button>
+                                </div>
+                                {portfolioItem.likes_count > 0 && (
+                                  <div className="text-sm font-semibold text-graphite-secondary mb-2">
+                                    {portfolioItem.likes_count} {portfolioItem.likes_count === 1 ? 'лайк' : portfolioItem.likes_count < 5 ? 'лайка' : 'лайков'}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="px-4 sm:px-5 pb-3">
+                                {portfolioItem.title && <div className="font-semibold text-base sm:text-lg text-graphite-secondary tracking-tight mb-1.5">{portfolioItem.title}</div>}
+                                {portfolioItem.description && <p className="text-sm sm:text-base text-text-secondary leading-relaxed whitespace-pre-wrap mb-2">{portfolioItem.description}</p>}
+                                {portfolioItem.comments && portfolioItem.comments.length > 0 && (
+                                  <div className="mb-2" onClick={(e) => e.stopPropagation()}>
+                                    {!portfolioItem.showComments && portfolioItem.comments_count && portfolioItem.comments_count > portfolioItem.comments.length && (
+                                      <button onClick={(e) => { e.stopPropagation(); data.setCommentsOpen(item.id, true); data.fetchAllComments(item.id) }} className="text-sm text-text-secondary hover:text-text-primary mb-2">
+                                        Показать все комментарии ({portfolioItem.comments_count})
+                                      </button>
+                                    )}
+                                    {portfolioItem.showComments ? (
+                                      <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
+                                        {portfolioItem.comments.map((comment: PortfolioComment) => (
+                                          <div key={comment.id} className="flex gap-2">
+                                            <div className="flex-1">
+                                              <span className="font-semibold text-sm text-graphite-secondary mr-2">{(comment as any).user?.full_name || 'Пользователь'}</span>
+                                              <span className="text-sm text-text-secondary">{comment.content}</span>
+                                              <div className="text-xs text-text-muted mt-0.5">{format(new Date(comment.created_at), 'd MMMM', { locale: ru })}</div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-2 mb-2">
+                                        {portfolioItem.comments.slice(-2).map((comment: PortfolioComment) => (
+                                          <div key={comment.id} className="flex gap-2">
+                                            <div className="flex-1">
+                                              <span className="font-semibold text-sm text-graphite-secondary mr-2">{(comment as any).user?.full_name || 'Пользователь'}</span>
+                                              <span className="text-sm text-text-secondary">{comment.content}</span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {data.user && (
+                                  <form onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); data.handleSubmitComment(item.id) }} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2 pt-2 border-t border-border-light/40">
+                                    <input
+                                      type="text"
+                                      value={data.commentTexts[item.id] || ''}
+                                      onChange={(e) => data.setCommentTexts({ ...data.commentTexts, [item.id]: e.target.value })}
+                                      placeholder="Добавить комментарий..."
+                                      className="flex-1 text-sm bg-transparent border-none outline-none text-text-secondary placeholder-text-muted"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <button type="submit" disabled={!data.commentTexts[item.id]?.trim() || data.submittingComments[item.id]} className={data.commentTexts[item.id]?.trim() && !data.submittingComments[item.id] ? 'text-brand-accent' : 'text-text-muted'} onClick={(e) => e.stopPropagation()}>
+                                      <FiSend size={18} />
+                                    </button>
+                                  </form>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }
+                      if (item.type === 'product' && item.product) {
+                        return (
+                          <div style={style} className="pb-7">
+                            <div id={`item-${item.id}`}>
+                              <ProductCard product={item.product} currentUser={data.user} />
+                            </div>
+                          </div>
+                        )
+                      }
+                      return <div style={style} />
+                    }}
+                  </List>
+                )}
+              </div>
+              {loadingMore && (
+                <div className="py-4 text-center text-sm text-text-secondary">Загрузка...</div>
+              )}
+            </>
           )}
         </div>
       </div>

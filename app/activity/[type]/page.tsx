@@ -1,12 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
+import { FixedSizeList as List } from 'react-window'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { FiArrowLeft, FiMessageCircle, FiHeart, FiBriefcase, FiStar, FiUsers, FiCornerDownRight } from 'react-icons/fi'
+
+const ROW_HEIGHT = 88
+const LIST_HEIGHT = typeof window !== 'undefined' ? Math.min(window.innerHeight * 0.6, 600) : 500
 
 const TYPES = ['comments', 'likes', 'responses', 'reviews', 'followers', 'replies'] as const
 const LABELS: Record<string, string> = {
@@ -34,6 +38,9 @@ export default function ActivityTypePage() {
   const type = (params?.type as string) || ''
   const [items, setItems] = useState<{ id: string; title: string; subtitle: string; link: string; created_at: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [backing, setBacking] = useState(false)
   const [period, setPeriod] = useState<'all' | '1d' | '7d' | '30d'>('all')
 
@@ -54,27 +61,46 @@ export default function ActivityTypePage() {
       router.push('/activity')
       return
     }
-    if (user) fetchItems()
+    if (user) fetchItems(false)
   }, [user, authLoading, type, period, router])
 
-  const fetchItems = async () => {
+  const fetchItems = async (append: boolean) => {
     if (!user) return
-    setLoading(true)
+    if (!append) setLoading(true)
+    else setLoadingMore(true)
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token
       if (!token) throw new Error('Not authenticated')
-      const res = await fetch(`/api/activity/items?type=${encodeURIComponent(type)}&period=${period}`, {
+      const params = new URLSearchParams({
+        type,
+        period,
+        limit: '20',
+      })
+      if (append && nextCursor) params.set('cursor', nextCursor)
+      const res = await fetch(`/api/activity/items?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to load')
       const data = await res.json()
-      setItems(data.items || [])
+      const list = data.items || []
+      setHasMore(!!data.hasMore)
+      setNextCursor(data.nextCursor ?? null)
+      if (append) {
+        setItems((prev) => [...prev, ...list])
+      } else {
+        setItems(list)
+      }
     } catch (e) {
       console.error(e)
-      setItems([])
+      if (!append) setItems([])
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
+  }
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) fetchItems(true)
   }
 
   const handleBack = async () => {
@@ -169,31 +195,51 @@ export default function ActivityTypePage() {
               За выбранный период записей нет.
             </div>
           ) : (
-            <div className="space-y-2">
-              {items.map((it) => (
-                <div
-                  key={it.id}
-                  className="bg-white border border-border-light rounded-lg p-4 hover:border-border-color/50 transition-colors"
+            <div className="flex flex-col gap-2">
+              <div style={{ height: LIST_HEIGHT }} className="w-full overflow-hidden rounded-lg">
+                <List
+                  width="100%"
+                  height={LIST_HEIGHT}
+                  itemCount={items.length}
+                  itemSize={ROW_HEIGHT}
+                  itemData={items}
+                  onScroll={({ scrollOffset }) => {
+                    const total = items.length * ROW_HEIGHT
+                    if (total > 0 && scrollOffset + LIST_HEIGHT >= total - 300 && hasMore && !loadingMore) {
+                      loadMore()
+                    }
+                  }}
                 >
-                  {(it as any).targetLabel && (
-                    <div className="text-xs text-text-muted mb-1.5">{(it as any).targetLabel}</div>
-                  )}
-                  <Link href={it.link} className="block">
-                    <div className="font-medium text-graphite-secondary mb-1">{it.title}</div>
-                    {it.subtitle ? <div className="text-sm text-text-secondary mb-2 line-clamp-2">{it.subtitle}</div> : null}
-                    <div className="text-xs text-text-muted">{formatDate(it.created_at)}</div>
-                  </Link>
-                  {(it as any).replyLink && (
-                    <Link
-                      href={(it as any).replyLink}
-                      className="inline-flex items-center gap-1.5 text-xs text-brand-accent hover:underline mt-2"
-                    >
-                      <FiMessageCircle size={12} />
-                      Ответить
-                    </Link>
-                  )}
-                </div>
-              ))}
+                  {({ index, style, data }) => {
+                    const it = data[index]
+                    if (!it) return <div style={style} />
+                    return (
+                      <div style={{ ...style, paddingBottom: 8 }} className="box-border">
+                        <div className="bg-white border border-border-light rounded-lg p-4 hover:border-border-color/50 transition-colors h-full">
+                          {(it as any).targetLabel && (
+                            <div className="text-xs text-text-muted mb-1.5">{(it as any).targetLabel}</div>
+                          )}
+                          <Link href={it.link} className="block">
+                            <div className="font-medium text-graphite-secondary mb-1">{it.title}</div>
+                            {it.subtitle ? <div className="text-sm text-text-secondary mb-2 line-clamp-2">{it.subtitle}</div> : null}
+                            <div className="text-xs text-text-muted">{formatDate(it.created_at)}</div>
+                          </Link>
+                          {(it as any).replyLink && (
+                            <Link
+                              href={(it as any).replyLink}
+                              className="inline-flex items-center gap-1.5 text-xs text-brand-accent hover:underline mt-2"
+                            >
+                              <FiMessageCircle size={12} />
+                              Ответить
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  }}
+                </List>
+              </div>
+              {loadingMore && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
             </div>
           )}
         </div>

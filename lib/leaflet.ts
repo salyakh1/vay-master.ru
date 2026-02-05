@@ -10,10 +10,11 @@ export function configureLeafletIcons(): void {
 
   void import('leaflet').then((L) => {
     delete (L.Icon.Default.prototype as any)._getIconUrl
+    const base = typeof window !== 'undefined' ? window.location.origin : ''
     L.Icon.Default.mergeOptions({
-      iconRetinaUrl: new URL('leaflet/dist/images/marker-icon-2x.png', import.meta.url).toString(),
-      iconUrl: new URL('leaflet/dist/images/marker-icon.png', import.meta.url).toString(),
-      shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).toString(),
+      iconRetinaUrl: `${base}/leaflet/marker-icon-2x.png`,
+      iconUrl: `${base}/leaflet/marker-icon.png`,
+      shadowUrl: `${base}/leaflet/marker-shadow.png`,
     })
   })
 }

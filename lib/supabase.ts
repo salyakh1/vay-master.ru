@@ -14,15 +14,34 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export type UserRole = 'master' | 'seller' | 'client'
 
-export interface Specialization {
+export interface Category {
   id: string
   name: string
   slug: string
+  image_url?: string | null
+  sort_order?: number
+}
+
+export interface Subcategory {
+  id: string
+  category_id: string
+  name: string
+  slug: string
+  image_url?: string | null
+  sort_order?: number
 }
 
 export interface Service {
   id: string
-  specialization_id: string
+  subcategory_id: string
+  name: string
+  slug: string
+  sort_order?: number
+}
+
+/** @deprecated Use Category + Subcategory. Kept for backward compatibility. */
+export interface Specialization {
+  id: string
   name: string
   slug: string
 }
@@ -65,8 +84,9 @@ export interface User {
   master_reviews_count?: number
   seller_rating?: number
   seller_reviews_count?: number
-  // Enriched relations
+  // Enriched relations (masters: subcategories + services)
   specializations?: Specialization[]
+  subcategories?: Subcategory[]
   services_list?: Service[]
 }
 
@@ -142,6 +162,7 @@ export interface ProductCategory {
   name: string
   slug: string
   created_at: string
+  image_url?: string | null
 }
 
 // Типы рекламы

@@ -32,12 +32,13 @@ export async function GET(request: NextRequest) {
 
     const now = new Date().toISOString()
 
+    const MAX_PRO_SELLERS = 100
     const { data: proSellers, error: proError } = await supabaseAdmin
       .from('profiles')
       .select('id')
       .eq('role', 'seller')
       .or(`is_pro.eq.true,pro_until.gt.${now}`)
-      .limit(500)
+      .limit(MAX_PRO_SELLERS)
 
     if (proError) throw proError
     const sellerIds = (proSellers || []).map((item) => item.id)

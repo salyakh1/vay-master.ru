@@ -7,11 +7,14 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/notifications - получить все уведомления пользователя
+const DEFAULT_LIMIT = 20
+const MAX_LIMIT = 20
+
+// GET /api/notifications - получить уведомления пользователя (limit + cursor)
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
-    const token = cookieStore.get('sb-access-token')?.value || 
+    const token = cookieStore.get('sb-access-token')?.value ||
                   request.headers.get('authorization')?.replace('Bearer ', '')
 
     if (!token) {
@@ -32,16 +35,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
 
-    const { data: notifications, error } = await supabaseClient
+    const { searchParams } = new URL(request.url)
+    const limit = Math.min(Number(searchParams.get('limit') || DEFAULT_LIMIT), MAX_LIMIT)
+    const cursor = searchParams.get('cursor') || ''
+
+    let query = supabaseClient
       .from('notifications')
       .select('*, order:orders(id, title, status)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(100)
+      .limit(limit + 1)
+
+    if (cursor) {
+      query = query.lt('created_at', cursor)
+    }
+
+    const { data: notifications, error } = await query
 
     if (error) throw error
 
-    return NextResponse.json({ notifications: notifications || [] })
+    const list = notifications || []
+    const hasMore = list.length > limit
+    const items = hasMore ? list.slice(0, limit) : list
+    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1]?.created_at : null
+
+    return NextResponse.json({
+      notifications: items,
+      nextCursor: nextCursor ?? null,
+      hasMore: !!hasMore,
+    })
   } catch (error: any) {
     console.error('Error fetching notifications:', error)
     return NextResponse.json({ error: error.message || 'Ошибка при получении уведомлений' }, { status: 500 })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { AdBanner, AdContext, AdType } from '@/lib/supabase'
 import { FiExternalLink, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
@@ -309,10 +310,13 @@ export default function AdSlot({
           
           {/* Контент рекламы */}
           <div className="flex gap-4" onClick={handleClick}>
-            <img
+            <Image
               src={ad.image_url}
               alt={ad.title}
+              width={96}
+              height={96}
               className="w-24 h-24 object-cover rounded-lg cursor-pointer"
+              unoptimized={!String(ad.image_url).includes('supabase')}
             />
             <div className="flex-1">
               <h3 className="font-semibold text-graphite-secondary mb-1 cursor-pointer">
@@ -383,10 +387,13 @@ export default function AdSlot({
           </div>
         )}
         <div className="flex gap-4">
-          <img
+          <Image
             src={ad.image_url}
             alt={ad.title}
+            width={96}
+            height={96}
             className="w-24 h-24 object-cover rounded-lg cursor-pointer"
+            unoptimized={!String(ad.image_url).includes('supabase')}
           />
           <div className="flex-1">
             <h3 className="font-semibold text-graphite-secondary mb-1 cursor-pointer">
@@ -414,11 +421,16 @@ export default function AdSlot({
           {ad.badge_text || 'Реклама'}
         </div>
       )}
-      <img
-        src={ad.image_url}
-        alt={ad.title}
-        className="w-full h-48 object-cover rounded-t-lg cursor-pointer"
-      />
+      <div className="relative w-full h-48">
+        <Image
+          src={ad.image_url}
+          alt={ad.title}
+          fill
+          sizes="(max-width: 768px) 100vw, 400px"
+          className="object-cover rounded-t-lg cursor-pointer"
+          unoptimized={!String(ad.image_url).includes('supabase')}
+        />
+      </div>
       <div className="p-4">
         <h3 className="font-semibold text-graphite-secondary mb-2 cursor-pointer">
           {ad.title}
@@ -444,10 +456,13 @@ export default function AdSlot({
         </div>
       )}
       <div className="flex gap-4">
-        <img
+        <Image
           src={ad.image_url}
           alt={ad.title}
+          width={80}
+          height={80}
           className="w-20 h-20 object-cover rounded-lg cursor-pointer"
+          unoptimized={!String(ad.image_url).includes('supabase')}
         />
         <div className="flex-1">
           <h3 className="font-semibold text-graphite-secondary mb-1 cursor-pointer">
@@ -466,11 +481,14 @@ export default function AdSlot({
       className={`flex items-center justify-center p-2 ${className}`}
       onClick={handleClick}
     >
-      <img
+      <Image
         src={ad.image_url}
         alt={ad.brand_name || ad.title}
+        width={120}
+        height={32}
         className="h-8 w-auto object-contain opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
         title={ad.title}
+        unoptimized={!String(ad.image_url).includes('supabase')}
       />
     </div>
   )

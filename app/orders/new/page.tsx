@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
-import { supabase, Specialization } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { FiArrowLeft, FiImage, FiX } from 'react-icons/fi'
 import Link from 'next/link'
@@ -25,8 +25,8 @@ export default function NewOrderPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [pendingSubmit, setPendingSubmit] = useState(false)
-  const [specializations, setSpecializations] = useState<Specialization[]>([])
-  const [loadingSpecializations, setLoadingSpecializations] = useState(true)
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([])
+  const [loadingCategories, setLoadingCategories] = useState(true)
 
   if (authLoading) {
     return (
@@ -36,33 +36,32 @@ export default function NewOrderPage() {
     )
   }
 
-  // Загружаем специализации из БД
   useEffect(() => {
-    const fetchSpecializations = async () => {
+    const fetchCategories = async () => {
       try {
-        setLoadingSpecializations(true)
+        setLoadingCategories(true)
         const { data, error } = await supabase
-          .from('specializations')
+          .from('categories')
           .select('id, name, slug')
+          .order('sort_order', { ascending: true })
           .order('name', { ascending: true })
 
         if (error) {
-          console.error('Error fetching specializations:', error)
-          // Показываем ошибку пользователю
-          setSpecializations([])
+          console.error('Error fetching categories:', error)
+          setCategories([])
         } else {
-          setSpecializations(data || [])
+          setCategories((data || []) as Array<{ id: string; name: string; slug: string }>)
         }
       } catch (error) {
-        console.error('Error fetching specializations:', error)
-        setSpecializations([])
+        console.error('Error fetching categories:', error)
+        setCategories([])
       } finally {
-        setLoadingSpecializations(false)
+        setLoadingCategories(false)
       }
     }
 
     if (user) {
-      fetchSpecializations()
+      fetchCategories()
     }
   }, [user])
 
@@ -231,13 +230,13 @@ export default function NewOrderPage() {
               />
             </div>
 
-            {/* Категория (специализация) */}
+            {/* Категория заказа */}
             <div>
               <label className="block text-sm font-semibold text-graphite-secondary mb-2">
-                Специализация (категория) *
+                Категория заказа *
               </label>
-              {loadingSpecializations ? (
-                <div className="input text-text-secondary">Загрузка специализаций...</div>
+              {loadingCategories ? (
+                <div className="input text-text-secondary">Загрузка категорий...</div>
               ) : (
                 <select
                   value={category}
@@ -245,16 +244,16 @@ export default function NewOrderPage() {
                   required
                   className="input"
                 >
-                  <option value="">Выберите специализацию</option>
-                  {specializations.map((spec) => (
-                    <option key={spec.id} value={spec.name}>
-                      {spec.name}
+                  <option value="">Выберите категорию</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
                     </option>
                   ))}
                 </select>
               )}
               <p className="text-xs text-text-muted mt-1">
-                Выберите специализацию, которая соответствует вашему заказу. Мастера с этой специализацией получат уведомление.
+                Выберите категорию заказа. Мастера этой категории получат уведомление.
               </p>
             </div>
 

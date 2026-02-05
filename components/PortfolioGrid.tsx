@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { PortfolioItem } from '@/lib/supabase'
 import { FiImage, FiVideo, FiPlay } from 'react-icons/fi'
 
@@ -41,10 +42,13 @@ export default function PortfolioGrid({ items, onItemClick }: PortfolioGridProps
           >
             {firstMedia ? (
               firstMedia.type === 'image' ? (
-                <img
+                <Image
                   src={firstMedia.url}
                   alt={item.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  fill
+                  sizes="(max-width: 768px) 33vw, 200px"
+                  className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  unoptimized={!String(firstMedia.url).includes('supabase')}
                 />
               ) : (
                 <div className="w-full h-full relative">

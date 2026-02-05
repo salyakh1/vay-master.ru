@@ -57,7 +57,8 @@ BEGIN
 END;
 $$;
 
--- 3. Обновляем функцию уведомлений с проверкой расстояния
+-- 3. Функция уведомлений при новом заказе (схема: категории → подкатегории, с проверкой расстояния)
+-- Требует таблицы: categories, subcategories, profile_subcategories, order_category_specialization(category_id).
 CREATE OR REPLACE FUNCTION notify_masters_on_new_order()
 RETURNS TRIGGER 
 SECURITY DEFINER
@@ -65,113 +66,94 @@ SET search_path = public
 AS $$
 DECLARE
   master_record RECORD;
-  mapped_specialization_id UUID;
+  mapped_category_id UUID;
   notification_title TEXT;
   notification_message TEXT;
   distance_km double precision;
 BEGIN
-  -- Только для новых заказов со статусом 'open'
   IF NEW.status != 'open' OR NEW.category IS NULL OR TRIM(NEW.category) = '' THEN
     RETURN NEW;
   END IF;
 
-  -- Находим специализацию, соответствующую категории заказа из маппинга
-  SELECT specialization_id INTO mapped_specialization_id
+  SELECT category_id INTO mapped_category_id
   FROM public.order_category_specialization
   WHERE order_category = NEW.category;
 
-  -- Ищем мастеров по специализации из маппинга
-  IF mapped_specialization_id IS NOT NULL THEN
+  IF mapped_category_id IS NOT NULL THEN
     FOR master_record IN
       SELECT DISTINCT 
         p.id, 
         p.full_name,
         p.master_lat,
         p.master_lng,
-        COALESCE(p.service_radius_km, 50) as radius_km
+        COALESCE(p.service_radius_km, 50)::integer as radius_km
       FROM public.profiles p
-      INNER JOIN public.profile_specializations ps ON ps.profile_id = p.id
-      WHERE ps.specialization_id = mapped_specialization_id
+      INNER JOIN public.profile_subcategories psc ON psc.profile_id = p.id
+      INNER JOIN public.subcategories sub ON sub.id = psc.subcategory_id
+      WHERE sub.category_id = mapped_category_id
         AND p.role = 'master'
-        AND p.id != NEW.client_id -- Не уведомляем автора заказа
+        AND p.id != NEW.client_id
     LOOP
-      -- Проверяем расстояние, если у обоих есть координаты
       IF master_record.master_lat IS NOT NULL 
          AND master_record.master_lng IS NOT NULL
          AND NEW.lat IS NOT NULL 
          AND NEW.lng IS NOT NULL THEN
-        
-        -- Вычисляем расстояние
         distance_km := calculate_distance_km(
-          master_record.master_lat,
-          master_record.master_lng,
-          NEW.lat,
-          NEW.lng
+          master_record.master_lat, master_record.master_lng,
+          NEW.lat, NEW.lng
         );
-
-        -- Создаем уведомление только если заказ в радиусе обслуживания
         IF distance_km IS NOT NULL AND distance_km <= master_record.radius_km THEN
-          notification_title := 'Новый заказ по вашей специализации';
+          notification_title := 'Новый заказ по вашей категории';
           notification_message := 'Появился новый заказ "' || NEW.title || '" в категории "' || NEW.category || '" на расстоянии ' || ROUND(distance_km, 1) || ' км';
-
           INSERT INTO public.notifications (user_id, type, order_id, title, message)
           VALUES (master_record.id, 'new_order_match', NEW.id, notification_title, notification_message)
-          ON CONFLICT DO NOTHING;
+          ON CONFLICT (user_id, order_id, type) DO NOTHING;
         END IF;
       ELSE
-        -- Если координат нет, создаем уведомление как раньше (без проверки расстояния)
-        notification_title := 'Новый заказ по вашей специализации';
+        notification_title := 'Новый заказ по вашей категории';
         notification_message := 'Появился новый заказ "' || NEW.title || '" в категории "' || NEW.category || '"';
-
         INSERT INTO public.notifications (user_id, type, order_id, title, message)
         VALUES (master_record.id, 'new_order_match', NEW.id, notification_title, notification_message)
-        ON CONFLICT DO NOTHING;
+        ON CONFLICT (user_id, order_id, type) DO NOTHING;
       END IF;
     END LOOP;
   END IF;
 
-  -- Также ищем мастеров с прямой специализацией, совпадающей с категорией заказа
+  -- Прямое совпадение по названию категории (если маппинг не сработал)
   FOR master_record IN
     SELECT DISTINCT 
       p.id, 
       p.full_name,
       p.master_lat,
       p.master_lng,
-      COALESCE(p.service_radius_km, 50) as radius_km
+      COALESCE(p.service_radius_km, 50)::integer as radius_km
     FROM public.profiles p
-    INNER JOIN public.profile_specializations ps ON ps.profile_id = p.id
-    INNER JOIN public.specializations s ON s.id = ps.specialization_id
-    WHERE LOWER(TRIM(s.name)) = LOWER(TRIM(NEW.category))
+    INNER JOIN public.profile_subcategories psc ON psc.profile_id = p.id
+    INNER JOIN public.subcategories sub ON sub.id = psc.subcategory_id
+    INNER JOIN public.categories c ON c.id = sub.category_id
+    WHERE LOWER(TRIM(c.name)) = LOWER(TRIM(NEW.category))
       AND p.role = 'master'
       AND p.id != NEW.client_id
-      AND (mapped_specialization_id IS NULL OR ps.specialization_id != mapped_specialization_id)
+      AND (mapped_category_id IS NULL OR c.id != mapped_category_id)
   LOOP
-    -- Проверяем расстояние, если у обоих есть координаты
     IF master_record.master_lat IS NOT NULL 
        AND master_record.master_lng IS NOT NULL
        AND NEW.lat IS NOT NULL 
        AND NEW.lng IS NOT NULL THEN
-      
       distance_km := calculate_distance_km(
-        master_record.master_lat,
-        master_record.master_lng,
-        NEW.lat,
-        NEW.lng
+        master_record.master_lat, master_record.master_lng,
+        NEW.lat, NEW.lng
       );
-
       IF distance_km IS NOT NULL AND distance_km <= master_record.radius_km THEN
-        notification_title := 'Новый заказ по вашей специализации';
+        notification_title := 'Новый заказ по вашей категории';
         notification_message := 'Появился новый заказ "' || NEW.title || '" в категории "' || NEW.category || '" на расстоянии ' || ROUND(distance_km, 1) || ' км';
-
         INSERT INTO public.notifications (user_id, type, order_id, title, message)
         VALUES (master_record.id, 'new_order_match', NEW.id, notification_title, notification_message)
         ON CONFLICT (user_id, order_id, type) DO NOTHING;
       END IF;
     ELSE
-      -- Если координат нет, создаем уведомление как раньше
-      notification_title := 'Новый заказ по вашей специализации';
+      notification_title := 'Новый заказ по вашей категории';
       notification_message := 'Появился новый заказ "' || NEW.title || '" в категории "' || NEW.category || '"';
-
       INSERT INTO public.notifications (user_id, type, order_id, title, message)
       VALUES (master_record.id, 'new_order_match', NEW.id, notification_title, notification_message)
       ON CONFLICT (user_id, order_id, type) DO NOTHING;
@@ -184,4 +166,11 @@ $$ LANGUAGE plpgsql;
 
 -- Комментарии
 COMMENT ON FUNCTION calculate_distance_km IS 'Вычисляет расстояние между двумя точками на Земле по формуле гаверсинуса (результат в км)';
-COMMENT ON FUNCTION notify_masters_on_new_order() IS 'Автоматически создает уведомления для мастеров при создании нового заказа с учетом расстояния';
+COMMENT ON FUNCTION notify_masters_on_new_order() IS 'Уведомления мастеров при новом заказе (категории → подкатегории), с учётом расстояния';
+
+-- Триггер на таблице orders
+DROP TRIGGER IF EXISTS trigger_notify_masters_on_new_order ON public.orders;
+CREATE TRIGGER trigger_notify_masters_on_new_order
+  AFTER INSERT ON public.orders
+  FOR EACH ROW
+  EXECUTE PROCEDURE notify_masters_on_new_order();

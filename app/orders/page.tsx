@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../providers'
 import { supabase, Order } from '@/lib/supabase'
@@ -59,8 +59,9 @@ export default function OrdersPage() {
   const [filterMode, setFilterMode] = useState<'all' | 'my_specializations'>('all')
   const [mySpecializations, setMySpecializations] = useState<string[]>([])
   const [notificationCount, setNotificationCount] = useState(0)
-  
-  const ITEMS_PER_PAGE = 20
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
+
+  const ITEMS_PER_PAGE = 12
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -68,67 +69,60 @@ export default function OrdersPage() {
     }
   }, [user, authLoading, router])
 
+  // Pro/settings, специализации мастера, счётчик уведомлений — после первого экрана (не блокируем список заказов)
   useEffect(() => {
-    // флаги ограничений (глобальный выключатель)
-    fetch('/api/pro/settings')
-      .then((r) => r.json())
-      .then((d) => setDisableMasterRestrictions(!!d?.disableMasterRestrictions))
-      .catch(() => {})
-  }, [])
+    if (!user) return
+    const run = () => {
+      fetch('/api/pro/settings')
+        .then((r) => r.json())
+        .then((d) => setDisableMasterRestrictions(!!d?.disableMasterRestrictions))
+        .catch(() => {})
 
-  // Загружаем специализации мастера
-  useEffect(() => {
-    if (user && user.role === 'master') {
-      const fetchMySpecializations = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('profile_specializations')
-            .select('specialization:specializations(name)')
-            .eq('profile_id', user.id)
+      if (user.role === 'master') {
+        supabase
+          .from('profile_subcategories')
+          .select('subcategory:subcategories(category:categories(name))')
+          .eq('profile_id', user.id)
+          .then(({ data, error }) => {
+            if (error) {
+              setMySpecializations([])
+              return
+            }
+            const names = (data || [])
+              .map((item: any) => item.subcategory?.category?.name)
+              .filter((name: string | undefined): name is string => !!name)
+            setMySpecializations([...new Set(names)])
+          })
+          .catch(() => setMySpecializations([]))
 
-          if (error) {
-            console.error('Error fetching specializations:', error)
-            setMySpecializations([])
-            return
-          }
-          
-          const specNames = (data || [])
-            .map((item: any) => item.specialization?.name)
-            .filter((name: string | undefined): name is string => !!name)
-          
-          console.log('Loaded specializations:', specNames) // Для отладки
-          setMySpecializations(specNames)
-        } catch (error) {
-          console.error('Error fetching specializations:', error)
-          setMySpecializations([])
-        }
+        fetch('/api/notifications/count')
+          .then((r) => r.json())
+          .then((d) => setNotificationCount(d?.count ?? 0))
+          .catch(() => {})
+      } else {
+        setMySpecializations([])
       }
-
-      fetchMySpecializations()
-    } else {
-      setMySpecializations([])
+    }
+    const id = typeof requestIdleCallback !== 'undefined'
+      ? requestIdleCallback(run, { timeout: 2500 })
+      : setTimeout(run, 2500)
+    return () => {
+      if (typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(id as number)
+      else clearTimeout(id as ReturnType<typeof setTimeout>)
     }
   }, [user])
 
-  // Загружаем количество непрочитанных уведомлений
+  // Обновление счётчика уведомлений каждые 30 с (только для мастера)
   useEffect(() => {
-    if (user && user.role === 'master') {
-      const fetchNotificationCount = async () => {
-        try {
-          const res = await fetch('/api/notifications/count')
-          const data = await res.json()
-          setNotificationCount(data.count || 0)
-        } catch (error) {
-          console.error('Error fetching notification count:', error)
-        }
-      }
-
-      fetchNotificationCount()
-      // Обновляем каждые 30 секунд
-      const interval = setInterval(fetchNotificationCount, 30000)
-      return () => clearInterval(interval)
-    }
-  }, [user])
+    if (user?.role !== 'master') return
+    const interval = setInterval(() => {
+      fetch('/api/notifications/count')
+        .then((r) => r.json())
+        .then((d) => setNotificationCount(d?.count ?? 0))
+        .catch(() => {})
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [user?.role])
 
   useEffect(() => {
     if (user) {
@@ -426,19 +420,7 @@ export default function OrdersPage() {
                   {orders.map((order) => (
                     <OrderCard key={order.id} order={order} variant="list" hideClientIdentity={hideClientIdentity} />
                   ))}
-                  
-                  {/* Load More Button */}
-                  {hasMore && (
-                    <div className="mt-8 text-center">
-                      <button
-                        onClick={loadMore}
-                        disabled={loadingMore}
-                        className="btn btn-secondary"
-                      >
-                        {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
-                      </button>
-                    </div>
-                  )}
+                  {hasMore && <div ref={loadMoreSentinelRef} className="h-4" aria-hidden />}
                 </>
               )}
             </div>
@@ -466,19 +448,7 @@ export default function OrdersPage() {
                       <OrderCard key={order.id} order={order} variant="grid" hideClientIdentity={hideClientIdentity} />
                     ))}
                   </div>
-                  
-                  {/* Load More Button */}
-                  {hasMore && (
-                    <div className="mt-8 text-center">
-                      <button
-                        onClick={loadMore}
-                        disabled={loadingMore}
-                        className="btn btn-secondary"
-                      >
-                        {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
-                      </button>
-                    </div>
-                  )}
+                  {hasMore && <div ref={loadMoreSentinelRef} className="h-4" aria-hidden />}
                 </>
               )}
             </>

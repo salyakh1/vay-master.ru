@@ -29,6 +29,8 @@ interface Order {
   days_since_created?: number
 }
 
+const PAGE_SIZE = 20
+
 export default function AdminOrdersPage() {
   const { user: currentUser } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
@@ -36,6 +38,9 @@ export default function AdminOrdersPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [categories, setCategories] = useState<string[]>([])
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [orderResponses, setOrderResponses] = useState<any[]>([])
 
@@ -44,12 +49,23 @@ export default function AdminOrdersPage() {
     if (currentUser) {
       logAdminAction(currentUser.id, 'view_orders', 'orders')
     }
-  }, [currentUser, statusFilter, categoryFilter])
+  }, [currentUser, statusFilter, categoryFilter, page])
 
-  const fetchOrders = async () => {
+  useEffect(() => {
+    const loadCategories = async () => {
+      const { data } = await supabase.from('orders').select('category').not('category', 'is', null)
+      const unique = Array.from(new Set((data || []).map((o: any) => o.category).filter(Boolean)))
+      setCategories(unique.sort())
+    }
+    loadCategories()
+  }, [])
+
+  const fetchOrders = async (pageOverride?: number) => {
+    const currentPage = pageOverride ?? page
     try {
       setLoading(true)
-      let query = supabase
+      let countQuery = supabase.from('orders').select('*', { count: 'exact', head: true })
+      let dataQuery = supabase
         .from('orders')
         .select(`
           *,
@@ -57,48 +73,49 @@ export default function AdminOrdersPage() {
           selected_master:profiles!selected_master_id(id, full_name, email)
         `)
         .order('created_at', { ascending: false })
-        .limit(200)
+        .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1)
 
       if (statusFilter) {
-        query = query.eq('status', statusFilter)
+        countQuery = countQuery.eq('status', statusFilter)
+        dataQuery = dataQuery.eq('status', statusFilter)
       }
-
       if (categoryFilter) {
-        query = query.eq('category', categoryFilter)
+        countQuery = countQuery.eq('category', categoryFilter)
+        dataQuery = dataQuery.eq('category', categoryFilter)
       }
-
       if (searchQuery) {
-        query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,location.ilike.%${searchQuery}%`)
+        const or = `title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,location.ilike.%${searchQuery}%`
+        countQuery = countQuery.or(or)
+        dataQuery = dataQuery.or(or)
       }
 
-      const { data: ordersData, error: ordersError } = await query
+      const [{ count }, { data: ordersData, error: ordersError }] = await Promise.all([
+        countQuery,
+        dataQuery,
+      ])
       if (ordersError) throw ordersError
+      setTotalCount(count ?? 0)
 
-      // Fetch responses count for each order
       const orderIds = (ordersData || []).map((o: any) => o.id)
-      const { data: responsesData } = await supabase
-        .from('order_responses')
-        .select('order_id')
-        .in('order_id', orderIds)
+      const { data: responsesData } = orderIds.length > 0
+        ? await supabase.from('order_responses').select('order_id').in('order_id', orderIds)
+        : { data: [] }
 
       const responsesCountMap = new Map<string, number>()
-      responsesData?.forEach((r) => {
+      responsesData?.forEach((r: any) => {
         responsesCountMap.set(r.order_id, (responsesCountMap.get(r.order_id) || 0) + 1)
       })
 
-      // Calculate days since created
       const now = new Date()
       const ordersWithStats = (ordersData || []).map((order: any) => {
         const created = new Date(order.created_at)
         const daysSince = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
-
         return {
           ...order,
           responses_count: responsesCountMap.get(order.id) || 0,
           days_since_created: daysSince,
         } as Order
       })
-
       setOrders(ordersWithStats)
     } catch (error) {
       console.error('Error fetching orders:', error)
@@ -130,12 +147,9 @@ export default function AdminOrdersPage() {
     await fetchOrderResponses(order.id)
   }
 
-  // Get unique categories
-  const categories = Array.from(new Set(orders.map((o) => o.category)))
-
-  // Statistics
+  // Statistics (for current page only; total from totalCount)
   const stats = {
-    total: orders.length,
+    total: totalCount,
     new: orders.filter((o) => o.status === 'new').length,
     in_progress: orders.filter((o) => o.status === 'in_progress').length,
     completed: orders.filter((o) => o.status === 'completed').length,
@@ -157,7 +171,7 @@ export default function AdminOrdersPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <div className="card">
-          <div className="text-sm text-text-secondary">Всего</div>
+          <div className="text-sm text-text-secondary">Всего в выборке</div>
           <div className="text-2xl font-bold text-text-primary">{stats.total}</div>
         </div>
         <div className="card">
@@ -191,7 +205,7 @@ export default function AdminOrdersPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchOrders()}
+              onKeyDown={(e) => e.key === 'Enter' && (setPage(1), fetchOrders(1))}
               placeholder="Поиск по названию, описанию, адресу..."
               className="input pl-10 w-full h-10 text-sm"
             />
@@ -223,9 +237,7 @@ export default function AdminOrdersPage() {
                 color: !categoryFilter ? 'transparent' : 'var(--text-primary)',
               }}
             >
-              <option value="" disabled style={{ color: 'var(--text-muted)', display: 'none' }}>
-                Категория
-              </option>
+              <option value="">Все категории</option>
               {categories.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
@@ -233,11 +245,20 @@ export default function AdminOrdersPage() {
               ))}
             </select>
           </div>
-          <button onClick={fetchOrders} className="btn btn-primary h-10 w-full text-sm">
+          <button
+            onClick={() => { setPage(1); fetchOrders(1); }}
+            className="btn btn-primary h-10 w-full text-sm"
+          >
             Найти
           </button>
         </div>
       </div>
+
+      {totalCount > 0 && (
+        <div className="text-sm text-text-secondary">
+          Показано {orders.length} из {totalCount}
+        </div>
+      )}
 
       {/* Orders List */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -302,6 +323,28 @@ export default function AdminOrdersPage() {
             </div>
           ))}
         </div>
+
+        {totalCount > PAGE_SIZE && (
+          <div className="lg:col-span-2 flex items-center justify-between gap-4 mt-4">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="btn btn-outline text-sm disabled:opacity-50"
+            >
+              ← Назад
+            </button>
+            <span className="text-sm text-text-secondary">
+              Страница {page} из {Math.ceil(totalCount / PAGE_SIZE)}
+            </span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= Math.ceil(totalCount / PAGE_SIZE) || loading}
+              className="btn btn-outline text-sm disabled:opacity-50"
+            >
+              Вперёд →
+            </button>
+          </div>
+        )}
 
         {/* Order Details */}
         {selectedOrder && (

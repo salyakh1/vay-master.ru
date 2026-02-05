@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { FixedSizeList as List } from 'react-window'
 import { useAuth } from '../providers'
 import { supabase, PortfolioItem, PortfolioComment } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -13,6 +14,9 @@ import PostImageSlider from '@/components/PostImageSlider'
 import { Story } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+
+const FEED_LIST_HEIGHT = typeof window !== 'undefined' ? Math.min(700, window.innerHeight - 280) : 600
+const FEED_ITEM_HEIGHT = 520
 
 interface ItemWithInteractions extends PortfolioItem {
   liked?: boolean
@@ -32,7 +36,19 @@ export default function FeedPage() {
   const [storiesLoading, setStoriesLoading] = useState(false)
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({})
   const [submittingComments, setSubmittingComments] = useState<Record<string, boolean>>({})
-  
+  const feedListRef = useRef<HTMLDivElement>(null)
+  const [feedListWidth, setFeedListWidth] = useState(400)
+
+  useEffect(() => {
+    const el = feedListRef.current
+    if (!el) return
+    const setW = () => setFeedListWidth(el.offsetWidth)
+    setW()
+    const ro = new ResizeObserver(setW)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [items.length])
+
   const ITEMS_PER_PAGE = 20
 
   useEffect(() => {
@@ -116,7 +132,7 @@ export default function FeedPage() {
         
         const likedItemIds = new Set(likesData?.map(l => l.portfolio_item_id) || [])
         
-        // Получаем комментарии для всех работ (первые 3 для каждой)
+        // Получаем комментарии для всех работ (не более 60 на порцию — ~3 на пост)
         const { data: commentsData } = await supabase
           .from('portfolio_comments')
           .select(`
@@ -125,6 +141,7 @@ export default function FeedPage() {
           `)
           .in('portfolio_item_id', itemIds)
           .order('created_at', { ascending: true })
+          .limit(60)
         
         // Группируем комментарии по работам
         const commentsByItem = new Map<string, PortfolioComment[]>()
@@ -365,200 +382,176 @@ export default function FeedPage() {
               <div className="card text-center text-text-secondary py-12 animate-fade-in">
                 <p className="text-lg font-medium text-graphite-secondary">Пока нет работ от ваших подписок.</p>
               </div>
-            ) : (
+            ) : items.length > 0 ? (
               <>
-                {items.map((item) => (
-                <div key={item.id} className="bg-bg-card rounded-lg border border-border-light/40 overflow-hidden">
-                  {/* Шапка публикации */}
-                  <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-graphite-primary text-white flex items-center justify-center text-sm font-semibold rounded-full flex-shrink-0 relative overflow-hidden">
-                        {item.master?.avatar_url ? (
-                          <Image src={item.master.avatar_url} alt={item.master.full_name} fill className="object-cover" sizes="48px" />
-                        ) : (
-                          item.master?.full_name?.[0]?.toUpperCase() || 'M'
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-base text-graphite-secondary truncate">{item.master?.full_name || 'Мастер'}</div>
-                        {item.master?.city && (
-                          <div className="text-sm text-text-secondary truncate">{item.master.city}</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Изображения/видео (на всю ширину, без отступов) */}
-                  {item.images && item.images.length > 0 ? (
-                    <PostImageSlider
-                      images={item.images}
-                      alt={item.title}
-                      className="w-full"
-                    />
-                  ) : item.videos && item.videos.length > 0 ? (
-                    <div className="w-full">
-                      <video src={item.videos[0]} controls className="w-full" />
-                    </div>
-                  ) : null}
-
-                  {/* Кнопки взаимодействия (как в Instagram) */}
-                  <div className="px-4 sm:px-5 pt-3 pb-2">
-                    <div className="flex items-center gap-4 mb-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleLike(item.id)
-                        }}
-                        className={`transition-colors ${
-                          item.liked ? 'text-brand-accent' : 'text-graphite-secondary'
-                        }`}
-                      >
-                        <FiHeart 
-                          size={24} 
-                          className={item.liked ? 'fill-current' : ''}
-                        />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const nextOpen = !item.showComments
-                          setCommentsOpen(item.id, nextOpen)
-                          if (nextOpen) fetchAllComments(item.id)
-                        }}
-                        className="text-graphite-secondary transition-colors"
-                      >
-                        <FiMessageCircle size={24} />
-                      </button>
-                    </div>
-                    
-                    {/* Счетчики */}
-                    {item.likes_count > 0 && (
-                      <div className="text-sm font-semibold text-graphite-secondary mb-2">
-                        {item.likes_count} {item.likes_count === 1 ? 'лайк' : item.likes_count < 5 ? 'лайка' : 'лайков'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Контент публикации */}
-                  <div className="px-4 sm:px-5 pb-3">
-                    {item.title && (
-                      <div className="font-semibold text-base sm:text-lg text-graphite-secondary tracking-tight mb-1.5">
-                        {item.title}
-                      </div>
-                    )}
-                    {item.description && (
-                      <p className="text-sm sm:text-base text-text-secondary leading-relaxed whitespace-pre-wrap mb-2">
-                        {item.description}
-                      </p>
-                    )}
-                    
-                    {/* Комментарии */}
-                    {item.comments && item.comments.length > 0 && (
-                      <div className="mb-2" onClick={(e) => e.stopPropagation()}>
-                        {!item.showComments && item.comments_count > item.comments.length && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setCommentsOpen(item.id, true)
-                              fetchAllComments(item.id)
-                            }}
-                            className="text-sm text-text-secondary hover:text-text-primary mb-2"
-                          >
-                            Показать все комментарии ({item.comments_count})
-                          </button>
-                        )}
-                        
-                        {item.showComments ? (
-                          <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
-                            {item.comments.map((comment) => (
-                              <div key={comment.id} className="flex gap-2">
-                                <div className="flex-1">
-                                  <span className="font-semibold text-sm text-graphite-secondary mr-2">
-                                    {comment.user?.full_name || 'Пользователь'}
-                                  </span>
-                                  <span className="text-sm text-text-secondary">
-                                    {comment.content}
-                                  </span>
-                                  <div className="text-xs text-text-muted mt-0.5">
-                                    {format(new Date(comment.created_at), 'd MMMM', { locale: ru })}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="space-y-2 mb-2">
-                            {item.comments.slice(-2).map((comment) => (
-                              <div key={comment.id} className="flex gap-2">
-                                <div className="flex-1">
-                                  <span className="font-semibold text-sm text-graphite-secondary mr-2">
-                                    {comment.user?.full_name || 'Пользователь'}
-                                  </span>
-                                  <span className="text-sm text-text-secondary">
-                                    {comment.content}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Форма добавления комментария */}
-                    {user && (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          handleSubmitComment(item.id)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-2 pt-2 border-t border-border-light/40"
-                      >
-                        <input
-                          type="text"
-                          value={commentTexts[item.id] || ''}
-                          onChange={(e) => {
-                            e.stopPropagation()
-                            setCommentTexts({ ...commentTexts, [item.id]: e.target.value })
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder="Добавить комментарий..."
-                          className="flex-1 text-sm bg-transparent border-none outline-none text-text-secondary placeholder-text-muted"
-                        />
-                        <button
-                          type="submit"
-                          disabled={!commentTexts[item.id]?.trim() || submittingComments[item.id]}
-                          onClick={(e) => e.stopPropagation()}
-                          className={`transition-colors ${
-                            commentTexts[item.id]?.trim() && !submittingComments[item.id]
-                              ? 'text-brand-accent'
-                              : 'text-text-muted'
-                          }`}
-                        >
-                          <FiSend size={18} />
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                </div>
-              ))}
-              
-              {/* Load More Button */}
-              {hasMore && (
-                <div className="mt-8 text-center">
-                  <button
-                    onClick={loadMore}
-                    disabled={loadingMore}
-                    className="btn btn-secondary"
+                <div ref={feedListRef} style={{ height: FEED_LIST_HEIGHT }} className="w-full overflow-hidden">
+                  <List
+                    width={feedListWidth}
+                    height={FEED_LIST_HEIGHT}
+                    itemCount={items.length}
+                    itemSize={FEED_ITEM_HEIGHT}
+                    itemData={{
+                      items,
+                      handleLike,
+                      setCommentsOpen,
+                      fetchAllComments,
+                      commentTexts,
+                      setCommentTexts,
+                      submittingComments,
+                      handleSubmitComment,
+                      user,
+                    }}
+                    onScroll={({ scrollOffset }) => {
+                      const total = items.length * FEED_ITEM_HEIGHT
+                      if (total > 0 && scrollOffset + FEED_LIST_HEIGHT >= total - 400 && hasMore && !loadingMore) {
+                        loadMore()
+                      }
+                    }}
                   >
-                    {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
-                  </button>
+                    {({ index, style, data }) => {
+                      const item = data.items[index]
+                      if (!item) return <div style={style} />
+                      return (
+                        <div style={{ ...style, paddingBottom: 28 }} className="box-border w-full">
+                          <div className="bg-bg-card rounded-lg border border-border-light/40 overflow-hidden">
+                            <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-graphite-primary text-white flex items-center justify-center text-sm font-semibold rounded-full flex-shrink-0 relative overflow-hidden">
+                                  {item.master?.avatar_url ? (
+                                    <Image src={item.master.avatar_url} alt={item.master.full_name} fill className="object-cover" sizes="48px" />
+                                  ) : (
+                                    item.master?.full_name?.[0]?.toUpperCase() || 'M'
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-base text-graphite-secondary truncate">{item.master?.full_name || 'Мастер'}</div>
+                                  {item.master?.city && (
+                                    <div className="text-sm text-text-secondary truncate">{item.master.city}</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            {item.images && item.images.length > 0 ? (
+                              <PostImageSlider images={item.images} alt={item.title} className="w-full" />
+                            ) : item.videos && item.videos.length > 0 ? (
+                              <div className="w-full">
+                                <video src={item.videos[0]} controls className="w-full" />
+                              </div>
+                            ) : null}
+                            <div className="px-4 sm:px-5 pt-3 pb-2">
+                              <div className="flex items-center gap-4 mb-2">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); data.handleLike(item.id) }}
+                                  className={item.liked ? 'text-brand-accent' : 'text-graphite-secondary'}
+                                >
+                                  <FiHeart size={24} className={item.liked ? 'fill-current' : ''} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    const nextOpen = !item.showComments
+                                    data.setCommentsOpen(item.id, nextOpen)
+                                    if (nextOpen) data.fetchAllComments(item.id)
+                                  }}
+                                  className="text-graphite-secondary transition-colors"
+                                >
+                                  <FiMessageCircle size={24} />
+                                </button>
+                              </div>
+                              {item.likes_count > 0 && (
+                                <div className="text-sm font-semibold text-graphite-secondary mb-2">
+                                  {item.likes_count} {item.likes_count === 1 ? 'лайк' : item.likes_count < 5 ? 'лайка' : 'лайков'}
+                                </div>
+                              )}
+                            </div>
+                            <div className="px-4 sm:px-5 pb-3">
+                              {item.title && (
+                                <div className="font-semibold text-base sm:text-lg text-graphite-secondary tracking-tight mb-1.5">{item.title}</div>
+                              )}
+                              {item.description && (
+                                <p className="text-sm sm:text-base text-text-secondary leading-relaxed whitespace-pre-wrap mb-2">{item.description}</p>
+                              )}
+                              {item.comments && item.comments.length > 0 && (
+                                <div className="mb-2" onClick={(e) => e.stopPropagation()}>
+                                  {!item.showComments && item.comments_count > item.comments.length && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        data.setCommentsOpen(item.id, true)
+                                        data.fetchAllComments(item.id)
+                                      }}
+                                      className="text-sm text-text-secondary hover:text-text-primary mb-2"
+                                    >
+                                      Показать все комментарии ({item.comments_count})
+                                    </button>
+                                  )}
+                                  {item.showComments ? (
+                                    <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
+                                      {item.comments.map((comment) => (
+                                        <div key={comment.id} className="flex gap-2">
+                                          <div className="flex-1">
+                                            <span className="font-semibold text-sm text-graphite-secondary mr-2">{comment.user?.full_name || 'Пользователь'}</span>
+                                            <span className="text-sm text-text-secondary">{comment.content}</span>
+                                            <div className="text-xs text-text-muted mt-0.5">{format(new Date(comment.created_at), 'd MMMM', { locale: ru })}</div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-2 mb-2">
+                                      {item.comments.slice(-2).map((comment) => (
+                                        <div key={comment.id} className="flex gap-2">
+                                          <div className="flex-1">
+                                            <span className="font-semibold text-sm text-graphite-secondary mr-2">{comment.user?.full_name || 'Пользователь'}</span>
+                                            <span className="text-sm text-text-secondary">{comment.content}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {data.user && (
+                                <form
+                                  onSubmit={(e) => { e.preventDefault(); e.stopPropagation(); data.handleSubmitComment(item.id) }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex items-center gap-2 pt-2 border-t border-border-light/40"
+                                >
+                                  <input
+                                    type="text"
+                                    value={data.commentTexts[item.id] || ''}
+                                    onChange={(e) => data.setCommentTexts({ ...data.commentTexts, [item.id]: e.target.value })}
+                                    onClick={(e) => e.stopPropagation()}
+                                    placeholder="Добавить комментарий..."
+                                    className="flex-1 text-sm bg-transparent border-none outline-none text-text-secondary placeholder-text-muted"
+                                  />
+                                  <button
+                                    type="submit"
+                                    disabled={!data.commentTexts[item.id]?.trim() || data.submittingComments[item.id]}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={data.commentTexts[item.id]?.trim() && !data.submittingComments[item.id] ? 'text-brand-accent' : 'text-text-muted'}
+                                  >
+                                    <FiSend size={18} />
+                                  </button>
+                                </form>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }}
+                  </List>
                 </div>
-              )}
-            </>
-            )}
+                {loadingMore && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
+                {hasMore && !loadingMore && (
+                  <div className="mt-4 text-center">
+                    <button type="button" onClick={loadMore} className="btn btn-secondary">
+                      Загрузить ещё
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : null}
           </div>
         </div>
       </div>

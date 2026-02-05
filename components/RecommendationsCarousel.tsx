@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+'use client'
+
+import { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiShoppingBag } from 'react-icons/fi'
@@ -27,6 +29,8 @@ export default function RecommendationsCarousel({
 }: RecommendationsCarouselProps) {
   const [items, setItems] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
+  const [shouldLoad, setShouldLoad] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const url = useMemo(() => {
     const params = new URLSearchParams()
@@ -44,7 +48,22 @@ export default function RecommendationsCarousel({
     return `/api/recommendations/products?${params.toString()}`
   }, [query, categoryId, subcategoryId, categorySlugs, subcategorySlugs, role, limit])
 
+  // Загружаем только когда карусель близко к viewport — не грузим всё сразу
   useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setShouldLoad(true)
+      },
+      { rootMargin: '400px', threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!shouldLoad) return
     let active = true
     const load = async () => {
       setLoading(true)
@@ -64,12 +83,13 @@ export default function RecommendationsCarousel({
     return () => {
       active = false
     }
-  }, [url])
+  }, [url, shouldLoad])
 
-  if (!loading && items.length === 0) return null
+  if (!shouldLoad) return <div ref={containerRef} className="mb-6 min-h-[140px]" aria-hidden />
+  if (!loading && items.length === 0) return <div ref={containerRef} className="mb-6" />
 
   return (
-    <div className="mb-6">
+    <div ref={containerRef} className="mb-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base sm:text-lg font-semibold text-graphite-secondary">
           {title}
@@ -107,6 +127,7 @@ export default function RecommendationsCarousel({
                         fill
                         className="object-cover group-hover:scale-110 transition-transform duration-300"
                         sizes="128px"
+                        loading="lazy"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </>

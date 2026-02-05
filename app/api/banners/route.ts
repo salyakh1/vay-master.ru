@@ -61,7 +61,9 @@ export async function GET(request: NextRequest) {
       return true
     }).slice(0, limit) // Ограничиваем до нужного количества
 
-    return NextResponse.json({ banners: filteredBanners })
+    const res = NextResponse.json({ banners: filteredBanners })
+    res.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
+    return res
   } catch (error) {
     console.error('Error in banners API:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

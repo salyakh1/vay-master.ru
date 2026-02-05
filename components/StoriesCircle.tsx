@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
+import Image from 'next/image'
 import { Story, User } from '@/lib/supabase'
 import { FiPlus } from 'react-icons/fi'
 
@@ -118,16 +119,22 @@ export default function StoriesCircle({
                 >
                   <div className="w-full h-full rounded-full overflow-hidden bg-bg-secondary">
                     {previewMedia ? (
-                      <img
+                      <Image
                         src={previewMedia}
                         alt={user.full_name}
+                        width={64}
+                        height={64}
                         className="w-full h-full object-cover"
+                        unoptimized={!String(previewMedia).includes('supabase')}
                       />
                     ) : user.avatar_url ? (
-                      <img
+                      <Image
                         src={user.avatar_url}
                         alt={user.full_name}
+                        width={64}
+                        height={64}
                         className="w-full h-full object-cover"
+                        unoptimized={!String(user.avatar_url).includes('supabase')}
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-graphite-primary to-graphite-tertiary flex items-center justify-center text-white font-semibold">

@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, Suspense, useMemo } from 'react'
+import { useEffect, useState, Suspense, useMemo, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { VariableSizeList as List } from 'react-window'
 import { useAuth } from '../providers'
 import { supabase, Product, ProductCategory, ProductSubcategory, PRODUCT_CATEGORY_SECTIONS, Order } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -41,10 +42,15 @@ import {
 } from 'react-icons/fi'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import StoriesCircle from '@/components/StoriesCircle'
-import RecommendationsCarousel from '@/components/RecommendationsCarousel'
 import NearbyProductsCarousel from '@/components/NearbyProductsCarousel'
-import StoresMap from '@/components/StoresMap'
 import { Story } from '@/lib/supabase'
+import dynamic from 'next/dynamic'
+
+const RecommendationsCarousel = dynamic(() => import('@/components/RecommendationsCarousel'), {
+  ssr: false,
+  loading: () => <div className="h-[200px] bg-bg-secondary rounded-xl animate-pulse" aria-hidden />,
+})
+const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
 import { getProductCategoriesForSpecializations } from '@/lib/specialization-product-mapping'
 
 // Кастомная иконка гвоздя для крепежа
@@ -150,7 +156,13 @@ function ProductsContent() {
   const [productSubcategories, setProductSubcategories] = useState<ProductSubcategory[]>([])
   const [showFilters, setShowFilters] = useState(false)
   const [filterStep, setFilterStep] = useState<'categories' | 'subcategories'>('categories')
+  const [categoryImageFailed, setCategoryImageFailed] = useState<Set<string>>(new Set())
   const [showAuthModal, setShowAuthModal] = useState(false)
+
+  const CATEGORY_IMAGE_SIZE = 48
+  const markCategoryImageFailed = (id: string) => {
+    setCategoryImageFailed((prev) => new Set(prev).add(id))
+  }
   const [stories, setStories] = useState<Story[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
@@ -199,36 +211,37 @@ function ProductsContent() {
     )
   }
   
-  const ITEMS_PER_PAGE = 20
+  // Порция «по экрану»: ~1–1.5 экрана (2 колонки × 4–6 рядов)
+  const ITEMS_PER_PAGE = 12
   const GRID_COLUMN_COUNT = 2
+  const PRODUCTS_LIST_HEIGHT = typeof window !== 'undefined' ? Math.min(window.innerHeight * 0.65, 700) : 600
+  const ROW_BASE_HEIGHT = 320
+  const ROW_AD_EXTRA = 160
+  const ROW_CAROUSEL_EXTRA = 220
 
   // Загружаем специализации мастера и получаем категории товаров
   const [masterSpecializations, setMasterSpecializations] = useState<Array<{ id: string; slug: string }>>([])
   const [loadingSpecializations, setLoadingSpecializations] = useState(false)
   
   useEffect(() => {
-    const loadMasterSpecializations = async () => {
+    const loadMasterCategories = async () => {
       if (user?.role === 'master' && user.id) {
         setLoadingSpecializations(true)
         try {
           const { data, error } = await supabase
-            .from('profile_specializations')
-            .select('specialization:specializations(id, slug)')
+            .from('profile_subcategories')
+            .select('subcategory:subcategories(id, slug, category:categories(id, slug))')
             .eq('profile_id', user.id)
-          
           if (!error && data) {
-            const specs = (data as any[])
-              .map((item) => item.specialization)
-              .filter(Boolean)
-              .map((spec: any) => ({ id: spec.id, slug: spec.slug }))
-            console.log('Loaded master specializations:', specs)
-            setMasterSpecializations(specs)
+            const slugs = (data as any[])
+              .map((item) => item.subcategory?.category?.slug)
+              .filter(Boolean) as string[]
+            setMasterSpecializations(Array.from(new Set(slugs)).map((slug) => ({ id: slug, slug })))
           } else {
-            console.log('No specializations found for master:', user.id)
             setMasterSpecializations([])
           }
         } catch (error) {
-          console.error('Error loading master specializations:', error)
+          console.error('Error loading master categories:', error)
           setMasterSpecializations([])
         } finally {
           setLoadingSpecializations(false)
@@ -238,31 +251,20 @@ function ProductsContent() {
         setLoadingSpecializations(false)
       }
     }
-    loadMasterSpecializations()
+    loadMasterCategories()
   }, [user])
 
-  // Получаем категории товаров для мастера на основе его специализаций
   const masterProductCategories = useMemo(() => {
     if (user?.role !== 'master' || masterSpecializations.length === 0) {
       return { categorySlugs: undefined, subcategorySlugs: undefined }
     }
-    
-    const specializationSlugs = masterSpecializations.map((spec) => spec.slug)
-    const result = getProductCategoriesForSpecializations(specializationSlugs)
-    
-    // Отладочная информация
-    if (result.categorySlugs.length > 0) {
-      console.log('Master specializations:', specializationSlugs)
-      console.log('Product categories for master:', result)
-    }
-    
-    return result
+    const categorySlugs = masterSpecializations.map((s) => s.slug)
+    return getProductCategoriesForSpecializations(categorySlugs)
   }, [user, masterSpecializations])
 
-  // Проверка: является ли пользователь мастером с категориями
-  const isMasterWithCategories = user?.role === 'master' && 
-    !loadingSpecializations && 
-    masterProductCategories.categorySlugs && 
+  const isMasterWithCategories = user?.role === 'master' &&
+    !loadingSpecializations &&
+    masterProductCategories.categorySlugs &&
     masterProductCategories.categorySlugs.length > 0
 
   // Загружаем заказы из города мастера
@@ -328,10 +330,16 @@ function ProductsContent() {
 
   // Убираем редирект для неавторизованных - они могут видеть карточки товаров
 
-  // Загружаем категории и истории при загрузке страницы
+  // Приоритет: категории для фильтра и список товаров (в другом useEffect). Истории — с задержкой.
   useEffect(() => {
     fetchCategories()
-    fetchStories() // Загружаем истории продавцов для всех пользователей (включая неавторизованных)
+    const id = typeof requestIdleCallback !== 'undefined'
+      ? requestIdleCallback(() => fetchStories(), { timeout: 1500 })
+      : setTimeout(fetchStories, 1500)
+    return () => {
+      if (typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(id as number)
+      else clearTimeout(id as ReturnType<typeof setTimeout>)
+    }
   }, [])
 
   // Создаем массив строк (каждая строка = 2 товара или товар+заказ)
@@ -389,6 +397,18 @@ function ProductsContent() {
     
     return rows
   }, [products, user, cityOrders])
+
+  const getProductsRowSize = useCallback(
+    (index: number) => {
+      const row = gridRows[index]
+      if (!row) return ROW_BASE_HEIGHT
+      let h = ROW_BASE_HEIGHT
+      if (row.hasAd) h += ROW_AD_EXTRA
+      if (index === 3) h += ROW_CAROUSEL_EXTRA
+      return h
+    },
+    [gridRows]
+  )
 
   // Город применяется только при закрытии модалки — во время ввода запросы не уходят
   const applyCityAndCloseFilters = () => {
@@ -607,7 +627,7 @@ function ProductsContent() {
             onClick={() => setShowFilters(false)}
           >
             <div 
-              className="absolute inset-0 bg-white flex flex-col"
+              className="absolute inset-0 bottom-16 bg-white flex flex-col rounded-t-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-border-light">
@@ -661,6 +681,8 @@ function ProductsContent() {
                             <div className="grid grid-cols-3 gap-3">
                               {categories.map((cat) => {
                                 const Icon = getCategoryIcon(cat.slug)
+                                const showImage = !categoryImageFailed.has(cat.id)
+                                const imageUrl = cat.image_url || `https://picsum.photos/seed/${encodeURIComponent(cat.slug)}/${CATEGORY_IMAGE_SIZE * 2}/${CATEGORY_IMAGE_SIZE * 2}`
                                 return (
                                   <button
                                     key={cat.id}
@@ -675,12 +697,28 @@ function ProductsContent() {
                                         : 'border-border-light text-graphite-secondary hover:border-brand-accent/30 hover:bg-bg-secondary'
                                     }`}
                                   >
-                                    <Icon 
-                                      size={32} 
-                                      className={`mb-2 ${
-                                        categoryId === cat.id ? 'text-brand-accent' : 'text-text-secondary'
-                                      }`} 
-                                    />
+                                    <div
+                                      className="w-12 h-12 rounded-lg overflow-hidden bg-bg-secondary flex items-center justify-center mb-2 flex-shrink-0"
+                                      style={{ width: CATEGORY_IMAGE_SIZE, height: CATEGORY_IMAGE_SIZE }}
+                                    >
+                                      {showImage ? (
+                                        <img
+                                          src={imageUrl}
+                                          alt=""
+                                          width={CATEGORY_IMAGE_SIZE}
+                                          height={CATEGORY_IMAGE_SIZE}
+                                          loading="lazy"
+                                          decoding="async"
+                                          className="w-full h-full object-cover"
+                                          onError={() => markCategoryImageFailed(cat.id)}
+                                        />
+                                      ) : (
+                                        <Icon
+                                          size={24}
+                                          className={categoryId === cat.id ? 'text-brand-accent' : 'text-text-secondary'}
+                                        />
+                                      )}
+                                    </div>
                                     <span className="text-xs font-medium text-center leading-tight">
                                       {cat.name}
                                     </span>
@@ -708,9 +746,26 @@ function ProductsContent() {
                           const selectedCat = productCategories.find((cat) => cat.id === categoryId)
                           if (!selectedCat) return null
                           const Icon = getCategoryIcon(selectedCat.slug)
+                          const showImg = !categoryImageFailed.has(selectedCat.id)
+                          const thumbUrl = selectedCat.image_url || `https://picsum.photos/seed/${encodeURIComponent(selectedCat.slug)}/64/64`
                           return (
                             <>
-                              <Icon size={20} className="text-brand-accent" />
+                              <div className="w-8 h-8 rounded overflow-hidden bg-bg-secondary flex-shrink-0 flex items-center justify-center">
+                                {showImg ? (
+                                  <img
+                                    src={thumbUrl}
+                                    alt=""
+                                    width={32}
+                                    height={32}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-full h-full object-cover"
+                                    onError={() => markCategoryImageFailed(selectedCat.id)}
+                                  />
+                                ) : (
+                                  <Icon size={18} className="text-brand-accent" />
+                                )}
+                              </div>
                               <span className="text-sm font-semibold text-graphite-secondary">
                                 {selectedCat.name}
                               </span>
@@ -839,72 +894,82 @@ function ProductsContent() {
           </div>
         ) : (
           <>
-            <div className="w-full space-y-4">
-              {gridRows.map((row, rowIndex) => (
-                <div key={`row-${rowIndex}`} className="w-full">
-                  <div className="grid grid-cols-2 gap-[10px] px-0">
-                    {/* Показываем товары, пропуская первый, если он уже использован с заказом */}
-                    {row.items.map((product, itemIndex) => {
-                      if (row.skipFirstItem && itemIndex === 0) return null
-                      return <ProductCard key={product.id} product={product} currentUser={user} />
-                    })}
-                    {/* Вставляем заказ, если есть место в строке или если это специальная строка с заказом */}
-                    {row.orderAfter ? (
-                      <OrderCard key={`order-${row.orderAfter.id}`} order={row.orderAfter} variant="product-grid" />
-                    ) : row.items.length < GRID_COLUMN_COUNT && !row.skipFirstItem ? (
-                      <div />
-                    ) : null}
-                  </div>
-                  
-                  {row.hasAd && row.adProductIndex !== undefined && (
-                    <div className="col-span-2 mt-4 px-0">
-                      <AdSlot
-                        type="INLINE_CONTEXT"
-                        context={{
-                          page: 'products',
-                          category: row.items[0]?.category_ref?.section
-                            ? [row.items[0].category_ref.section]
-                            : undefined,
-                          keywords: searchQuery ? [searchQuery] : undefined,
-                          city: cityFilter || undefined,
-                        }}
-                        index={row.adProductIndex}
-                        className="my-4"
-                      />
+            <div style={{ height: PRODUCTS_LIST_HEIGHT }} className="w-full overflow-hidden">
+              <List
+                width="100%"
+                height={PRODUCTS_LIST_HEIGHT}
+                itemCount={gridRows.length}
+                itemSize={getProductsRowSize}
+                itemData={{
+                  gridRows,
+                  user,
+                  searchQuery,
+                  categoryId,
+                  subcategoryId,
+                  cityFilter,
+                  masterProductCategories,
+                  isMasterWithCategories,
+                }}
+                onScroll={({ scrollOffset }) => {
+                  let total = 0
+                  for (let i = 0; i < gridRows.length; i++) total += getProductsRowSize(i)
+                  if (total > 0 && scrollOffset + PRODUCTS_LIST_HEIGHT >= total - 400 && hasMore && !loadingMore) {
+                    loadMore()
+                  }
+                }}
+              >
+                {({ index, style, data }) => {
+                  const row = data.gridRows[index]
+                  if (!row) return <div style={style} />
+                  const rowIndex = index
+                  return (
+                    <div style={{ ...style, paddingBottom: 16 }} className="box-border w-full">
+                      <div className="grid grid-cols-2 gap-[10px] px-0">
+                        {row.items.map((product, itemIndex) => {
+                          if (row.skipFirstItem && itemIndex === 0) return null
+                          return <ProductCard key={product.id} product={product} currentUser={data.user} />
+                        })}
+                        {row.orderAfter ? (
+                          <OrderCard key={`order-${row.orderAfter.id}`} order={row.orderAfter} variant="product-grid" />
+                        ) : row.items.length < GRID_COLUMN_COUNT && !row.skipFirstItem ? (
+                          <div />
+                        ) : null}
+                      </div>
+                      {row.hasAd && row.adProductIndex !== undefined && (
+                        <div className="col-span-2 mt-4 px-0">
+                          <AdSlot
+                            type="INLINE_CONTEXT"
+                            context={{
+                              page: 'products',
+                              category: row.items[0]?.category_ref?.section ? [row.items[0].category_ref.section] : undefined,
+                              keywords: data.searchQuery ? [data.searchQuery] : undefined,
+                              city: data.cityFilter || undefined,
+                            }}
+                            index={row.adProductIndex}
+                            className="my-4"
+                          />
+                        </div>
+                      )}
+                      {rowIndex === 3 && (
+                        <RecommendationsCarousel
+                          title={
+                            data.isMasterWithCategories ? "Рекомендации под ваши услуги" : "Рекомендации Pro‑товаров"
+                          }
+                          query={data.searchQuery}
+                          categoryId={data.isMasterWithCategories ? undefined : data.categoryId}
+                          subcategoryId={data.isMasterWithCategories ? undefined : data.subcategoryId}
+                          categorySlugs={data.isMasterWithCategories ? data.masterProductCategories.categorySlugs : undefined}
+                          subcategorySlugs={data.isMasterWithCategories ? data.masterProductCategories.subcategorySlugs : undefined}
+                          role={data.user?.role || 'client'}
+                          limit={12}
+                        />
+                      )}
                     </div>
-                  )}
-                  {rowIndex === 3 && (
-                    <RecommendationsCarousel
-                      title={
-                        isMasterWithCategories
-                          ? "Рекомендации под ваши услуги"
-                          : "Рекомендации Pro‑товаров"
-                      }
-                      query={searchQuery}
-                      categoryId={isMasterWithCategories ? undefined : categoryId}
-                      subcategoryId={isMasterWithCategories ? undefined : subcategoryId}
-                      categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
-                      subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
-                      role={user?.role || 'client'}
-                      limit={12}
-                    />
-                  )}
-                </div>
-              ))}
+                  )
+                }}
+              </List>
             </div>
-            
-            {/* Load More Button */}
-            {hasMore && (
-              <div className="mt-8 text-center">
-                <button
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="btn btn-secondary"
-                >
-                  {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
-                </button>
-              </div>
-            )}
+            {loadingMore && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
           </>
         )}
       </div>

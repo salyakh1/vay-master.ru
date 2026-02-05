@@ -45,6 +45,8 @@ export async function GET(request: NextRequest) {
     const period = (request.nextUrl.searchParams.get('period') as typeof PERIODS[number]) || 'all'
     const days = period !== 'all' && PERIODS.includes(period) ? PERIOD_DAYS[period] : null
     const after = days ? new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString() : null
+    const limit = Math.min(Number(request.nextUrl.searchParams.get('limit') || 20), 20)
+    const cursor = request.nextUrl.searchParams.get('cursor') || ''
 
     const userId = user.id
     console.log(`[activity/items] type=${type}, period=${period}, after=${after}, userId=${userId}, role=${role}`)
@@ -65,8 +67,10 @@ export async function GET(request: NextRequest) {
             `)
             .in('portfolio_item_id', ids)
           if (after) query = query.gt('created_at', after)
-          const { data: rows } = await query.order('created_at', { ascending: false }).limit(50)
-          items = (rows || []).map((r: any) => {
+          if (cursor) query = query.lt('created_at', cursor)
+          const { data: rows } = await query.order('created_at', { ascending: false }).limit(limit + 1)
+          const slice = (rows || []).slice(0, limit)
+          items = slice.map((r: any) => {
             const tit = (itemMap.get(r.portfolio_item_id) as any)?.title || 'Работа'
             return {
               id: r.id,
@@ -92,8 +96,10 @@ export async function GET(request: NextRequest) {
             `)
             .in('product_id', productIds)
           if (after) query = query.gt('created_at', after)
-          const { data: rows } = await query.order('created_at', { ascending: false }).limit(50)
-          items = (rows || []).map((r: any) => {
+          if (cursor) query = query.lt('created_at', cursor)
+          const { data: rows } = await query.order('created_at', { ascending: false }).limit(limit + 1)
+          const slice = (rows || []).slice(0, limit)
+          items = slice.map((r: any) => {
             const pTitle = productMap.get(r.product_id) || 'Товар'
             return {
               id: r.id,
@@ -116,8 +122,10 @@ export async function GET(request: NextRequest) {
           .select(`id, created_at, user_id, author:profiles!user_id(id, full_name)`)
           .in('portfolio_item_id', ids)
         if (after) query = query.gt('created_at', after)
-        const { data: rows } = await query.order('created_at', { ascending: false }).limit(50)
-        items = (rows || []).map((r: any) => ({
+        if (cursor) query = query.lt('created_at', cursor)
+        const { data: rows } = await query.order('created_at', { ascending: false }).limit(limit + 1)
+        const slice = (rows || []).slice(0, limit)
+        items = slice.map((r: any) => ({
           id: r.id,
           title: `${r.author?.full_name || 'Пользователь'} лайкнул работу`,
           subtitle: formatDate(r.created_at),
@@ -134,7 +142,9 @@ export async function GET(request: NextRequest) {
         `)
         .eq('master_id', userId)
       if (after) query = query.gt('created_at', after)
-      const { data: rows } = await query.order('created_at', { ascending: false }).limit(50)
+      if (cursor) query = query.lt('created_at', cursor)
+      const { data: rows } = await query.order('created_at', { ascending: false }).limit(limit + 1)
+      const sliceRes = (rows || []).slice(0, limit)
       items = (rows || []).map((r: any) => ({
         id: r.id,
         title: `Отклик на заказ «${(r.order as any)?.title || 'Заказ'}»`,
@@ -149,10 +159,12 @@ export async function GET(request: NextRequest) {
           .select(`id, rating, comment, created_at, reviewer:profiles!reviewer_id(id, full_name)`)
           .eq('master_id', userId)
         if (after) query = query.gt('created_at', after)
-        const { data: rows, error } = await query.order('created_at', { ascending: false }).limit(50)
+        if (cursor) query = query.lt('created_at', cursor)
+        const { data: rows, error } = await query.order('created_at', { ascending: false }).limit(limit + 1)
         if (error) console.error('Error fetching master_reviews:', error)
         console.log(`[activity/items] master_reviews: found ${rows?.length || 0} rows`)
-        items = (rows || []).map((r: any) => ({
+        const sliceRev = (rows || []).slice(0, limit)
+        items = sliceRev.map((r: any) => ({
           id: r.id,
           title: `Отзыв от ${r.reviewer?.full_name || 'Пользователь'}, ${r.rating} ★`,
           subtitle: (r.comment || '').slice(0, 80) + ((r.comment || '').length > 80 ? '…' : ''),
@@ -194,7 +206,7 @@ export async function GET(request: NextRequest) {
           created_at: r.created_at,
         }))
         list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        items = list.slice(0, 50)
+        items = list.slice(0, limit)
       }
     } else if (type === 'followers') {
       let query = supabaseAdmin
@@ -202,8 +214,10 @@ export async function GET(request: NextRequest) {
         .select(`id, created_at, follower_id, follower:profiles!follower_id(id, full_name)`)
         .eq('following_id', userId)
       if (after) query = query.gt('created_at', after)
-      const { data: rows } = await query.order('created_at', { ascending: false }).limit(50)
-      items = (rows || []).map((r: any) => ({
+      if (cursor) query = query.lt('created_at', cursor)
+      const { data: rows } = await query.order('created_at', { ascending: false }).limit(limit + 1)
+      const sliceF = (rows || []).slice(0, limit)
+      items = sliceF.map((r: any) => ({
         id: r.id,
         title: `${(r.follower as any)?.full_name || 'Пользователь'} подписался`,
         subtitle: formatDate(r.created_at),
@@ -258,15 +272,16 @@ export async function GET(request: NextRequest) {
             .in('id', Array.from(allReplyIds))
           // Применяем фильтр по дате только при получении полных данных
           if (after) query = query.gt('created_at', after)
-          const { data: rows, error: fetchError } = await query.order('created_at', { ascending: false }).limit(50)
-          
+          if (cursor) query = query.lt('created_at', cursor)
+          const { data: rows, error: fetchError } = await query.order('created_at', { ascending: false }).limit(limit + 1)
+          const sliceRep = (rows || []).slice(0, limit)
           console.log(`[activity/items] replies: fetched ${rows?.length || 0} replies after date filter`)
-          
+
           if (fetchError) {
             console.error('Error fetching full reply data:', fetchError)
             items = []
           } else {
-            items = (rows || []).map((r: any) => {
+            items = sliceRep.map((r: any) => {
               const pTitle = (r.product as any)?.title || 'Товар'
               return {
                 id: r.id,
@@ -284,7 +299,8 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[activity/items] returning ${items.length} items for type=${type}`)
-    return NextResponse.json({ items })
+    const nextCursor = items.length > 0 && items.length === limit ? items[items.length - 1].created_at : null
+    return NextResponse.json({ items, nextCursor, hasMore: items.length === limit })
   } catch (e: any) {
     console.error('activity/items', e)
     return NextResponse.json({ error: e?.message || 'Ошибка' }, { status: 500 })

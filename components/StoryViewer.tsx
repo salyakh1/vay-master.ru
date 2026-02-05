@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Story, User } from '@/lib/supabase'
 import { FiX, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
@@ -335,11 +336,16 @@ export default function StoryViewer({
             onPause={() => setIsPlaying(false)}
           />
         ) : (
-          <img
-            src={currentMedia}
-            alt="Story"
-            className="max-w-full max-h-full object-contain"
-          />
+          <div className="relative w-full h-full min-h-[200px]">
+            <Image
+              src={currentMedia}
+              alt="Story"
+              fill
+              sizes="100vw"
+              className="object-contain"
+              unoptimized={!String(currentMedia).includes('supabase')}
+            />
+          </div>
         )}
       </div>
 

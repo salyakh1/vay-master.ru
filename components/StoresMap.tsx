@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
+import Image from 'next/image'
 import Link from 'next/link'
 import { supabase, User, Product } from '@/lib/supabase'
 import { FiMapPin, FiShoppingBag, FiX, FiNavigation, FiFilter } from 'react-icons/fi'
@@ -72,7 +73,8 @@ export default function StoresMap({ masterLocation, onSellerClick, className = '
         query = query.or(`is_pro.eq.true,pro_until.gt.${now}`)
       }
 
-      const { data, error } = await query
+      const MAP_SELLERS_LIMIT = 200
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(MAP_SELLERS_LIMIT)
 
       if (error) throw error
 
@@ -346,10 +348,13 @@ export default function StoresMap({ masterLocation, onSellerClick, className = '
                               >
                                 <div className="flex items-center gap-2">
                                   {product.images && product.images.length > 0 ? (
-                                    <img
+                                    <Image
                                       src={product.images[0]}
                                       alt={product.name}
+                                      width={40}
+                                      height={40}
                                       className="w-10 h-10 rounded object-cover"
+                                      unoptimized={!String(product.images[0]).includes('supabase')}
                                     />
                                   ) : (
                                     <div className="w-10 h-10 rounded bg-gray-200 flex items-center justify-center">

@@ -12,16 +12,16 @@ export const dynamic = 'force-dynamic'
 const ITEMS_PER_PAGE = 20
 
 /**
- * GET /api/search/masters?q=&city=&spec=&service=&page=1
- * Единая точка поиска мастеров: текст, город (геокод + зона обслуживания), специализация, услуга.
- * Без параметров не вызывать — при отсутствии фильтров клиент использует fetchRandomProfiles.
+ * GET /api/search/masters?q=&city=&category=&subcategory=&service=&page=1
+ * Поиск мастеров: текст, город, категория, подкатегория, услуга.
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const q = (searchParams.get('q') || '').trim()
     const city = (searchParams.get('city') || '').trim()
-    const spec = searchParams.get('spec') || ''
+    let category = searchParams.get('category') || ''
+    const subcategory = searchParams.get('subcategory') || ''
     const service = searchParams.get('service') || ''
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
 
@@ -30,36 +30,50 @@ export async function GET(request: NextRequest) {
 
     let profileIds: string[] | null = null
 
-    // Текст: поиск по специализациям и услугам
+    // Текст: поиск по категориям, подкатегориям и услугам
     if (q) {
-      const [specRes, serviceRes] = await Promise.all([
-        supabaseAdmin.from('specializations').select('id').ilike('name', `%${q}%`),
+      const [catRes, subRes, svcRes] = await Promise.all([
+        supabaseAdmin.from('categories').select('id').ilike('name', `%${q}%`),
+        supabaseAdmin.from('subcategories').select('id').ilike('name', `%${q}%`),
         supabaseAdmin.from('services').select('id').ilike('name', `%${q}%`),
       ])
-      const specIds = (specRes.data || []).map((s: { id: string }) => s.id)
-      const serviceIds = (serviceRes.data || []).map((s: { id: string }) => s.id)
+      const catIds = (catRes.data || []).map((c: { id: string }) => c.id)
+      const subIds = (subRes.data || []).map((s: { id: string }) => s.id)
+      const svcIds = (svcRes.data || []).map((s: { id: string }) => s.id)
 
-      let profileIdsFromSpecs: string[] = []
-      let profileIdsFromServices: string[] = []
-      if (specIds.length > 0) {
-        const { data: ps } = await supabaseAdmin
-          .from('profile_specializations')
-          .select('profile_id')
-          .in('specialization_id', specIds)
-        profileIdsFromSpecs = (ps || []).map((p: { profile_id: string }) => p.profile_id)
+      let fromCats: string[] = []
+      let fromSubs: string[] = []
+      let fromSvc: string[] = []
+      if (catIds.length > 0) {
+        const subsInCats = await supabaseAdmin.from('subcategories').select('id').in('category_id', catIds)
+        const subIdsInCats = (subsInCats.data || []).map((s: { id: string }) => s.id)
+        if (subIdsInCats.length > 0) {
+          const { data: psc } = await supabaseAdmin
+            .from('profile_subcategories')
+            .select('profile_id')
+            .in('subcategory_id', subIdsInCats)
+          fromCats = (psc || []).map((p: { profile_id: string }) => p.profile_id)
+        }
       }
-      if (serviceIds.length > 0) {
+      if (subIds.length > 0) {
+        const { data: psc } = await supabaseAdmin
+          .from('profile_subcategories')
+          .select('profile_id')
+          .in('subcategory_id', subIds)
+        fromSubs = (psc || []).map((p: { profile_id: string }) => p.profile_id)
+      }
+      if (svcIds.length > 0) {
         const { data: psv } = await supabaseAdmin
           .from('profile_services')
           .select('profile_id')
-          .in('service_id', serviceIds)
-        profileIdsFromServices = (psv || []).map((p: { profile_id: string }) => p.profile_id)
+          .in('service_id', svcIds)
+        fromSvc = (psv || []).map((p: { profile_id: string }) => p.profile_id)
       }
-      const allIds = Array.from(new Set([...profileIdsFromSpecs, ...profileIdsFromServices]))
+      const allIds = Array.from(new Set([...fromCats, ...fromSubs, ...fromSvc]))
       if (allIds.length > 0) profileIds = allIds
     }
 
-    // Фильтр по выбранной специализации или услуге
+    // Фильтр по категории / подкатегории / услуге
     let filteredIds: string[] | null = null
     if (service) {
       const { data } = await supabaseAdmin
@@ -67,12 +81,25 @@ export async function GET(request: NextRequest) {
         .select('profile_id')
         .eq('service_id', service)
       filteredIds = (data || []).map((r: { profile_id: string }) => r.profile_id)
-    } else if (spec) {
+    } else if (subcategory) {
       const { data } = await supabaseAdmin
-        .from('profile_specializations')
+        .from('profile_subcategories')
         .select('profile_id')
-        .eq('specialization_id', spec)
+        .eq('subcategory_id', subcategory)
       filteredIds = (data || []).map((r: { profile_id: string }) => r.profile_id)
+    } else if (category) {
+      const { data: subs } = await supabaseAdmin
+        .from('subcategories')
+        .select('id')
+        .eq('category_id', category)
+      const subIds = (subs || []).map((s: { id: string }) => s.id)
+      if (subIds.length > 0) {
+        const { data } = await supabaseAdmin
+          .from('profile_subcategories')
+          .select('profile_id')
+          .in('subcategory_id', subIds)
+        filteredIds = (data || []).map((r: { profile_id: string }) => r.profile_id)
+      }
     }
 
     let finalProfileIds: string[] | null = null
@@ -132,11 +159,11 @@ export async function GET(request: NextRequest) {
       .select(
         `
         *,
-        profile_specializations (
-          specialization:specializations (id, name, slug)
+        profile_subcategories (
+          subcategory:subcategories (id, name, slug, category:categories (id, name, slug))
         ),
         profile_services (
-          service:services (id, name, slug, specialization_id)
+          service:services (id, name, slug, subcategory:subcategories (id, name, slug, category:categories (id, name, slug)))
         ),
         master_rating,
         master_reviews_count

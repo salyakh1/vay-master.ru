@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../providers'
 import { supabase, Chat, Message, User, OrderResponse, Order } from '@/lib/supabase'
@@ -12,6 +12,9 @@ import { FiBriefcase, FiMessageSquare, FiCheckCircle, FiXCircle, FiClock } from 
 
 type TabType = 'chats' | 'responses'
 
+const CHATS_PAGE_SIZE = 12
+const RESPONSES_PAGE_SIZE = 12
+
 export default function ChatsPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
@@ -20,6 +23,14 @@ export default function ChatsPage() {
   const [responses, setResponses] = useState<(OrderResponse & { order?: Order; master?: User })[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingResponses, setLoadingResponses] = useState(false)
+  const [chatsPage, setChatsPage] = useState(1)
+  const [hasMoreChats, setHasMoreChats] = useState(false)
+  const [loadingMoreChats, setLoadingMoreChats] = useState(false)
+  const [responsesPage, setResponsesPage] = useState(1)
+  const [hasMoreResponses, setHasMoreResponses] = useState(false)
+  const [loadingMoreResponses, setLoadingMoreResponses] = useState(false)
+  const loadMoreChatsSentinelRef = useRef<HTMLDivElement>(null)
+  const loadMoreResponsesSentinelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -107,80 +118,65 @@ export default function ChatsPage() {
     }
   }, [user, activeTab])
 
-  const fetchChats = async () => {
+  const fetchChats = async (append: boolean = false) => {
     if (!user) return
 
+    const page = append ? chatsPage : 1
+    if (!append) setLoading(true)
+    else setLoadingMoreChats(true)
+
     try {
-      const { data, error } = await supabase
+      const from = (page - 1) * CHATS_PAGE_SIZE
+      const to = from + CHATS_PAGE_SIZE - 1
+
+      const { data, error, count } = await supabase
         .from('chats')
-        .select('*')
+        .select('*', { count: 'exact' })
         .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
         .order('updated_at', { ascending: false })
+        .range(from, to)
 
       if (error) throw error
 
-      // Фильтруем чаты, которые были удалены пользователем
-      const filteredChats = (data || []).filter((chat) => {
+      const rawChats = data || []
+      const total = count ?? 0
+      setHasMoreChats(rawChats.length === CHATS_PAGE_SIZE && total > page * CHATS_PAGE_SIZE)
+
+      const filteredChats = rawChats.filter((chat) => {
         const deletedByUserIds = (chat.deleted_by_user_ids || []) as string[]
         return !deletedByUserIds.includes(user.id)
       })
 
-      // Оптимизация: получаем все данные параллельно
-      const chatIds = filteredChats.map((chat) => chat.id)
-      const otherUserIds = filteredChats.map((chat) =>
-        chat.user1_id === user.id ? chat.user2_id : chat.user1_id
-      )
+      const chatIds = filteredChats.map((c) => c.id)
+      const otherUserIds = filteredChats.map((c) => (c.user1_id === user.id ? c.user2_id : c.user1_id))
 
-      // Получаем всех пользователей одним запросом
-      const { data: allUsers } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', otherUserIds)
+      if (otherUserIds.length === 0) {
+        if (!append) setChats([])
+        setLoading(false)
+        setLoadingMoreChats(false)
+        return
+      }
 
-      // Получаем последние сообщения и количество непрочитанных для всех чатов одним запросом
-      // Используем оконные функции для получения последнего сообщения для каждого чата
-      const { data: allMessages, error: messagesError } = await supabase
-        .from('messages')
-        .select('*')
-        .in('chat_id', chatIds)
-        .order('created_at', { ascending: false })
+      const [{ data: allUsers }, { data: allMessages, error: messagesError }, { data: unreadMessages, error: unreadError }] = await Promise.all([
+        supabase.from('profiles').select('*').in('id', otherUserIds),
+        supabase.from('messages').select('*').in('chat_id', chatIds).order('created_at', { ascending: false }).limit(100),
+        supabase.from('messages').select('chat_id, id').in('chat_id', chatIds).eq('read', false).neq('sender_id', user.id),
+      ])
 
       if (messagesError) throw messagesError
-
-      // Получаем непрочитанные сообщения для всех чатов одним запросом
-      const { data: unreadMessages, error: unreadError } = await supabase
-        .from('messages')
-        .select('chat_id, id')
-        .in('chat_id', chatIds)
-        .eq('read', false)
-        .neq('sender_id', user.id)
-
       if (unreadError) throw unreadError
 
-      // Группируем последние сообщения по chat_id (берем первое для каждого чата, т.к. отсортировано по убыванию)
       const messagesByChat = new Map<string, Message>()
-      const processedChats = new Set<string>()
       allMessages?.forEach((msg) => {
-        if (!processedChats.has(msg.chat_id)) {
-          messagesByChat.set(msg.chat_id, msg as Message)
-          processedChats.add(msg.chat_id)
-        }
+        if (!messagesByChat.has(msg.chat_id)) messagesByChat.set(msg.chat_id, msg as Message)
       })
-
-      // Подсчитываем непрочитанные сообщения для каждого чата
       const unreadCountsByChat = new Map<string, number>()
       unreadMessages?.forEach((msg) => {
-        const current = unreadCountsByChat.get(msg.chat_id) || 0
-        unreadCountsByChat.set(msg.chat_id, current + 1)
+        unreadCountsByChat.set(msg.chat_id, (unreadCountsByChat.get(msg.chat_id) || 0) + 1)
       })
-
-      // Создаем map пользователей для быстрого доступа
       const usersMap = new Map<string, User>()
-      allUsers?.forEach((u) => {
-        usersMap.set(u.id, u as User)
-      })
+      allUsers?.forEach((u) => { usersMap.set(u.id, u as User) })
 
-      // Формируем результат
       const chatsWithUsers = filteredChats.map((chat) => {
         const otherUserId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id
         return {
@@ -191,12 +187,23 @@ export default function ChatsPage() {
         }
       })
 
-      setChats(chatsWithUsers)
+      if (append) {
+        setChats((prev) => [...prev, ...chatsWithUsers])
+        setChatsPage((p) => p + 1)
+      } else {
+        setChats(chatsWithUsers)
+        setChatsPage(2)
+      }
     } catch (error) {
       console.error('Error fetching chats:', error)
     } finally {
       setLoading(false)
+      setLoadingMoreChats(false)
     }
+  }
+
+  const loadMoreChats = () => {
+    if (!loadingMoreChats && hasMoreChats) fetchChats(true)
   }
 
   const formatMessageTime = (date: Date): string => {
@@ -224,12 +231,14 @@ export default function ChatsPage() {
     return format(messageDate, 'dd.MM.yyyy')
   }
 
-  const fetchResponses = async () => {
+  const fetchResponses = async (append: boolean = false) => {
     if (!user) return
 
-    setLoadingResponses(true)
+    const page = append ? responsesPage : 1
+    if (!append) setLoadingResponses(true)
+    else setLoadingMoreResponses(true)
+
     try {
-      // Для всех ролей - получаем отклики на заказы пользователя
       const { data: orders } = await supabase
         .from('orders')
         .select('id')
@@ -237,29 +246,73 @@ export default function ChatsPage() {
 
       if (!orders || orders.length === 0) {
         setResponses([])
+        setLoadingResponses(false)
+        setLoadingMoreResponses(false)
         return
       }
 
-      const orderIds = orders.map(o => o.id)
+      const orderIds = orders.map((o) => o.id)
+      const from = (page - 1) * RESPONSES_PAGE_SIZE
+      const to = from + RESPONSES_PAGE_SIZE - 1
 
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('order_responses')
-        .select(`
-          *,
-          order:orders!inner(id, title, status),
-          master:profiles!master_id(id, full_name, avatar_url, city)
-        `)
+        .select(
+          `*, order:orders!inner(id, title, status), master:profiles!master_id(id, full_name, avatar_url, city)`,
+          { count: 'exact' }
+        )
         .in('order_id', orderIds)
         .order('created_at', { ascending: false })
+        .range(from, to)
 
       if (error) throw error
-      setResponses((data || []) as any)
+
+      const list = (data || []) as (OrderResponse & { order?: Order; master?: User })[]
+      const total = count ?? 0
+      setHasMoreResponses(list.length === RESPONSES_PAGE_SIZE && total > page * RESPONSES_PAGE_SIZE)
+
+      if (append) {
+        setResponses((prev) => [...prev, ...list])
+        setResponsesPage((p) => p + 1)
+      } else {
+        setResponses(list)
+        setResponsesPage(2)
+      }
     } catch (error) {
       console.error('Error fetching responses:', error)
     } finally {
       setLoadingResponses(false)
+      setLoadingMoreResponses(false)
     }
   }
+
+  const loadMoreResponses = () => {
+    if (!loadingMoreResponses && hasMoreResponses) fetchResponses(true)
+  }
+
+  // Бесконечный скролл: список чатов
+  useEffect(() => {
+    const el = loadMoreChatsSentinelRef.current
+    if (!el || !hasMoreChats || loadingMoreChats || activeTab !== 'chats') return
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0]?.isIntersecting) loadMoreChats() },
+      { rootMargin: '300px', threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMoreChats, loadingMoreChats, chatsPage, chats.length, activeTab])
+
+  // Бесконечный скролл: отклики
+  useEffect(() => {
+    const el = loadMoreResponsesSentinelRef.current
+    if (!el || !hasMoreResponses || loadingMoreResponses || activeTab !== 'responses') return
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0]?.isIntersecting) loadMoreResponses() },
+      { rootMargin: '300px', threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMoreResponses, loadingMoreResponses, responsesPage, responses.length, activeTab])
 
   const startChat = async (otherUserId: string) => {
     if (!user) return
@@ -396,6 +449,7 @@ export default function ChatsPage() {
                               src={chat.otherUser.avatar_url}
                               alt={chat.otherUser.full_name}
                               className="w-full h-full rounded-full object-cover"
+                              loading="lazy"
                             />
                           ) : (
                             <div className="w-full h-full bg-graphite-primary flex items-center justify-center rounded-full text-white text-base sm:text-lg font-semibold">
@@ -428,6 +482,7 @@ export default function ChatsPage() {
                       </div>
                     </Link>
                   ))}
+                  {hasMoreChats && <div ref={loadMoreChatsSentinelRef} className="h-4" aria-hidden />}
                 </div>
               )}
             </>
@@ -503,6 +558,7 @@ export default function ChatsPage() {
                       </Link>
                     )
                   })}
+                  {hasMoreResponses && <div ref={loadMoreResponsesSentinelRef} className="h-4" aria-hidden />}
                 </div>
               )}
             </>

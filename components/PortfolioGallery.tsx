@@ -55,7 +55,12 @@ export default function PortfolioGallery({ items, initialIndex, onClose, initial
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({})
   const [showAllReplies, setShowAllReplies] = useState<Record<string, boolean>>({})
   const [master, setMaster] = useState<User | null>(null)
-  
+  const [commentsOffset, setCommentsOffset] = useState(0)
+  const [hasMoreComments, setHasMoreComments] = useState(false)
+  const [loadingMoreComments, setLoadingMoreComments] = useState(false)
+
+  const COMMENTS_PAGE_SIZE = 20
+
   const touchStartY = useRef<number | null>(null)
   const touchStartX = useRef<number | null>(null)
   const swipeDirection = useRef<'vertical' | 'horizontal' | null>(null)
@@ -144,9 +149,12 @@ export default function PortfolioGallery({ items, initialIndex, onClose, initial
     }
   }
 
-  const fetchComments = async () => {
+  const fetchComments = async (offset: number = 0) => {
     if (!currentItem) return
+    if (offset > 0) setLoadingMoreComments(true)
     try {
+      const from = offset
+      const to = offset + COMMENTS_PAGE_SIZE - 1
       const { data, error } = await supabase
         .from('portfolio_comments')
         .select(`
@@ -155,12 +163,27 @@ export default function PortfolioGallery({ items, initialIndex, onClose, initial
         `)
         .eq('portfolio_item_id', currentItem.id)
         .order('created_at', { ascending: true })
+        .range(from, to)
 
       if (error) throw error
-      setComments((data as PortfolioComment[]) || [])
+      const list = (data as PortfolioComment[]) || []
+      setHasMoreComments(list.length === COMMENTS_PAGE_SIZE)
+      if (offset === 0) {
+        setComments(list)
+        setCommentsOffset(COMMENTS_PAGE_SIZE)
+      } else {
+        setComments((prev) => [...prev, ...list])
+        setCommentsOffset((o) => o + list.length)
+      }
     } catch (error) {
       console.error('Error fetching comments:', error)
+    } finally {
+      setLoadingMoreComments(false)
     }
+  }
+
+  const loadMoreComments = () => {
+    if (!loadingMoreComments && hasMoreComments) fetchComments(commentsOffset)
   }
 
   const handleLike = async () => {
@@ -211,7 +234,7 @@ export default function PortfolioGallery({ items, initialIndex, onClose, initial
       if (error) throw error
       setCommentText('')
       setReplyingTo(null)
-      await fetchComments()
+      await fetchComments(0)
       // Прокрутка к последнему комментарию
       setTimeout(() => {
         if (commentsRef.current) {
@@ -781,7 +804,21 @@ export default function PortfolioGallery({ items, initialIndex, onClose, initial
                   Пока нет комментариев
                 </p>
               ) : (
-                tree.map((c) => <CommentBlock key={c.id} comment={c} level={0} />)
+                <>
+                  {tree.map((c) => <CommentBlock key={c.id} comment={c} level={0} />)}
+                  {hasMoreComments && (
+                    <div className="pt-2 pb-2">
+                      <button
+                        type="button"
+                        onClick={loadMoreComments}
+                        disabled={loadingMoreComments}
+                        className="text-sm text-brand-accent hover:text-brand-accent-hover disabled:opacity-50"
+                      >
+                        {loadingMoreComments ? 'Загрузка...' : 'Показать ещё'}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

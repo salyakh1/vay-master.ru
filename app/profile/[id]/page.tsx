@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@/app/providers'
-import { supabase, User, PortfolioItem, Specialization, Service, Product } from '@/lib/supabase'
+import { supabase, User, PortfolioItem, Service, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import PortfolioGrid from '@/components/PortfolioGrid'
 
@@ -26,8 +26,9 @@ import RatingStars from '@/components/RatingStars'
 import StoriesCircle from '@/components/StoriesCircle'
 import SellerAddressPicker from '@/components/SellerAddressPicker'
 import MasterRadiusPicker from '@/components/MasterRadiusPicker'
-import StoresMap from '@/components/StoresMap'
 import StoreLocationMapModal from '@/components/StoreLocationMapModal'
+
+const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
 
 // Dynamic import для создания истории - загружается только при открытии
 const CreateStory = dynamic(() => import('@/components/CreateStory'), {
@@ -49,11 +50,11 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile')
   const [settingsTab, setSettingsTab] = useState<'edit' | 'specializations' | 'security' | 'account'>('edit')
   const [adminRole, setAdminRole] = useState<string | null>(null)
-  const [specializations, setSpecializations] = useState<Specialization[]>([])
-  const [services, setServices] = useState<Service[]>([])
-  const [selectedSpecializationIds, setSelectedSpecializationIds] = useState<string[]>([])
+  type TreeCategory = { id: string; name: string; slug: string; sort_order: number; subcategories: Array<{ id: string; name: string; slug: string; sort_order: number; services: Array<{ id: string; name: string; slug: string; sort_order: number }> }> }
+  const [tree, setTree] = useState<TreeCategory[]>([])
+  const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState<string[]>([])
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
-  const [profileSpecializations, setProfileSpecializations] = useState<Specialization[]>([])
+  const [profileSubcategories, setProfileSubcategories] = useState<Array<{ id: string; name: string; slug: string; category?: { id: string; name: string; slug: string } }>>([])
   const [profileServices, setProfileServices] = useState<Service[]>([])
   const [isFollowing, setIsFollowing] = useState<boolean>(false)
   const [followLoading, setFollowLoading] = useState(false)
@@ -67,6 +68,7 @@ export default function ProfilePage() {
   const [editingReview, setEditingReview] = useState<any>(null)
   const [replyingToReview, setReplyingToReview] = useState<string | null>(null)
   const [reviewsExpanded, setReviewsExpanded] = useState(false)
+  const [specializationsExpanded, setSpecializationsExpanded] = useState(false)
   const [quickReviewRating, setQuickReviewRating] = useState(0)
   const [quickReviewText, setQuickReviewText] = useState('')
   const [sendingQuickReview, setSendingQuickReview] = useState(false)
@@ -85,8 +87,17 @@ export default function ProfilePage() {
   // Render-on-Demand: состояния для отслеживания загрузки данных по секциям
   const [portfolioFetched, setPortfolioFetched] = useState(false)
   const [reviewsFetched, setReviewsFetched] = useState(false)
+  const [portfolioPage, setPortfolioPage] = useState(1)
+  const [portfolioHasMore, setPortfolioHasMore] = useState(false)
+  const [loadingMorePortfolio, setLoadingMorePortfolio] = useState(false)
+  const [productsPage, setProductsPage] = useState(1)
+  const [productsHasMore, setProductsHasMore] = useState(false)
+  const [loadingMoreProducts, setLoadingMoreProducts] = useState(false)
   const portfolioSectionRef = useRef<HTMLDivElement>(null)
   const reviewsSectionRef = useRef<HTMLDivElement>(null)
+  const portfolioLoadMoreSentinelRef = useRef<HTMLDivElement>(null)
+  const productsLoadMoreSentinelRef = useRef<HTMLDivElement>(null)
+  const PROFILE_ITEMS_PER_PAGE = 12
   
   // Settings form state - common
   const [fullName, setFullName] = useState('')
@@ -214,6 +225,30 @@ export default function ProfilePage() {
     if (idx >= 0) setSelectedPortfolioIndex(idx)
   }, [searchParams, portfolioItems])
 
+  // Бесконечный скролл: портфолио
+  useEffect(() => {
+    const el = portfolioLoadMoreSentinelRef.current
+    if (!el || !portfolioHasMore || loadingMorePortfolio) return
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0]?.isIntersecting) loadMorePortfolio() },
+      { rootMargin: '300px', threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [portfolioHasMore, loadingMorePortfolio, portfolioPage, portfolioItems.length])
+
+  // Бесконечный скролл: товары продавца
+  useEffect(() => {
+    const el = productsLoadMoreSentinelRef.current
+    if (!el || !productsHasMore || loadingMoreProducts) return
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0]?.isIntersecting) loadMoreProducts() },
+      { rootMargin: '300px', threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [productsHasMore, loadingMoreProducts, productsPage, products.length])
+
   const fetchProfile = async () => {
     try {
       setLoading(true)
@@ -277,20 +312,28 @@ export default function ProfilePage() {
       // Специализации и услуги
       await fetchSelections()
       
-      // Истории профиля (для всех ролей) - загружаем сразу, они нужны для верхней части
+      // Истории профиля (для всех ролей) — нужны для шапки
       if (profileId) {
         await fetchProfileStories(profileId)
       }
 
-      // Теперь загружаем остальные данные последовательно (не параллельно)
-      // для уменьшения нагрузки на initial load
-      if (userData.role === 'master' && profileId) {
-        await fetchPortfolio()
-        await fetchMasterReviews(profileId)
-      } else if (userData.role === 'seller' && profileId) {
-        await fetchSellerProducts()
-        await fetchSellerStats(profileId)
-        await fetchProductReviews(profileId)
+      // Первый экран готов: показываем контент
+      setLoading(false)
+
+      // Портфолио, отзывы, товары — после первого рендера (idle), не блокируем LCP
+      const scheduleHeavy = () => {
+        if (userData.role === 'master' && profileId) {
+          fetchPortfolio().then(() => fetchMasterReviews(profileId))
+        } else if (userData.role === 'seller' && profileId) {
+          fetchSellerProducts()
+          fetchSellerStats(profileId)
+          fetchProductReviews(profileId)
+        }
+      }
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(scheduleHeavy, { timeout: 600 })
+      } else {
+        setTimeout(scheduleHeavy, 600)
       }
     } catch (error) {
       console.error('Error fetching profile:', error)
@@ -321,16 +364,9 @@ export default function ProfilePage() {
 
   const fetchReferenceData = async () => {
     try {
-      const [{ data: specData, error: specError }, { data: svcData, error: svcError }] = await Promise.all([
-        supabase.from('specializations').select('*').order('name', { ascending: true }),
-        supabase.from('services').select('*').order('name', { ascending: true })
-      ])
-
-      if (specError) throw specError
-      if (svcError) throw svcError
-
-      setSpecializations((specData as Specialization[]) || [])
-      setServices((svcData as Service[]) || [])
+      const res = await fetch('/api/master-categories/tree')
+      const data = await res.json().catch(() => ({}))
+      setTree((data?.tree as TreeCategory[]) || [])
     } catch (error) {
       console.error('Error fetching reference data:', error)
     }
@@ -339,45 +375,43 @@ export default function ProfilePage() {
   const fetchSelections = async () => {
     if (!params.id) return
     try {
-      const [{ data: specSel, error: specSelError }, { data: svcSel, error: svcSelError }] = await Promise.all([
+      const [{ data: subSel, error: subSelError }, { data: svcSel, error: svcSelError }] = await Promise.all([
         supabase
-          .from('profile_specializations')
-          .select('specialization:specializations(id, name, slug)')
+          .from('profile_subcategories')
+          .select('subcategory:subcategories(id, name, slug, category:categories(id, name, slug))')
           .eq('profile_id', params.id),
         supabase
           .from('profile_services')
-          .select('service:services(id, name, slug, specialization_id)')
+          .select('service:services(id, name, slug, subcategory_id)')
           .eq('profile_id', params.id),
       ])
 
-      if (specSelError) throw specSelError
+      if (subSelError) throw subSelError
       if (svcSelError) throw svcSelError
 
-      const specs = ((specSel as any[]) || [])
-        .map((item) => item.specialization as Specialization)
-        .filter(Boolean)
+      const subs = ((subSel as any[]) || [])
+        .map((item) => item.subcategory && { ...item.subcategory, category: (item.subcategory as any).category })
+        .filter(Boolean) as typeof profileSubcategories
       const svcs = ((svcSel as any[]) || [])
         .map((item) => item.service as Service)
         .filter(Boolean)
 
-      setProfileSpecializations(specs)
+      setProfileSubcategories(subs)
       setProfileServices(svcs)
-      setSelectedSpecializationIds(specs.map((s) => s.id))
+      setSelectedSubcategoryIds(subs.map((s) => s.id))
       setSelectedServiceIds(svcs.map((s) => s.id))
     } catch (error) {
       console.error('Error fetching selections:', error)
     }
   }
 
-  const toggleSpecialization = (id: string) => {
-    setSelectedSpecializationIds((prev) => {
-      const exists = prev.includes(id)
-      const next = exists ? prev.filter((x) => x !== id) : [...prev, id]
-      // drop services that no longer belong to selected specializations
-      setSelectedServiceIds((prevServices) =>
-        prevServices.filter((svcId) => {
-          const svc = services.find((s) => s.id === svcId)
-          return svc ? next.includes(svc.specialization_id) : false
+  const toggleSubcategory = (id: string) => {
+    setSelectedSubcategoryIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      setSelectedServiceIds((prevSvc) =>
+        prevSvc.filter((svcId) => {
+          const sub = tree.flatMap((c) => c.subcategories).find((s) => s.services.some((v) => v.id === svcId))
+          return !sub || next.includes(sub.id)
         })
       )
       return next
@@ -385,36 +419,26 @@ export default function ProfilePage() {
   }
 
   const toggleService = (id: string) => {
-    const svc = services.find((s) => s.id === id)
-    if (svc && !selectedSpecializationIds.includes(svc.specialization_id)) {
-      // auto-select specialization if not selected
-      setSelectedSpecializationIds((prev) => [...prev, svc.specialization_id])
+    const sub = tree.flatMap((c) => c.subcategories).find((s) => s.services.some((v) => v.id === id))
+    if (sub && !selectedSubcategoryIds.includes(sub.id)) {
+      setSelectedSubcategoryIds((prev) => [...prev, sub.id])
     }
-    setSelectedServiceIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    )
+    setSelectedServiceIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
   const syncSelections = async (profileId: string) => {
     try {
-      // specializations
-      await supabase.from('profile_specializations').delete().eq('profile_id', profileId)
-      if (selectedSpecializationIds.length > 0) {
-        const specPayload = selectedSpecializationIds.map((specId) => ({
-          profile_id: profileId,
-          specialization_id: specId,
-        }))
-        await supabase.from('profile_specializations').insert(specPayload)
+      await supabase.from('profile_subcategories').delete().eq('profile_id', profileId)
+      if (selectedSubcategoryIds.length > 0) {
+        await supabase.from('profile_subcategories').insert(
+          selectedSubcategoryIds.map((subId) => ({ profile_id: profileId, subcategory_id: subId }))
+        )
       }
-
-      // services
       await supabase.from('profile_services').delete().eq('profile_id', profileId)
       if (selectedServiceIds.length > 0) {
-        const svcPayload = selectedServiceIds.map((svcId) => ({
-          profile_id: profileId,
-          service_id: svcId,
-        }))
-        await supabase.from('profile_services').insert(svcPayload)
+        await supabase.from('profile_services').insert(
+          selectedServiceIds.map((svcId) => ({ profile_id: profileId, service_id: svcId }))
+        )
       }
     } catch (error) {
       console.error('Error syncing selections:', error)
@@ -484,40 +508,81 @@ export default function ProfilePage() {
   }
 
 
-  const fetchPortfolio = async () => {
-    if (!params.id) return
+  const fetchPortfolio = async (append: boolean = false) => {
+    const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+    if (!profileId) return
+    if (!append) setPortfolioFetched(true)
+    else setLoadingMorePortfolio(true)
     try {
-      const { data, error } = await supabase
+      const page = append ? portfolioPage : 1
+      const from = (page - 1) * PROFILE_ITEMS_PER_PAGE
+      const to = from + PROFILE_ITEMS_PER_PAGE - 1
+      const { data, error, count } = await supabase
         .from('portfolio_items')
-        .select('*, master:profiles(id, full_name, avatar_url, role)')
-        .eq('master_id', params.id)
+        .select('*, master:profiles(id, full_name, avatar_url, role)', { count: 'exact' })
+        .eq('master_id', profileId)
         .order('created_at', { ascending: false })
+        .range(from, to)
 
       if (error) throw error
-      setPortfolioItems(data as PortfolioItem[] || [])
+      const list = (data as PortfolioItem[]) || []
+      setPortfolioHasMore(list.length === PROFILE_ITEMS_PER_PAGE && (count ?? 0) > page * PROFILE_ITEMS_PER_PAGE)
+      if (append) {
+        setPortfolioItems((prev) => [...prev, ...list])
+        setPortfolioPage((p) => p + 1)
+      } else {
+        setPortfolioItems(list)
+        setPortfolioPage(2)
+      }
     } catch (error) {
       console.error('Error fetching portfolio:', error)
+    } finally {
+      setLoadingMorePortfolio(false)
     }
   }
 
-  const fetchSellerProducts = async () => {
-    if (!params.id) return
+  const loadMorePortfolio = () => {
+    if (!loadingMorePortfolio && portfolioHasMore) fetchPortfolio(true)
+  }
+
+  const fetchSellerProducts = async (append: boolean = false) => {
+    const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+    if (!profileId) return
+    if (append) setLoadingMoreProducts(true)
     try {
-      const { data, error } = await supabase
+      const page = append ? productsPage : 1
+      const from = (page - 1) * PROFILE_ITEMS_PER_PAGE
+      const to = from + PROFILE_ITEMS_PER_PAGE - 1
+      const { data, error, count } = await supabase
         .from('products')
         .select(`
           *,
           seller:profiles(id, full_name, avatar_url, city),
           category_ref:product_categories(id, name, section)
-        `)
-        .eq('seller_id', params.id)
+        `, { count: 'exact' })
+        .eq('seller_id', profileId)
         .order('created_at', { ascending: false })
+        .range(from, to)
       if (error) throw error
-      setProducts((data as Product[]) || [])
+      const list = (data as Product[]) || []
+      setProductsHasMore(list.length === PROFILE_ITEMS_PER_PAGE && (count ?? 0) > page * PROFILE_ITEMS_PER_PAGE)
+      if (append) {
+        setProducts((prev) => [...prev, ...list])
+        setProductsPage((p) => p + 1)
+      } else {
+        setProducts(list)
+        setProductsPage(2)
+      }
     } catch (error) {
       console.error('Error fetching products:', error)
-      setProducts([])
+      if (!append) setProducts([])
+    } finally {
+      setLoadingMoreProducts(false)
     }
+  }
+
+  const loadMoreProducts = () => {
+    if (!loadingMoreProducts && productsHasMore) fetchSellerProducts(true)
   }
 
   const fetchSellerStats = async (sellerId: string) => {
@@ -1078,9 +1143,7 @@ export default function ProfilePage() {
   const displayRole = adminRole || profile.role
 
   const isOwnProfile = currentUser?.id === profile.id
-  const filteredServices = services.filter((svc) =>
-    selectedSpecializationIds.includes(svc.specialization_id)
-  )
+  const filteredServices = tree.flatMap((c) => c.subcategories.flatMap((s) => s.services.map((v) => ({ ...v, subcategory_id: s.id })))).filter((svc: any) => selectedSubcategoryIds.includes(svc.subcategory_id))
 
   const returnTo = searchParams.get('returnTo')
 
@@ -1258,24 +1321,82 @@ export default function ProfilePage() {
                 {/* Master-specific information */}
                 {profile.role === 'master' && (
                   <div className="mt-10 pt-8 px-4 sm:px-5 border-t border-border-color/40">
-                    {profileSpecializations.length > 0 && (
-                      <div className="mb-6">
-                        <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-graphite-secondary">
-                          <FiBriefcase size={16} />
-                          <span>Специализации</span>
+                    <div className="mb-6 border border-border-light rounded-xl overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setSpecializationsExpanded(!specializationsExpanded)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-left bg-bg-secondary/50 hover:bg-bg-secondary transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FiBriefcase size={16} className="text-graphite-secondary" />
+                          <span className="text-sm font-semibold text-graphite-secondary">Специализации и услуги</span>
+                          <span className="text-xs text-text-secondary">
+                            {profileSubcategories.length + profileServices.length > 0
+                              ? `${profileSubcategories.length} подкат., ${profileServices.length} услуг`
+                              : profile.specialization
+                                ? 'специализация'
+                                : 'пока не выбрано'}
+                          </span>
                         </div>
-                        <div className="flex flex-wrap gap-2.5">
-                          {profileSpecializations.map((spec) => (
-                            <span
-                              key={spec.id}
-                              className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
-                            >
-                              {spec.name}
-                            </span>
-                          ))}
+                        {specializationsExpanded ? (
+                          <FiChevronUp size={18} className="text-text-secondary" />
+                        ) : (
+                          <FiChevronDown size={18} className="text-text-secondary" />
+                        )}
+                      </button>
+                      {specializationsExpanded && (
+                        <div className="px-4 py-4 bg-white border-t border-border-light">
+                          {profileSubcategories.length > 0 && (
+                            <div className="mb-4">
+                              <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">Специализации</div>
+                              <div className="flex flex-wrap gap-2.5">
+                                {profileSubcategories.map((spec) => (
+                                  <span
+                                    key={spec.id}
+                                    className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
+                                  >
+                                    {spec.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {profileServices.length > 0 && (
+                            <div className={profileSubcategories.length > 0 ? 'mt-4' : ''}>
+                              <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">Услуги мастера</div>
+                              <div className="flex flex-wrap gap-2.5">
+                                {profileServices.map((svc) => (
+                                  <span
+                                    key={svc.id}
+                                    className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
+                                  >
+                                    {svc.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {profileSubcategories.length === 0 && profile.specialization && (
+                            <div className={profileServices.length > 0 ? 'mt-4' : ''}>
+                              <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">Специализация</div>
+                              <div className="flex flex-wrap gap-2.5">
+                                {profile.specialization.split(',').map((spec, index) => (
+                                  <span
+                                    key={index}
+                                    className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
+                                  >
+                                    {spec.trim()}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {profileSubcategories.length === 0 && profileServices.length === 0 && !profile.specialization && (
+                            <p className="text-sm text-text-secondary">Пока не выбрано. Добавьте в настройках профиля.</p>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
                       {profile.services && (
@@ -1627,24 +1748,6 @@ export default function ProfilePage() {
                       </div>
                     )}
 
-                    {profileSpecializations.length === 0 && profile.specialization && (
-                      <div className="mt-8">
-                        <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-graphite-secondary">
-                          <FiBriefcase size={16} />
-                          <span>Специализация</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2.5">
-                          {profile.specialization.split(',').map((spec, index) => (
-                            <span
-                              key={index}
-                              className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
-                            >
-                              {spec.trim()}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -1734,7 +1837,7 @@ export default function ProfilePage() {
                     type="PROFILE_RELATED" 
                     context={{ 
                       masterId: profile.id,
-                      specialization: profile.specialization || profileSpecializations[0]?.name || undefined
+                      specialization: profile.specialization || profileSubcategories[0]?.name || undefined
                     }}
                     className="mb-6"
                   />
@@ -1871,6 +1974,7 @@ export default function ProfilePage() {
                       })}
                     </div>
                   )}
+                  {productsHasMore && <div ref={productsLoadMoreSentinelRef} className="h-4" aria-hidden />}
 
                   {/* Отзывы о продавце - Render-on-Demand */}
                   <div ref={reviewsSectionRef} className="mt-10 sm:mt-12 px-4 sm:px-5">
@@ -2059,6 +2163,7 @@ export default function ProfilePage() {
                     items={portfolioItems}
                     onItemClick={(item, index) => setSelectedPortfolioIndex(index)}
                   />
+                  {portfolioHasMore && <div ref={portfolioLoadMoreSentinelRef} className="h-4" aria-hidden />}
                 </div>
               )}
 
@@ -2423,7 +2528,7 @@ export default function ProfilePage() {
                       setPhone(profile.phone || '')
                       setCity(profile.city || '')
                       setDescription(profile.description || '')
-                      setSelectedSpecializationIds(profileSpecializations.map((s) => s.id))
+                      setSelectedSubcategoryIds(profileSubcategories.map((s) => s.id))
                       setSelectedServiceIds(profileServices.map((s) => s.id))
                       // Reset master fields
                       if (profile.role === 'master') {
@@ -2454,32 +2559,39 @@ export default function ProfilePage() {
               {settingsTab === 'specializations' && profile.role === 'master' && (
                 <div className="space-y-4 sm:space-y-6 w-full">
                   <div className="w-full">
-                    <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Специализации</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto border border-border-color p-3 sm:p-4 rounded-md">
-                      {specializations.map((spec) => (
-                        <label key={spec.id} className="flex items-center gap-2 text-sm text-text-primary">
-                          <input
-                            type="checkbox"
-                            checked={selectedSpecializationIds.includes(spec.id)}
-                            onChange={() => toggleSpecialization(spec.id)}
-                            className="w-4 h-4"
-                          />
-                          <span>{spec.name}</span>
-                        </label>
+                    <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Категории и подкатегории</h2>
+                    <div className="space-y-4 max-h-96 overflow-y-auto border border-border-color p-3 sm:p-4 rounded-md">
+                      {tree.map((cat) => (
+                        <div key={cat.id}>
+                          <div className="font-medium text-graphite-secondary mb-2">{cat.name}</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-2">
+                            {cat.subcategories.map((sub) => (
+                              <label key={sub.id} className="flex items-center gap-2 text-sm text-text-primary">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSubcategoryIds.includes(sub.id)}
+                                  onChange={() => toggleSubcategory(sub.id)}
+                                  className="w-4 h-4"
+                                />
+                                <span>{sub.name}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
                       ))}
-      </div>
-          </div>
+                    </div>
+                  </div>
 
                   <div className="w-full">
                     <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Услуги</h2>
                     <p className="text-sm text-text-secondary mb-3 sm:mb-4">
-                      Услуги отфильтрованы по выбранным специализациям
+                      Услуги по выбранным подкатегориям
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto border border-border-color p-3 sm:p-4 rounded-md">
                       {filteredServices.length === 0 ? (
-                        <p className="text-sm text-text-secondary col-span-2">Сначала выберите специализации</p>
+                        <p className="text-sm text-text-secondary col-span-2">Сначала выберите подкатегории</p>
                       ) : (
-                        filteredServices.map((svc) => (
+                        filteredServices.map((svc: any) => (
                           <label key={svc.id} className="flex items-center gap-2 text-sm text-text-primary">
                             <input
                               type="checkbox"
@@ -2490,36 +2602,36 @@ export default function ProfilePage() {
                             <span>{svc.name}</span>
                           </label>
                         ))
-                    )}
-                  </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border-color w-full">
-                            <button
+                    <button
                       type="button"
                       onClick={async () => {
                         if (!currentUser) return
                         await syncSelections(currentUser.id)
                         await fetchSelections()
-                        alert('Специализации и услуги сохранены!')
+                        alert('Категории и услуги сохранены!')
                       }}
                       className="btn btn-primary w-full sm:w-auto"
                     >
                       Сохранить
-                            </button>
-                          <button
+                    </button>
+                    <button
                       type="button"
                       onClick={() => {
-                        setSelectedSpecializationIds(profileSpecializations.map((s) => s.id))
+                        setSelectedSubcategoryIds(profileSubcategories.map((s) => s.id))
                         setSelectedServiceIds(profileServices.map((s) => s.id))
                       }}
                       className="btn btn-secondary w-full sm:w-auto"
                     >
                       Отмена
-                          </button>
-                    </div>
-                        </div>
-                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Security Tab */}
               {settingsTab === 'security' && (

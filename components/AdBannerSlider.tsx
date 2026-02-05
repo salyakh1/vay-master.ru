@@ -10,6 +10,8 @@ interface AdBannerSliderProps {
   autoplay?: boolean
   interval?: number
   className?: string
+  /** Данные с сервера для быстрого LCP (SSR) */
+  initialBanners?: AdBanner[] | null
 }
 
 export default function AdBannerSlider({
@@ -17,10 +19,11 @@ export default function AdBannerSlider({
   autoplay = true,
   interval = 5000,
   className = '',
+  initialBanners = null,
 }: AdBannerSliderProps) {
   const router = useRouter()
-  const [banners, setBanners] = useState<AdBanner[]>([])
-  const [loading, setLoading] = useState(true)
+  const [banners, setBanners] = useState<AdBanner[]>(initialBanners ?? [])
+  const [loading, setLoading] = useState(!(initialBanners && initialBanners.length > 0))
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [touchStart, setTouchStart] = useState(0)
@@ -95,47 +98,41 @@ export default function AdBannerSlider({
     }
   }, [])
 
-  // Загрузка баннеров
+  // Загрузка баннеров: при наличии initialBanners не показываем лоадер, запрос для актуализации
   useEffect(() => {
-    const fetchBanners = async () => {
-      setLoading(true)
-      try {
-        const response = await fetch(`/api/banners?page=${page}&limit=10`)
-        if (!response.ok) {
-          console.error('Failed to fetch banners:', response.status, response.statusText)
-          setBanners([])
-          setLoading(false)
-          return
-        }
-        const data = await response.json()
-        console.log('Banners fetched:', data.banners?.length || 0, 'banners for page:', page)
-        if (data.banners && data.banners.length > 0) {
-          setBanners(data.banners)
-          // Отслеживаем просмотр первого баннера
-          trackView(data.banners[0].id)
-        } else {
-          console.log('No banners found for page:', page)
-          setBanners([])
-        }
-      } catch (error) {
-        console.error('Error fetching banners:', error)
-        setBanners([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchBanners()
-    // Очищаем отслеженные просмотры при смене страницы
     trackedViewsRef.current.clear()
-    
+    if (initialBanners && initialBanners.length > 0) {
+      setBanners(initialBanners)
+      setLoading(false)
+      trackViewRef.current?.(initialBanners[0].id)
+    }
+    let cancelled = false
+    fetch(`/api/banners?page=${page}&limit=10`)
+      .then((response) => {
+        if (cancelled || !response.ok) return response.ok ? response.json() : null
+        return response.json()
+      })
+      .then((data) => {
+        if (cancelled) return
+        if (data?.banners?.length > 0) {
+          setBanners(data.banners)
+          trackViewRef.current?.(data.banners[0].id)
+        } else if (!initialBanners?.length) {
+          setBanners([])
+        }
+      })
+      .catch(() => { if (!cancelled && !initialBanners?.length) setBanners([]) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [page, initialBanners?.length])
+
+  useEffect(() => {
     return () => {
-      // Очищаем таймаут при размонтировании
       if (trackViewTimeoutRef.current) {
         clearTimeout(trackViewTimeoutRef.current)
       }
     }
-  }, [page]) // Убрали trackView из зависимостей
+  }, [])
 
   // Автопрокрутка с индивидуальным временем для каждого баннера
   useEffect(() => {
@@ -271,26 +268,24 @@ export default function AdBannerSlider({
     setTimeout(() => setIsPaused(false), 10000)
   }
 
-  // Не показываем компонент во время загрузки или если нет баннеров
-  if (loading || banners.length === 0) {
-    return null
-  }
-
-  // Безопасный индекс
+  // Всегда резервируем место под баннеры — убираем CLS при появлении блока
   const safeIndex = currentIndex >= 0 && currentIndex < banners.length ? currentIndex : 0
   const currentBanner = banners[safeIndex]
+  const hasContent = !loading && banners.length > 0
 
   return (
     <div className={`relative w-full ${className}`}>
       <div
         ref={containerRef}
-        className="relative overflow-hidden bg-bg-secondary md:h-[280px] h-[180px] w-full"
+        className="relative overflow-hidden bg-bg-secondary md:h-[280px] h-[180px] w-full min-h-[180px] md:min-h-[280px]"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
+        {hasContent ? (
+          <>
         {/* Контейнер для всех баннеров с горизонтальной прокруткой */}
         <div
           className="flex transition-transform duration-500 ease-in-out h-full"
@@ -305,6 +300,11 @@ export default function AdBannerSlider({
               <img
                 src={banner.image_url}
                 alt={banner.title}
+                width={1200}
+                height={280}
+                fetchPriority={index === 0 ? 'high' : 'low'}
+                loading={index === 0 ? 'eager' : 'lazy'}
+                decoding={index === 0 ? 'sync' : 'async'}
                 className="w-full h-full object-cover"
               />
               
@@ -374,6 +374,12 @@ export default function AdBannerSlider({
                 aria-label={`Перейти к баннеру ${index + 1}`}
               />
             ))}
+          </div>
+        )}
+          </>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center" aria-hidden>
+            <div className="w-12 h-12 border-2 border-border-light border-t-brand-accent/50 rounded-full animate-spin" />
           </div>
         )}
       </div>

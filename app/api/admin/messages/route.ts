@@ -64,19 +64,23 @@ export async function POST(request: NextRequest) {
 
     console.log('Admin role verified:', adminRole.role, 'for user:', user.id)
 
-    // Получаем список получателей
+    // Получаем список получателей (с лимитом во избежание getAll)
+    const RECIPIENTS_CAP_ALL = 2000
+    const RECIPIENTS_CAP_ROLE = 500
     let recipientIds: string[] = []
 
     if (type === 'all') {
-      // Все пользователи
-      const { data: allUsers } = await supabaseClient.from('profiles').select('id')
-      recipientIds = (allUsers || []).map((u: any) => u.id)
+      const { data: batch } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .range(0, RECIPIENTS_CAP_ALL - 1)
+      recipientIds = (batch || []).map((u: any) => u.id)
     } else if (type === 'role') {
-      // По ролям
       const { data: roleUsers } = await supabaseClient
         .from('profiles')
         .select('id')
         .eq('role', role)
+        .range(0, RECIPIENTS_CAP_ROLE - 1)
       recipientIds = (roleUsers || []).map((u: any) => u.id)
     } else if (type === 'individual' && user_ids && Array.isArray(user_ids)) {
       // Индивидуально

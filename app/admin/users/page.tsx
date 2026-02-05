@@ -8,12 +8,16 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { FiSearch, FiFilter, FiUser, FiAlertCircle, FiShield, FiTrash2 } from 'react-icons/fi'
 
+const PAGE_SIZE = 20
+
 export default function AdminUsersPage() {
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [userRestrictions, setUserRestrictions] = useState<UserRestriction[]>([])
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null)
@@ -24,26 +28,35 @@ export default function AdminUsersPage() {
       logAdminAction(currentUser.id, 'view_users', 'users')
       getAdminRole(currentUser.id).then(setAdminRole)
     }
-  }, [currentUser, roleFilter])
+  }, [currentUser, roleFilter, page])
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (pageOverride?: number) => {
+    const currentPage = pageOverride ?? page
     try {
-      let query = supabase
+      setLoading(true)
+      let countQuery = supabase.from('profiles').select('*', { count: 'exact', head: true })
+      let dataQuery = supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100)
+        .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1)
 
       if (roleFilter) {
-        query = query.eq('role', roleFilter)
+        countQuery = countQuery.eq('role', roleFilter)
+        dataQuery = dataQuery.eq('role', roleFilter)
       }
-
       if (searchQuery) {
-        query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%`)
+        const or = `full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%`
+        countQuery = countQuery.or(or)
+        dataQuery = dataQuery.or(or)
       }
 
-      const { data, error } = await query
+      const [{ count }, { data, error }] = await Promise.all([
+        countQuery,
+        dataQuery,
+      ])
       if (error) throw error
+      setTotalCount(count ?? 0)
       setUsers((data || []) as User[])
     } catch (error) {
       console.error('Error fetching users:', error)
@@ -125,7 +138,7 @@ export default function AdminUsersPage() {
       })
 
       alert('Пользователь и все связанные данные успешно удалены из системы.')
-      fetchUsers()
+      await fetchUsers()
       if (selectedUser?.id === userId) {
         setSelectedUser(null)
       }
@@ -155,7 +168,7 @@ export default function AdminUsersPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchUsers()}
+              onKeyDown={(e) => e.key === 'Enter' && (setPage(1), fetchUsers(1))}
               placeholder="Поиск по имени, email, телефону..."
               className="input pl-10 w-full h-10 text-sm"
             />
@@ -177,11 +190,21 @@ export default function AdminUsersPage() {
               <option value="client">Клиенты</option>
             </select>
           </div>
-          <button onClick={fetchUsers} className="btn btn-primary h-10 w-full text-sm">
+          <button
+            onClick={() => { setPage(1); fetchUsers(1); }}
+            className="btn btn-primary h-10 w-full text-sm"
+          >
             Найти
           </button>
         </div>
       </div>
+
+      {/* Pagination info */}
+      {totalCount > 0 && (
+        <div className="text-sm text-text-secondary">
+          Показано {users.length} из {totalCount}
+        </div>
+      )}
 
       {/* Users List */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -220,6 +243,29 @@ export default function AdminUsersPage() {
             </div>
           ))}
         </div>
+
+        {/* Pagination */}
+        {totalCount > PAGE_SIZE && (
+          <div className="lg:col-span-2 flex items-center justify-between gap-4 mt-4">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="btn btn-outline text-sm disabled:opacity-50"
+            >
+              ← Назад
+            </button>
+            <span className="text-sm text-text-secondary">
+              Страница {page} из {Math.ceil(totalCount / PAGE_SIZE)}
+            </span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= Math.ceil(totalCount / PAGE_SIZE) || loading}
+              className="btn btn-outline text-sm disabled:opacity-50"
+            >
+              Вперёд →
+            </button>
+          </div>
+        )}
 
         {/* User Details */}
         {selectedUser && (

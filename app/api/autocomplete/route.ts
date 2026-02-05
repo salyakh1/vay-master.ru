@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const suggestions: Array<{
       id: string
       name: string
-      type: 'master' | 'product' | 'service' | 'specialization'
+      type: 'master' | 'product' | 'service' | 'category' | 'subcategory'
     }> = []
 
     // Поиск мастеров
@@ -90,26 +90,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Поиск специализаций
+    // Поиск категорий и подкатегорий мастеров
     if (type === 'all' || type === 'master') {
       try {
-        const { data: specializations } = await supabase
-          .from('specializations')
-          .select('id, name')
-          .ilike('name', `%${query}%`)
-          .limit(5)
-
-        if (specializations) {
+        const [catRes, subRes] = await Promise.all([
+          supabase.from('categories').select('id, name').ilike('name', `%${query}%`).limit(3),
+          supabase.from('subcategories').select('id, name').ilike('name', `%${query}%`).limit(3),
+        ])
+        if (catRes.data?.length) {
           suggestions.push(
-            ...specializations.map((s) => ({
-              id: s.id,
-              name: s.name,
-              type: 'specialization' as const,
-            }))
+            ...catRes.data.map((c) => ({ id: c.id, name: c.name, type: 'category' as const }))
+          )
+        }
+        if (subRes.data?.length) {
+          suggestions.push(
+            ...subRes.data.map((s) => ({ id: s.id, name: s.name, type: 'subcategory' as const }))
           )
         }
       } catch (error) {
-        console.error('Error fetching specializations:', error)
+        console.error('Error fetching categories/subcategories:', error)
       }
     }
 

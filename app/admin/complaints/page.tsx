@@ -21,10 +21,14 @@ const statusColors: Record<string, string> = {
   rejected: 'bg-red-100 text-red-800',
 }
 
+const PAGE_SIZE = 20
+
 export default function AdminComplaintsPage() {
   const { user } = useAuth()
   const [complaints, setComplaints] = useState<Complaint[]>([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null)
   const [adminNotes, setAdminNotes] = useState('')
   const [updating, setUpdating] = useState(false)
@@ -33,22 +37,30 @@ export default function AdminComplaintsPage() {
     if (user) {
       fetchComplaints()
     }
-  }, [user])
+  }, [user, page])
 
   const fetchComplaints = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('complaints')
-        .select(`
-          *,
-          complainer:profiles!complaints_complainer_id_fkey(id, full_name, avatar_url, email),
-          reported_user:profiles!complaints_reported_user_id_fkey(id, full_name, avatar_url, email),
-          chat:chats(id)
-        `)
-        .order('created_at', { ascending: false })
+      const from = (page - 1) * PAGE_SIZE
+      const to = page * PAGE_SIZE - 1
+
+      const [{ count }, { data, error }] = await Promise.all([
+        supabase.from('complaints').select('*', { count: 'exact', head: true }),
+        supabase
+          .from('complaints')
+          .select(`
+            *,
+            complainer:profiles!complaints_complainer_id_fkey(id, full_name, avatar_url, email),
+            reported_user:profiles!complaints_reported_user_id_fkey(id, full_name, avatar_url, email),
+            chat:chats(id)
+          `)
+          .order('created_at', { ascending: false })
+          .range(from, to),
+      ])
 
       if (error) throw error
+      setTotalCount(count ?? 0)
       setComplaints((data as any) || [])
     } catch (error) {
       console.error('Error fetching complaints:', error)
@@ -108,7 +120,7 @@ export default function AdminComplaintsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-text-primary mb-2">Жалобы</h1>
         <p className="text-text-secondary">
-          Всего жалоб: {complaints.length} | Новых: {complaints.filter((c) => c.status === 'new').length}
+          Всего жалоб: {totalCount} | Показано: {complaints.length} | Новых на странице: {complaints.filter((c) => c.status === 'new').length}
         </p>
       </div>
 
@@ -271,6 +283,28 @@ export default function AdminComplaintsPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {totalCount > PAGE_SIZE && (
+        <div className="flex items-center justify-between gap-4 mt-6">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1 || loading}
+            className="btn btn-outline text-sm disabled:opacity-50"
+          >
+            ← Назад
+          </button>
+          <span className="text-sm text-text-secondary">
+            Страница {page} из {Math.ceil(totalCount / PAGE_SIZE)}
+          </span>
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            disabled={page >= Math.ceil(totalCount / PAGE_SIZE) || loading}
+            className="btn btn-outline text-sm disabled:opacity-50"
+          >
+            Вперёд →
+          </button>
         </div>
       )}
 

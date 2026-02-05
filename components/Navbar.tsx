@@ -32,50 +32,29 @@ export default function Navbar() {
 
     const fetchUnreadChatsCount = async () => {
       try {
-        // Получаем все чаты пользователя
-        const { data: chats, error: chatsError } = await supabase
-          .from('chats')
-          .select('id, deleted_by_user_ids')
-          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-
-        if (chatsError || !chats) return
-
-        // Фильтруем чаты, которые были удалены пользователем
-        const filteredChats = chats.filter((chat: any) => {
-          const deletedByUserIds = (chat.deleted_by_user_ids || []) as string[]
-          return !deletedByUserIds.includes(user.id)
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) return
+        const res = await fetch('/api/chats/unread-count', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
         })
-
-        if (filteredChats.length === 0) {
-          setUnreadChatsCount(0)
-          return
-        }
-
-        const chatIds = filteredChats.map((chat: any) => chat.id)
-
-        // Для каждого чата проверяем, есть ли непрочитанные сообщения
-        const unreadPromises = chatIds.map(async (chatId: string) => {
-          const { count } = await supabase
-            .from('messages')
-            .select('id', { count: 'exact', head: true })
-            .eq('chat_id', chatId)
-            .eq('read', false)
-            .neq('sender_id', user.id)
-
-          return (count ?? 0) > 0 ? 1 : 0
-        })
-
-        const unreadResults = await Promise.all(unreadPromises)
-        const unreadCount = unreadResults.reduce((sum: number, count: number) => sum + count, 0)
-        setUnreadChatsCount(unreadCount)
-      } catch (error) {
-        console.error('Error fetching unread chats count:', error)
+        const data = await res.json().catch(() => ({}))
+        setUnreadChatsCount(typeof data.count === 'number' ? data.count : 0)
+      } catch {
+        setUnreadChatsCount(0)
       }
     }
 
-    fetchUnreadChatsCount()
+    // Отложенная загрузка счётчика — не конкурируем с первым экраном (5 с или idle)
+    const scheduleFetch = () => {
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => fetchUnreadChatsCount(), { timeout: 5000 })
+      } else {
+        setTimeout(fetchUnreadChatsCount, 5000)
+      }
+    }
+    scheduleFetch()
 
-    // Подписываемся на изменения сообщений для обновления счетчика
+    // Realtime — единственный источник обновлений счётчика при новых сообщениях
     const channel = supabase
       .channel('unread-chats-count')
       .on(
@@ -86,9 +65,7 @@ export default function Navbar() {
           table: 'messages',
           filter: 'read=eq.false',
         },
-        () => {
-          fetchUnreadChatsCount()
-        }
+        () => fetchUnreadChatsCount()
       )
       .on(
         'postgres_changes',
@@ -97,44 +74,18 @@ export default function Navbar() {
           schema: 'public',
           table: 'messages',
         },
-        () => {
-          fetchUnreadChatsCount()
-        }
+        () => fetchUnreadChatsCount()
       )
       .subscribe()
 
-    // Слушаем кастомное событие обновления счетчика
-    const handleMessagesRead = (event: any) => {
-      console.log('messagesRead event received in Navbar, chatId:', event.detail?.chatId)
-      // Обновляем счетчик с задержкой для гарантии обновления в базе данных
-      setTimeout(() => {
-        console.log('Refreshing unread chats count...')
-        fetchUnreadChatsCount()
-      }, 500)
+    const handleMessagesRead = () => {
+      setTimeout(fetchUnreadChatsCount, 500)
     }
     window.addEventListener('messagesRead', handleMessagesRead)
-    
-    // Также обновляем при возврате на страницу
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('Page visible, refreshing unread chats count...')
-        fetchUnreadChatsCount()
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    
-    // Обновляем при фокусе на окне
-    const handleFocus = () => {
-      console.log('Window focused, refreshing unread chats count...')
-      fetchUnreadChatsCount()
-    }
-    window.addEventListener('focus', handleFocus)
 
     return () => {
       supabase.removeChannel(channel)
       window.removeEventListener('messagesRead', handleMessagesRead)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('focus', handleFocus)
     }
   }, [user])
 
@@ -262,7 +213,7 @@ export default function Navbar() {
       </header>
 
       {/* Fixed bottom navigation - Глянцевая, премиальная */}
-      <nav className="fixed bottom-0 left-0 right-0 glass-strong border-t border-white/20 shadow-glass backdrop-blur-md z-50 safe-area-inset-bottom pointer-events-auto">
+      <nav className="fixed bottom-0 left-0 right-0 glass-strong border-t border-white/20 shadow-glass backdrop-blur-md z-[100] safe-area-inset-bottom pointer-events-auto">
         <div className="w-full px-0">
           <div className="flex items-center justify-between sm:justify-evenly h-16 pointer-events-auto w-full">
             <Link
@@ -272,7 +223,7 @@ export default function Navbar() {
                   ? 'text-brand-accent'
                   : 'text-text-secondary hover:text-brand-accent'
               }`}
-              prefetch={true}
+              prefetch={false}
             >
               <div className={`relative ${pathname === '/feed' ? 'glow-effect' : ''}`}>
                 <FiHome className="w-5 h-5 sm:w-[22px] sm:h-[22px] transition-all group-hover:scale-110" strokeWidth={pathname === '/feed' ? 2.5 : 2} />
@@ -290,7 +241,7 @@ export default function Navbar() {
                   ? 'text-brand-accent'
                   : 'text-text-secondary hover:text-graphite-secondary'
               }`}
-              prefetch={true}
+              prefetch={false}
             >
               <FiSearch className="w-5 h-5 sm:w-[22px] sm:h-[22px]" strokeWidth={pathname === '/search' ? 2.5 : 2} />
               <span className="text-[10px] sm:text-xs font-medium leading-tight">Мастера</span>
@@ -303,7 +254,7 @@ export default function Navbar() {
                   ? 'text-brand-accent'
                   : 'text-text-secondary hover:text-graphite-secondary'
               }`}
-              prefetch={true}
+              prefetch={false}
             >
               <FiBriefcase className="w-5 h-5 sm:w-[22px] sm:h-[22px]" strokeWidth={pathname?.startsWith('/orders') ? 2.5 : 2} />
               <span className="text-[10px] sm:text-xs font-medium leading-tight">Заказы</span>
@@ -316,7 +267,7 @@ export default function Navbar() {
                   ? 'text-brand-accent'
                   : 'text-text-secondary hover:text-graphite-secondary'
               }`}
-              prefetch={true}
+              prefetch={false}
             >
               <FiShoppingBag className="w-5 h-5 sm:w-[22px] sm:h-[22px]" strokeWidth={pathname?.startsWith('/products') ? 2.5 : 2} />
               <span className="text-[10px] sm:text-xs font-medium leading-tight">Товары</span>
@@ -329,7 +280,7 @@ export default function Navbar() {
                   ? 'text-brand-accent'
                   : 'text-text-secondary hover:text-graphite-secondary'
               }`}
-              prefetch={true}
+              prefetch={false}
             >
               <div className="relative">
                 <FiMessageCircle className="w-5 h-5 sm:w-[22px] sm:h-[22px]" strokeWidth={pathname?.startsWith('/chats') ? 2.5 : 2} />
@@ -349,7 +300,7 @@ export default function Navbar() {
                   ? 'text-brand-accent'
                   : 'text-text-secondary hover:text-graphite-secondary'
               }`}
-              prefetch={true}
+              prefetch={false}
             >
               <FiUser className="w-5 h-5 sm:w-[22px] sm:h-[22px]" strokeWidth={pathname?.startsWith('/profile') ? 2.5 : 2} />
               <span className="text-[10px] sm:text-xs font-medium leading-tight">Профиль</span>
