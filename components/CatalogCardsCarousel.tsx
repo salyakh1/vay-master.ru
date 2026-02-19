@@ -77,8 +77,7 @@ export default function CatalogCardsCarousel() {
       <h2 className="text-lg font-semibold text-graphite-secondary mb-4">Каталог</h2>
       <div
         ref={scrollRef}
-        className="flex gap-3 overflow-x-auto overflow-y-hidden pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin scrollbar-thumb-border-color scrollbar-track-transparent"
-        style={{ scrollbarWidth: 'thin' }}
+        className="flex gap-3 overflow-x-auto overflow-y-hidden pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide"
       >
         {items.map((cat, index) => {
           const pastel = PASTEL_BGS[index % PASTEL_BGS.length]

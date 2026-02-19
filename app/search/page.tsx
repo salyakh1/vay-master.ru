@@ -3,7 +3,6 @@
 import { useEffect, useState, Suspense, useRef, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
-import { VariableSizeList as List } from 'react-window'
 import { useAuth } from '../providers'
 import { supabase, User } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -21,12 +20,7 @@ const RecommendationsCarousel = dynamic(() => import('@/components/Recommendatio
 })
 import { Story } from '@/lib/supabase'
 import type { AdBanner } from '@/lib/supabase'
-import { getProductCategoriesForSpecializations } from '@/lib/specialization-product-mapping'
-
-const ROW_HEIGHT_CARDS = 420
-const ROW_HEIGHT_AD = 100
-const ROW_HEIGHT_CAROUSEL = 220
-const MASTERS_LIST_HEIGHT = typeof window !== 'undefined' ? Math.min(800, window.innerHeight - 320) : 700
+import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs, getProductCategoriesForCategorySlugs } from '@/lib/specialization-product-mapping'
 
 type MastersRow = 
   | { type: 'cards'; masters: [User | undefined, User | undefined] }
@@ -43,12 +37,6 @@ function buildMastersRows(masters: User[], showCarousel: boolean): MastersRow[] 
     cardRowIndex++
   }
   return rows
-}
-
-function getMastersRowHeight(row: MastersRow): number {
-  if (row.type === 'cards') return ROW_HEIGHT_CARDS
-  if (row.type === 'ad') return ROW_HEIGHT_AD
-  return ROW_HEIGHT_CAROUSEL
 }
 
 function MasterCardContent({ master }: { master: User }) {
@@ -155,23 +143,11 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const [hasMoreRandom, setHasMoreRandom] = useState(true)
   const loadMoreRandomSentinelRef = useRef<HTMLDivElement>(null)
   const loadMoreMastersSentinelRef = useRef<HTMLDivElement>(null)
-  const mastersListContainerRef = useRef<HTMLDivElement>(null)
 
   const ITEMS_PER_PAGE = 12
 
   const randomRows = useMemo(() => buildMastersRows(randomProfiles, true), [randomProfiles])
   const filteredRows = useMemo(() => buildMastersRows(masters, false), [masters])
-  const [mastersListWidth, setMastersListWidth] = useState(400)
-
-  useEffect(() => {
-    const el = mastersListContainerRef.current
-    if (!el) return
-    const setW = () => setMastersListWidth(el.offsetWidth)
-    setW()
-    const ro = new ResizeObserver(setW)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [loading, randomProfiles.length, masters.length])
 
   // Загружаем подкатегории мастера и получаем категории товаров
   const [masterCategorySlugs, setMasterCategorySlugs] = useState<string[]>([])
@@ -529,6 +505,19 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const selectedSubcategoryNode = subcategoriesForFilter.find((s) => s.id === selectedSubcategory)
   const servicesForFilter = selectedSubcategoryNode?.services || []
 
+  // Категории/подкатегории товаров по выбранному фильтру (категория или подкатегория мастеров)
+  const filterProductCategories = useMemo(() => {
+    const categorySlug = selectedCategoryNode?.slug
+    const subcategorySlug = selectedSubcategoryNode?.slug
+    if (subcategorySlug && categorySlug) {
+      return getProductCategoriesForMasterSubcategorySlugs([subcategorySlug], [categorySlug])
+    }
+    if (categorySlug) {
+      return getProductCategoriesForCategorySlugs([categorySlug])
+    }
+    return null
+  }, [selectedCategoryNode?.slug, selectedSubcategoryNode?.slug])
+
   const hasFilters =
     query.trim().length > 0 ||
     !!selectedCategory ||
@@ -543,9 +532,9 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
       <div className="w-full mb-6">
         <AdBannerSlider page="search" initialBanners={initialBanners ?? undefined} />
       </div>
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-3 py-4">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-semibold mb-6 text-text-primary">Мастера</h1>
+          <h1 className="text-2xl font-semibold mb-4 text-text-primary">Мастера</h1>
 
           {/* Search Form */}
           <form onSubmit={handleSearch} className="mb-6">
@@ -613,23 +602,25 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-4 py-4">
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-graphite-secondary mb-2">Город</label>
-                    <input
-                      type="text"
-                      value={cityFilter}
-                      onChange={(e) => setCityFilter(e.target.value)}
-                      placeholder="Введите город"
-                      className="input w-full h-10 text-sm"
-                    />
-                  </div>
+                  {/* Город показываем только после выбора категории, подкатегории или услуги */}
+                  {(selectedCategory || selectedSubcategory || selectedService) && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-graphite-secondary mb-2">Город</label>
+                      <input
+                        type="text"
+                        value={cityFilter}
+                        onChange={(e) => setCityFilter(e.target.value)}
+                        placeholder="Введите город"
+                        className="input w-full h-10 text-sm"
+                      />
+                    </div>
+                  )}
 
                   {filterStepMasters === 'category' && (
                     <div className="grid grid-cols-3 gap-1">
                       {categoriesForFilter.map((cat) => {
-                        const showImage = !filterImageFailed.has(cat.id)
+                        const showImage = cat.image_url && !filterImageFailed.has(cat.id)
                         const imgSize = 88
-                        const imageUrl = cat.image_url || `https://picsum.photos/seed/${encodeURIComponent(cat.slug)}/${imgSize * 2}/${imgSize * 2}`
                         return (
                           <button
                             key={cat.id}
@@ -649,7 +640,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                             <div className="w-full aspect-square flex-shrink-0 bg-bg-secondary flex items-center justify-center">
                               {showImage ? (
                                 <img
-                                  src={imageUrl}
+                                  src={cat.image_url!}
                                   alt=""
                                   width={imgSize * 2}
                                   height={imgSize * 2}
@@ -811,15 +802,27 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
           <RecommendationsCarousel
             title={
-              isMasterWithCategories
+              isMasterWithCategories && !filterProductCategories
                 ? "Рекомендации под ваши услуги"
-                : "Рекомендации Pro‑товаров"
+                : "Рекомендуемые товары"
             }
             query={query}
-            categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
-            subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
+            categorySlugs={
+              filterProductCategories?.categorySlugs?.length
+                ? filterProductCategories.categorySlugs
+                : isMasterWithCategories
+                  ? masterProductCategories.categorySlugs
+                  : undefined
+            }
+            subcategorySlugs={
+              filterProductCategories?.subcategorySlugs?.length
+                ? filterProductCategories.subcategorySlugs
+                : isMasterWithCategories
+                  ? masterProductCategories.subcategorySlugs
+                  : undefined
+            }
             role={user?.role || 'client'}
-            limit={12}
+            limit={20}
           />
 
           {/* Results */}
@@ -828,121 +831,16 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
           ) : !hasFilters ? (
             <>
               {randomProfiles.length > 0 ? (
-                <div className="space-y-6">
-                  <h2 className="text-xl font-semibold text-text-primary mb-2">
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold text-text-primary mb-1">
                     Мастера вашего города
                   </h2>
-                  <div ref={mastersListContainerRef} style={{ height: MASTERS_LIST_HEIGHT }} className="w-full overflow-hidden">
-                    <List
-                      width={mastersListWidth}
-                      height={MASTERS_LIST_HEIGHT}
-                      itemCount={randomRows.length}
-                      itemSize={(i) => getMastersRowHeight(randomRows[i])}
-                      itemData={{
-                        rows: randomRows,
-                        user,
-                        setShowAuthModal,
-                        query,
-                        context: { page: 'search' as const, category: selectedCategory ? [selectedCategory] : undefined, city: cityFilter || userCity || undefined },
-                        role: user?.role || 'client',
-                      }}
-                      onScroll={({ scrollOffset }) => {
-                        let total = 0
-                        for (let i = 0; i < randomRows.length; i++) total += getMastersRowHeight(randomRows[i])
-                        if (total > 0 && scrollOffset + MASTERS_LIST_HEIGHT >= total - 400 && hasMoreRandom && !loadingMoreRandom) {
-                          setRandomPage((p) => p + 1)
-                        }
-                      }}
-                    >
-                      {({ index, style, data }) => {
-                        const row = data.rows[index]
-                        if (!row) return <div style={style} />
-                        if (row.type === 'cards') {
-                          return (
-                            <div style={{ ...style, paddingBottom: 8 }} className="box-border w-full">
-                              <div className="grid grid-cols-2 gap-5">
-                                {row.masters.map((master) =>
-                                  master ? (
-                                    user ? (
-                                      <Link key={master.id} href={`/profile/${master.id}`}>
-                                        <MasterCardContent master={master} />
-                                      </Link>
-                                    ) : (
-                                      <div key={master.id} onClick={() => data.setShowAuthModal(true)} className="cursor-pointer">
-                                        <MasterCardContent master={master} />
-                                      </div>
-                                    )
-                                  ) : null
-                                )}
-                              </div>
-                            </div>
-                          )
-                        }
-                        if (row.type === 'ad') {
-                          return (
-                            <div style={style} className="flex items-center justify-center">
-                              <AdSlot type="INLINE_CONTEXT" context={data.context} index={row.rowIndex} className="my-4" />
-                            </div>
-                          )
-                        }
-                        return (
-                          <div style={style}>
-                            <RecommendationsCarousel title="Рекомендации Pro‑товаров" query={data.query} role={data.role} limit={12} />
-                          </div>
-                        )
-                      }}
-                    </List>
-                  </div>
-                  {loadingMoreRandom && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
-                  {hasMoreRandom && <div ref={loadMoreRandomSentinelRef} className="h-4" aria-hidden />}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-text-secondary">
-                  Введите запрос или выберите фильтры
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold text-text-primary flex items-center gap-2 mb-2">
-                <FiUser />
-                Мастера ({masters.length})
-              </h2>
-              {masters.length === 0 ? (
-                <div className="card text-center text-text-secondary py-12">
-                  Мастера не найдены
-                </div>
-              ) : (
-                <>
-                <div ref={mastersListContainerRef} style={{ height: MASTERS_LIST_HEIGHT }} className="w-full overflow-hidden">
-                  <List
-                    width={mastersListWidth}
-                    height={MASTERS_LIST_HEIGHT}
-                    itemCount={filteredRows.length}
-                    itemSize={(i) => getMastersRowHeight(filteredRows[i])}
-                    itemData={{
-                      rows: filteredRows,
-                      user,
-                      setShowAuthModal,
-                      query,
-                      context: { page: 'search' as const, category: selectedCategory ? [selectedCategory] : undefined, keywords: query ? [query] : undefined, city: cityFilter || userCity || undefined },
-                      role: user?.role || 'client',
-                    }}
-                    onScroll={({ scrollOffset }) => {
-                      let total = 0
-                      for (let i = 0; i < filteredRows.length; i++) total += getMastersRowHeight(filteredRows[i])
-                      if (total > 0 && scrollOffset + MASTERS_LIST_HEIGHT >= total - 400 && hasMoreMasters && !loadingMoreMasters) {
-                        setMastersPage((p) => p + 1)
-                      }
-                    }}
-                  >
-                    {({ index, style, data }) => {
-                      const row = data.rows[index]
-                      if (!row) return <div style={style} />
+                  <div className="w-full space-y-1">
+                    {randomRows.map((row, index) => {
                       if (row.type === 'cards') {
                         return (
-                          <div style={{ ...style, paddingBottom: 8 }} className="box-border w-full">
-                            <div className="grid grid-cols-2 gap-5">
+                          <div key={index} className="w-full pb-1">
+                            <div className="grid grid-cols-2 gap-2">
                               {row.masters.map((master) =>
                                 master ? (
                                   user ? (
@@ -950,7 +848,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                                       <MasterCardContent master={master} />
                                     </Link>
                                   ) : (
-                                    <div key={master.id} onClick={() => data.setShowAuthModal(true)} className="cursor-pointer">
+                                    <div key={master.id} onClick={() => setShowAuthModal(true)} className="cursor-pointer">
                                       <MasterCardContent master={master} />
                                     </div>
                                   )
@@ -962,18 +860,89 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                       }
                       if (row.type === 'ad') {
                         return (
-                          <div style={style} className="flex items-center justify-center">
-                            <AdSlot type="INLINE_CONTEXT" context={data.context} index={row.rowIndex} className="my-4" />
+                          <div key={index} className="flex items-center justify-center py-2">
+                            <AdSlot type="INLINE_CONTEXT" context={{ page: 'search' as const, category: selectedCategory ? [selectedCategory] : undefined, city: cityFilter || userCity || undefined }} index={row.rowIndex} className="my-4" />
                           </div>
                         )
                       }
                       return (
-                        <div style={style}>
-                          <RecommendationsCarousel title="Рекомендации Pro‑товаров" query={data.query} role={data.role} limit={12} />
+                        <div key={index}>
+                          <RecommendationsCarousel
+                            title="Рекомендуемые товары"
+                            query={query}
+                            categorySlugs={filterProductCategories?.categorySlugs?.length ? filterProductCategories.categorySlugs : undefined}
+                            subcategorySlugs={filterProductCategories?.subcategorySlugs?.length ? filterProductCategories.subcategorySlugs : undefined}
+                            role={user?.role || 'client'}
+                            limit={20}
+                          />
                         </div>
                       )
-                    }}
-                  </List>
+                    })}
+                  </div>
+                  {loadingMoreRandom && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
+                  {hasMoreRandom && <div ref={loadMoreRandomSentinelRef} className="h-4" aria-hidden />}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-text-secondary">
+                  Введите запрос или выберите фильтры
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-text-primary flex items-center gap-2 mb-1">
+                <FiUser />
+                Мастера ({masters.length})
+              </h2>
+              {masters.length === 0 ? (
+                <div className="card text-center text-text-secondary py-12">
+                  Мастера не найдены
+                </div>
+              ) : (
+                <>
+                <div className="w-full space-y-1">
+                  {filteredRows.map((row, index) => {
+                    if (row.type === 'cards') {
+                      return (
+                        <div key={index} className="w-full pb-1">
+                          <div className="grid grid-cols-2 gap-2">
+                            {row.masters.map((master) =>
+                              master ? (
+                                user ? (
+                                  <Link key={master.id} href={`/profile/${master.id}`}>
+                                    <MasterCardContent master={master} />
+                                  </Link>
+                                ) : (
+                                  <div key={master.id} onClick={() => setShowAuthModal(true)} className="cursor-pointer">
+                                    <MasterCardContent master={master} />
+                                  </div>
+                                )
+                              ) : null
+                            )}
+                          </div>
+                        </div>
+                      )
+                    }
+                    if (row.type === 'ad') {
+                      return (
+                        <div key={index} className="flex items-center justify-center py-2">
+                          <AdSlot type="INLINE_CONTEXT" context={{ page: 'search' as const, category: selectedCategory ? [selectedCategory] : undefined, keywords: query ? [query] : undefined, city: cityFilter || userCity || undefined }} index={row.rowIndex} className="my-4" />
+                        </div>
+                      )
+                    }
+                    return (
+                      <div key={index}>
+                        <RecommendationsCarousel
+                          title="Рекомендуемые товары"
+                          query={query}
+                          categorySlugs={filterProductCategories?.categorySlugs?.length ? filterProductCategories.categorySlugs : undefined}
+                          subcategorySlugs={filterProductCategories?.subcategorySlugs?.length ? filterProductCategories.subcategorySlugs : undefined}
+                          role={user?.role || 'client'}
+                          limit={20}
+                        />
+                      </div>
+                    )
+                  })}
                 </div>
                 {loadingMoreMasters && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
                 {hasMoreMasters && <div ref={loadMoreMastersSentinelRef} className="h-4" aria-hidden />}

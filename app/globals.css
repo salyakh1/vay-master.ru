@@ -563,17 +563,32 @@ select.input:not([value=""]) {
   }
 }
 
-/* Скрыть скроллбар глобально (скролл остается функциональным) */
-/* WebKit (Chrome, Safari, Edge) */
-*::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
+/* Скрыть скроллбар глобально (скролл остаётся функциональным, полоса не видна) */
+html,
+body,
 * {
   -ms-overflow-style: none; /* IE и Edge */
   scrollbar-width: none; /* Firefox */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* Скрыть скроллбар у каруселей (горизонтальный скролл без полосы) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* Custom Scrollbar - для элементов с классом */

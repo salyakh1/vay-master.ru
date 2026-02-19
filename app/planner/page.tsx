@@ -1059,7 +1059,7 @@ export default function PlannerPage() {
                     ) : recommendedProducts.length === 0 ? (
                       <div className="text-xs text-text-secondary">Нет товаров по выбранной услуге.</div>
                     ) : (
-                      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+                      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
                         {recommendedProducts.map((product) => (
                           <Link
                             key={product.id}
@@ -1124,7 +1124,7 @@ export default function PlannerPage() {
                     ) : recommendedMasters.length === 0 ? (
                       <div className="text-xs text-text-secondary">Нет мастеров по выбранной услуге.</div>
                     ) : (
-                      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+                      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
                         {recommendedMasters.map((master) => (
                           <Link
                             key={master.id}

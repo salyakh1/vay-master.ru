@@ -75,7 +75,7 @@ export default function NearbyProductsCarousel({
         )}
       </div>
       {loading ? (
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory scrollbar-hide">
           {Array.from({ length: 5 }).map((_, idx) => (
               <div
                 key={`skeleton-${idx}`}
@@ -94,7 +94,7 @@ export default function NearbyProductsCarousel({
           В радиусе {radiusKm} км пока нет товаров
         </div>
       ) : (
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory scrollbar-hide">
           {items.map((product) => (
               <Link
                 key={product.id}

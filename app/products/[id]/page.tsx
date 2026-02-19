@@ -306,7 +306,7 @@ export default function ProductPage() {
               
               {/* Thumbnails */}
               {images.length > 1 && (
-                <div className="mt-3 overflow-x-auto">
+                <div className="mt-3 overflow-x-auto scrollbar-hide">
                   <div className="flex gap-2">
                     {images.map((img, idx) => (
                       <button

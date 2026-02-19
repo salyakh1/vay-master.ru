@@ -2,7 +2,6 @@
 
 import { useEffect, useState, Suspense, useMemo, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { VariableSizeList as List } from 'react-window'
 import { useAuth } from '../providers'
 import { supabase, Product, ProductCategory, ProductSubcategory, PRODUCT_CATEGORY_SECTIONS, Order } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -214,10 +213,8 @@ function ProductsContent() {
   // Порция «по экрану»: ~1–1.5 экрана (2 колонки × 4–6 рядов)
   const ITEMS_PER_PAGE = 12
   const GRID_COLUMN_COUNT = 2
-  const PRODUCTS_LIST_HEIGHT = typeof window !== 'undefined' ? Math.min(window.innerHeight * 0.65, 700) : 600
   const ROW_BASE_HEIGHT = 320
-  const ROW_AD_EXTRA = 160
-  const ROW_CAROUSEL_EXTRA = 220
+  const productsLoadMoreRef = useRef<HTMLDivElement>(null)
 
   // Загружаем специализации мастера и получаем категории товаров
   const [masterSpecializations, setMasterSpecializations] = useState<Array<{ id: string; slug: string }>>([])
@@ -398,17 +395,19 @@ function ProductsContent() {
     return rows
   }, [products, user, cityOrders])
 
-  const getProductsRowSize = useCallback(
-    (index: number) => {
-      const row = gridRows[index]
-      if (!row) return ROW_BASE_HEIGHT
-      let h = ROW_BASE_HEIGHT
-      if (row.hasAd) h += ROW_AD_EXTRA
-      if (index === 3) h += ROW_CAROUSEL_EXTRA
-      return h
-    },
-    [gridRows]
-  )
+  // Подгрузка при прокрутке до конца списка
+  useEffect(() => {
+    const el = productsLoadMoreRef.current
+    if (!el || !hasMore || loadingMore) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore()
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, gridRows.length])
 
   // Город применяется только при закрытии модалки — во время ввода запросы не уходят
   const applyCityAndCloseFilters = () => {
@@ -682,7 +681,7 @@ function ProductsContent() {
                               {categories.map((cat) => {
                                 const Icon = getCategoryIcon(cat.slug)
                                 const showImage = !categoryImageFailed.has(cat.id)
-                                const imageUrl = cat.image_url || `https://picsum.photos/seed/${encodeURIComponent(cat.slug)}/${CATEGORY_IMAGE_SIZE * 2}/${CATEGORY_IMAGE_SIZE * 2}`
+                                const hasImage = cat.image_url && showImage
                                 return (
                                   <button
                                     key={cat.id}
@@ -701,9 +700,9 @@ function ProductsContent() {
                                       className="w-12 h-12 rounded-lg overflow-hidden bg-bg-secondary flex items-center justify-center mb-2 flex-shrink-0"
                                       style={{ width: CATEGORY_IMAGE_SIZE, height: CATEGORY_IMAGE_SIZE }}
                                     >
-                                      {showImage ? (
+                                      {hasImage ? (
                                         <img
-                                          src={imageUrl}
+                                          src={cat.image_url!}
                                           alt=""
                                           width={CATEGORY_IMAGE_SIZE}
                                           height={CATEGORY_IMAGE_SIZE}
@@ -747,13 +746,13 @@ function ProductsContent() {
                           if (!selectedCat) return null
                           const Icon = getCategoryIcon(selectedCat.slug)
                           const showImg = !categoryImageFailed.has(selectedCat.id)
-                          const thumbUrl = selectedCat.image_url || `https://picsum.photos/seed/${encodeURIComponent(selectedCat.slug)}/64/64`
+                          const hasThumb = selectedCat.image_url && showImg
                           return (
                             <>
                               <div className="w-8 h-8 rounded overflow-hidden bg-bg-secondary flex-shrink-0 flex items-center justify-center">
-                                {showImg ? (
+                                {hasThumb ? (
                                   <img
-                                    src={thumbUrl}
+                                    src={selectedCat.image_url!}
                                     alt=""
                                     width={32}
                                     height={32}
@@ -876,7 +875,7 @@ function ProductsContent() {
           title={
             isMasterWithCategories
               ? "Рекомендации под ваши услуги"
-              : "Рекомендуемые товары от Pro‑продавцов"
+              : "Рекомендуемые товары"
           }
           query={searchQuery}
           categoryId={isMasterWithCategories ? undefined : categoryId}
@@ -884,7 +883,7 @@ function ProductsContent() {
           categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
           subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
           role={user?.role || 'client'}
-          limit={12}
+          limit={20}
         />
 
         {/* Products Grid */}
@@ -894,80 +893,52 @@ function ProductsContent() {
           </div>
         ) : (
           <>
-            <div style={{ height: PRODUCTS_LIST_HEIGHT }} className="w-full overflow-hidden">
-              <List
-                width="100%"
-                height={PRODUCTS_LIST_HEIGHT}
-                itemCount={gridRows.length}
-                itemSize={getProductsRowSize}
-                itemData={{
-                  gridRows,
-                  user,
-                  searchQuery,
-                  categoryId,
-                  subcategoryId,
-                  cityFilter,
-                  masterProductCategories,
-                  isMasterWithCategories,
-                }}
-                onScroll={({ scrollOffset }) => {
-                  let total = 0
-                  for (let i = 0; i < gridRows.length; i++) total += getProductsRowSize(i)
-                  if (total > 0 && scrollOffset + PRODUCTS_LIST_HEIGHT >= total - 400 && hasMore && !loadingMore) {
-                    loadMore()
-                  }
-                }}
-              >
-                {({ index, style, data }) => {
-                  const row = data.gridRows[index]
-                  if (!row) return <div style={style} />
-                  const rowIndex = index
-                  return (
-                    <div style={{ ...style, paddingBottom: 16 }} className="box-border w-full">
-                      <div className="grid grid-cols-2 gap-[10px] px-0">
-                        {row.items.map((product, itemIndex) => {
-                          if (row.skipFirstItem && itemIndex === 0) return null
-                          return <ProductCard key={product.id} product={product} currentUser={data.user} />
-                        })}
-                        {row.orderAfter ? (
-                          <OrderCard key={`order-${row.orderAfter.id}`} order={row.orderAfter} variant="product-grid" />
-                        ) : row.items.length < GRID_COLUMN_COUNT && !row.skipFirstItem ? (
-                          <div />
-                        ) : null}
-                      </div>
-                      {row.hasAd && row.adProductIndex !== undefined && (
-                        <div className="col-span-2 mt-4 px-0">
-                          <AdSlot
-                            type="INLINE_CONTEXT"
-                            context={{
-                              page: 'products',
-                              category: row.items[0]?.category_ref?.section ? [row.items[0].category_ref.section] : undefined,
-                              keywords: data.searchQuery ? [data.searchQuery] : undefined,
-                              city: data.cityFilter || undefined,
-                            }}
-                            index={row.adProductIndex}
-                            className="my-4"
-                          />
-                        </div>
-                      )}
-                      {rowIndex === 3 && (
-                        <RecommendationsCarousel
-                          title={
-                            data.isMasterWithCategories ? "Рекомендации под ваши услуги" : "Рекомендации Pro‑товаров"
-                          }
-                          query={data.searchQuery}
-                          categoryId={data.isMasterWithCategories ? undefined : data.categoryId}
-                          subcategoryId={data.isMasterWithCategories ? undefined : data.subcategoryId}
-                          categorySlugs={data.isMasterWithCategories ? data.masterProductCategories.categorySlugs : undefined}
-                          subcategorySlugs={data.isMasterWithCategories ? data.masterProductCategories.subcategorySlugs : undefined}
-                          role={data.user?.role || 'client'}
-                          limit={12}
-                        />
-                      )}
+            <div className="w-full space-y-2">
+              {gridRows.map((row, rowIndex) => (
+                <div key={rowIndex} className="w-full pb-2">
+                  <div className="grid grid-cols-2 gap-2 px-0">
+                    {row.items.map((product, itemIndex) => {
+                      if (row.skipFirstItem && itemIndex === 0) return null
+                      return <ProductCard key={product.id} product={product} currentUser={user} />
+                    })}
+                    {row.orderAfter ? (
+                      <OrderCard key={`order-${row.orderAfter.id}`} order={row.orderAfter} variant="product-grid" />
+                    ) : row.items.length < GRID_COLUMN_COUNT && !row.skipFirstItem ? (
+                      <div />
+                    ) : null}
+                  </div>
+                  {row.hasAd && row.adProductIndex !== undefined && (
+                    <div className="col-span-2 mt-4 px-0">
+                      <AdSlot
+                        type="INLINE_CONTEXT"
+                        context={{
+                          page: 'products',
+                          category: row.items[0]?.category_ref?.section ? [row.items[0].category_ref.section] : undefined,
+                          keywords: searchQuery ? [searchQuery] : undefined,
+                          city: cityFilter || undefined,
+                        }}
+                        index={row.adProductIndex}
+                        className="my-4"
+                      />
                     </div>
-                  )
-                }}
-              </List>
+                  )}
+                  {rowIndex === 3 && (
+                    <RecommendationsCarousel
+                      title={
+                        isMasterWithCategories ? "Рекомендации под ваши услуги" : "Рекомендуемые товары"
+                      }
+                      query={searchQuery}
+                      categoryId={isMasterWithCategories ? undefined : categoryId}
+                      subcategoryId={isMasterWithCategories ? undefined : subcategoryId}
+                      categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
+                      subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
+                      role={user?.role || 'client'}
+                      limit={20}
+                    />
+                  )}
+                </div>
+              ))}
+              <div ref={productsLoadMoreRef} className="h-4" aria-hidden />
             </div>
             {loadingMore && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
           </>

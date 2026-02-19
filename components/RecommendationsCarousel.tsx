@@ -25,7 +25,7 @@ export default function RecommendationsCarousel({
   categorySlugs,
   subcategorySlugs,
   role,
-  limit = 12,
+  limit = 20,
 }: RecommendationsCarouselProps) {
   const [items, setItems] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
@@ -95,7 +95,7 @@ export default function RecommendationsCarousel({
           {title}
         </h2>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
+      <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory scrollbar-hide">
         {loading
           ? Array.from({ length: 6 }).map((_, idx) => (
               <div

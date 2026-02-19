@@ -404,7 +404,7 @@ export default function ProblemResultPage() {
                 <FiShoppingBag />
                 Подходящие товары ({result.products.length})
               </h2>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto scrollbar-hide">
                 <div className="flex gap-4 pb-4" style={{ minWidth: 'max-content' }}>
                   {result.products.map((product) => (
                     <Link

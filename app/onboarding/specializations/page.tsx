@@ -160,9 +160,8 @@ export default function SpecializationsOnboardingPage() {
             <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Категория</div>
             <div className="grid grid-cols-3 gap-2">
               {tree.map((cat) => {
-                const showImage = !filterImageFailed.has(cat.id)
+                const showImage = cat.image_url && !filterImageFailed.has(cat.id)
                 const imgSize = 88
-                const imageUrl = cat.image_url || `https://picsum.photos/seed/${encodeURIComponent(cat.slug)}/${imgSize * 2}/${imgSize * 2}`
                 return (
                   <button
                     key={cat.id}
@@ -176,7 +175,7 @@ export default function SpecializationsOnboardingPage() {
                     <div className="w-full aspect-square flex-shrink-0 bg-bg-secondary flex items-center justify-center">
                       {showImage ? (
                         <img
-                          src={imageUrl}
+                          src={cat.image_url!}
                           alt=""
                           width={imgSize * 2}
                           height={imgSize * 2}

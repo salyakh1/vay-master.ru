@@ -114,10 +114,9 @@ export default function SpecializationCardsCarousel({
       {hasContent && (
         <div
           ref={scrollRef}
-          className={`flex gap-2 overflow-x-auto overflow-y-hidden pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin scrollbar-thumb-border-color scrollbar-track-transparent transition-opacity duration-300 ease-out ${
+          className={`flex gap-2 overflow-x-auto overflow-y-hidden pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide transition-opacity duration-300 ease-out ${
             contentFadedIn ? 'opacity-100' : 'opacity-0'
           }`}
-          style={{ scrollbarWidth: 'thin' }}
         >
         {items.map((spec) => (
           <Link
@@ -131,30 +130,17 @@ export default function SpecializationCardsCarousel({
               className="relative w-full bg-bg-secondary flex items-center justify-center overflow-hidden"
               style={{ height: imageSize }}
             >
-              {!failedImages.has(spec.id) ? (
-                spec.image_url ? (
-                  <img
-                    src={spec.image_url}
-                    alt=""
-                    width={imageSize}
-                    height={imageSize}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover"
-                    onError={() => markImageFailed(spec.id)}
-                  />
-                ) : (
-                  <img
-                    src={`https://picsum.photos/seed/${encodeURIComponent(spec.slug)}/${imageSize}/${imageSize}`}
-                    alt=""
-                    width={imageSize}
-                    height={imageSize}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover"
-                    onError={() => markImageFailed(spec.id)}
-                  />
-                )
+              {!failedImages.has(spec.id) && spec.image_url ? (
+                <img
+                  src={spec.image_url}
+                  alt=""
+                  width={imageSize}
+                  height={imageSize}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover"
+                  onError={() => markImageFailed(spec.id)}
+                />
               ) : (
                 <FiBriefcase size={28} className="text-text-muted/80" strokeWidth={2} aria-hidden />
               )}

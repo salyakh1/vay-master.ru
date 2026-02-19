@@ -1165,7 +1165,7 @@ export default function ProfilePage() {
             </div>
           )}
           {/* Tabs */}
-          <div className="flex gap-1 sm:gap-2 mb-6 sm:mb-8 border-b border-border-color/40 overflow-x-auto">
+          <div className="flex gap-1 sm:gap-2 mb-6 sm:mb-8 border-b border-border-color/40 overflow-x-auto scrollbar-hide">
             <button
               onClick={() => setActiveTab('profile')}
               className={`px-3 sm:px-4 py-2 font-medium text-sm sm:text-base transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${

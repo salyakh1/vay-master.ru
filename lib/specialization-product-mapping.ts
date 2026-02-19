@@ -451,6 +451,18 @@ export const CATEGORY_SLUG_TO_PRODUCT_CATEGORIES: Record<string, { categories: s
   specoborudovanie: { categories: ['power-tools', 'metalworks-welding-materials', 'consumables-accessories', 'building-mixes', 'hand-tools'] },
 }
 
+/**
+ * Маппинг подкатегорий мастеров (slug) на категории и подкатегории товаров.
+ * Если подкатегории нет в маппинге — используются категории товаров родительской категории (fallback).
+ */
+export const SUBCATEGORY_SLUG_TO_PRODUCT_CATEGORIES: Record<string, {
+  categories: string[]
+  subcategories?: string[]
+}> = {
+  // Пример: можно добавлять slug подкатегорий для более точного подбора товаров.
+  // Пока пусто — везде используется fallback по родительской категории.
+}
+
 export function getProductCategoriesForCategorySlugs(
   categorySlugs: string[]
 ): { categorySlugs: string[]; subcategorySlugs: string[] } {
@@ -464,6 +476,31 @@ export function getProductCategoriesForCategorySlugs(
     }
   }
   return { categorySlugs: Array.from(categorySlugsSet), subcategorySlugs: Array.from(subcategorySlugsSet) }
+}
+
+/**
+ * Получить категории и подкатегории товаров для подкатегорий мастеров.
+ * Если для подкатегории есть маппинг — используются он, иначе — маппинг родительской категории (categorySlugsFallback).
+ */
+export function getProductCategoriesForMasterSubcategorySlugs(
+  subcategorySlugs: string[],
+  categorySlugsFallback: string[]
+): { categorySlugs: string[]; subcategorySlugs: string[] } {
+  const categorySlugsSet = new Set<string>()
+  const subcategorySlugsSet = new Set<string>()
+  let hasSubMapping = false
+  for (const slug of subcategorySlugs) {
+    const mapping = SUBCATEGORY_SLUG_TO_PRODUCT_CATEGORIES[slug]
+    if (mapping && (mapping.categories.length > 0 || (mapping.subcategories?.length ?? 0) > 0)) {
+      hasSubMapping = true
+      mapping.categories.forEach((c) => categorySlugsSet.add(c))
+      if (mapping.subcategories) mapping.subcategories.forEach((s) => subcategorySlugsSet.add(s))
+    }
+  }
+  if (hasSubMapping) {
+    return { categorySlugs: Array.from(categorySlugsSet), subcategorySlugs: Array.from(subcategorySlugsSet) }
+  }
+  return getProductCategoriesForCategorySlugs(categorySlugsFallback)
 }
 
 /**

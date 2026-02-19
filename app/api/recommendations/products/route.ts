@@ -9,7 +9,7 @@ const supabaseAdmin = createClient(
 
 export const dynamic = 'force-dynamic'
 
-const DEFAULT_LIMIT = 12
+const DEFAULT_LIMIT = 20
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const categorySlugsParam = searchParams.get('categorySlugs')
     const subcategorySlugsParam = searchParams.get('subcategorySlugs')
     
-    const limit = Math.min(Number(searchParams.get('limit') || DEFAULT_LIMIT), 20)
+    const limit = Math.min(Number(searchParams.get('limit') || DEFAULT_LIMIT), 20) // не более 20: новые показываются вместо самых ранних
 
     const now = new Date().toISOString()
 
