@@ -158,7 +158,6 @@ function ProductsContent() {
   const [categoryImageFailed, setCategoryImageFailed] = useState<Set<string>>(new Set())
   const [showAuthModal, setShowAuthModal] = useState(false)
 
-  const CATEGORY_IMAGE_SIZE = 48
   const markCategoryImageFailed = (id: string) => {
     setCategoryImageFailed((prev) => new Set(prev).add(id))
   }
@@ -677,48 +676,44 @@ function ProductsContent() {
                             <div className="text-sm font-bold text-graphite-secondary mb-3 uppercase tracking-wide">
                               {section.label}
                             </div>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-3 gap-1">
                               {categories.map((cat) => {
                                 const Icon = getCategoryIcon(cat.slug)
                                 const showImage = !categoryImageFailed.has(cat.id)
                                 const hasImage = cat.image_url && showImage
+                                const imgSize = 88
                                 return (
                                   <button
                                     key={cat.id}
+                                    type="button"
                                     onClick={() => {
                                       setCategoryId(cat.id)
                                       setSubcategoryId('')
                                       setFilterStep('subcategories')
                                     }}
-                                    className={`flex flex-col items-center justify-center border rounded-xl p-4 transition-all ${
+                                    className={`flex flex-col overflow-hidden rounded-xl border transition-all ${
                                       categoryId === cat.id
                                         ? 'border-brand-accent bg-brand-accent/5 text-brand-accent'
                                         : 'border-border-light text-graphite-secondary hover:border-brand-accent/30 hover:bg-bg-secondary'
                                     }`}
                                   >
-                                    <div
-                                      className="w-12 h-12 rounded-lg overflow-hidden bg-bg-secondary flex items-center justify-center mb-2 flex-shrink-0"
-                                      style={{ width: CATEGORY_IMAGE_SIZE, height: CATEGORY_IMAGE_SIZE }}
-                                    >
+                                    <div className="w-full aspect-square flex-shrink-0 bg-bg-secondary flex items-center justify-center">
                                       {hasImage ? (
                                         <img
                                           src={cat.image_url!}
                                           alt=""
-                                          width={CATEGORY_IMAGE_SIZE}
-                                          height={CATEGORY_IMAGE_SIZE}
+                                          width={imgSize * 2}
+                                          height={imgSize * 2}
                                           loading="lazy"
                                           decoding="async"
                                           className="w-full h-full object-cover"
                                           onError={() => markCategoryImageFailed(cat.id)}
                                         />
                                       ) : (
-                                        <Icon
-                                          size={24}
-                                          className={categoryId === cat.id ? 'text-brand-accent' : 'text-text-secondary'}
-                                        />
+                                        <Icon size={32} className="text-text-muted" />
                                       )}
                                     </div>
-                                    <span className="text-xs font-medium text-center leading-tight">
+                                    <span className="text-sm font-medium text-center leading-tight line-clamp-2 px-1 py-2 block">
                                       {cat.name}
                                     </span>
                                   </button>

@@ -18,8 +18,6 @@ import {
   FiActivity,
   FiMap,
 } from 'react-icons/fi'
-import NotificationBell from './NotificationBell'
-
 export default function Navbar() {
   const { user } = useAuth()
   const router = useRouter()
@@ -131,7 +129,6 @@ export default function Navbar() {
               <Link href="/" className="text-xl font-semibold bg-gradient-to-r from-graphite-secondary via-brand-accent to-graphite-secondary bg-clip-text text-transparent tracking-tight hover:from-brand-accent hover:via-brand-accent-hover hover:to-brand-accent transition-all">
                 VAY-MASTER
               </Link>
-              {user.role === 'master' && <NotificationBell />}
             </div>
 
             <div className="relative global-menu-container">
