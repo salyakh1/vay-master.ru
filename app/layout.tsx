@@ -18,6 +18,10 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: 'VayMaster - Социальная сеть для мастеров и продавцов',
   description: 'Платформа для строителей, автомехаников и продавцов строительных материалов',
+  icons: {
+    icon: '/icon.jpg',
+    apple: '/apple-icon.jpg',
+  },
 }
 
 export default function RootLayout({
