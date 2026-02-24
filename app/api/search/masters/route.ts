@@ -22,7 +22,8 @@ export async function GET(request: NextRequest) {
     const city = (searchParams.get('city') || '').trim()
     let category = searchParams.get('category') || ''
     const subcategory = searchParams.get('subcategory') || ''
-    const service = searchParams.get('service') || ''
+    const serviceParam = searchParams.get('service') || ''
+    const serviceIds = serviceParam ? serviceParam.split(',').map((s) => s.trim()).filter(Boolean) : []
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
 
     const from = (page - 1) * ITEMS_PER_PAGE
@@ -73,14 +74,18 @@ export async function GET(request: NextRequest) {
       if (allIds.length > 0) profileIds = allIds
     }
 
-    // Фильтр по категории / подкатегории / услуге
+    // Фильтр по категории / подкатегории / услуге (несколько услуг — мастера с любой из выбранных)
     let filteredIds: string[] | null = null
-    if (service) {
-      const { data } = await supabaseAdmin
-        .from('profile_services')
-        .select('profile_id')
-        .eq('service_id', service)
-      filteredIds = (data || []).map((r: { profile_id: string }) => r.profile_id)
+    if (serviceIds.length > 0) {
+      const allIds: string[] = []
+      for (const sid of serviceIds) {
+        const { data } = await supabaseAdmin
+          .from('profile_services')
+          .select('profile_id')
+          .eq('service_id', sid)
+        allIds.push(...(data || []).map((r: { profile_id: string }) => r.profile_id))
+      }
+      filteredIds = allIds.length > 0 ? Array.from(new Set(allIds)) : []
     } else if (subcategory) {
       const { data } = await supabaseAdmin
         .from('profile_subcategories')

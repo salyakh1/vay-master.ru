@@ -50,7 +50,7 @@ const RecommendationsCarousel = dynamic(() => import('@/components/Recommendatio
   loading: () => <div className="h-[200px] bg-bg-secondary rounded-xl animate-pulse" aria-hidden />,
 })
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
-import { getProductCategoriesForSpecializations } from '@/lib/specialization-product-mapping'
+import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs } from '@/lib/specialization-product-mapping'
 
 // Кастомная иконка гвоздя для крепежа
 const NailIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
@@ -148,7 +148,7 @@ function ProductsContent() {
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
   const [categoryId, setCategoryId] = useState('')
-  const [subcategoryId, setSubcategoryId] = useState('')
+  const [subcategoryIds, setSubcategoryIds] = useState<string[]>([])
   const [cityFilter, setCityFilter] = useState('')
   const [cityFilterInput, setCityFilterInput] = useState('')
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([])
@@ -215,8 +215,9 @@ function ProductsContent() {
   const ROW_BASE_HEIGHT = 320
   const productsLoadMoreRef = useRef<HTMLDivElement>(null)
 
-  // Загружаем специализации мастера и получаем категории товаров
-  const [masterSpecializations, setMasterSpecializations] = useState<Array<{ id: string; slug: string }>>([])
+  // Загружаем подкатегории мастера для рекомендаций «под ваши услуги»
+  const [masterSubcategorySlugs, setMasterSubcategorySlugs] = useState<string[]>([])
+  const [masterCategorySlugs, setMasterCategorySlugs] = useState<string[]>([])
   const [loadingSpecializations, setLoadingSpecializations] = useState(false)
   
   useEffect(() => {
@@ -229,21 +230,28 @@ function ProductsContent() {
             .select('subcategory:subcategories(id, slug, category:categories(id, slug))')
             .eq('profile_id', user.id)
           if (!error && data) {
-            const slugs = (data as any[])
+            const subSlugs = (data as any[])
+              .map((item) => item.subcategory?.slug)
+              .filter(Boolean) as string[]
+            const catSlugs = (data as any[])
               .map((item) => item.subcategory?.category?.slug)
               .filter(Boolean) as string[]
-            setMasterSpecializations(Array.from(new Set(slugs)).map((slug) => ({ id: slug, slug })))
+            setMasterSubcategorySlugs(Array.from(new Set(subSlugs)))
+            setMasterCategorySlugs(Array.from(new Set(catSlugs)))
           } else {
-            setMasterSpecializations([])
+            setMasterSubcategorySlugs([])
+            setMasterCategorySlugs([])
           }
         } catch (error) {
           console.error('Error loading master categories:', error)
-          setMasterSpecializations([])
+          setMasterSubcategorySlugs([])
+          setMasterCategorySlugs([])
         } finally {
           setLoadingSpecializations(false)
         }
       } else {
-        setMasterSpecializations([])
+        setMasterSubcategorySlugs([])
+        setMasterCategorySlugs([])
         setLoadingSpecializations(false)
       }
     }
@@ -251,12 +259,14 @@ function ProductsContent() {
   }, [user])
 
   const masterProductCategories = useMemo(() => {
-    if (user?.role !== 'master' || masterSpecializations.length === 0) {
+    if (user?.role !== 'master' || (masterSubcategorySlugs.length === 0 && masterCategorySlugs.length === 0)) {
       return { categorySlugs: undefined, subcategorySlugs: undefined }
     }
-    const categorySlugs = masterSpecializations.map((s) => s.slug)
-    return getProductCategoriesForSpecializations(categorySlugs)
-  }, [user, masterSpecializations])
+    if (masterSubcategorySlugs.length > 0) {
+      return getProductCategoriesForMasterSubcategorySlugs(masterSubcategorySlugs, masterCategorySlugs)
+    }
+    return getProductCategoriesForSpecializations(masterCategorySlugs)
+  }, [user, masterSubcategorySlugs, masterCategorySlugs])
 
   const isMasterWithCategories = user?.role === 'master' &&
     !loadingSpecializations &&
@@ -414,19 +424,23 @@ function ProductsContent() {
     setShowFilters(false)
   }
 
-  // При открытии модалки синхронизируем инпут с текущим cityFilter
+  // При открытии модалки синхронизируем инпут и всегда показываем шаг «Выберите категорию»
   useEffect(() => {
-    if (showFilters) setCityFilterInput(cityFilter)
+    if (showFilters) {
+      setCityFilterInput(cityFilter)
+      setFilterStep('categories')
+    }
   }, [showFilters]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Загружаем товары при изменении фильтров (город меняется только после закрытия модалки)
+  // Загружаем товары только когда модалка фильтра закрыта (чтобы выбор каталогов не обновлял страницу)
   useEffect(() => {
+    if (showFilters) return
     setPage(1)
     setProducts([])
     setHasMore(true)
     fetchProducts(1, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, categoryId, subcategoryId, cityFilter])
+  }, [searchQuery, categoryId, subcategoryIds, cityFilter, showFilters])
 
   const fetchCategories = async () => {
     try {
@@ -527,12 +541,10 @@ function ProductsContent() {
         query = query.in('seller_id', sellerIds)
       }
 
-      if (categoryId) {
+      if (subcategoryIds.length > 0) {
+        query = query.in('subcategory_id', subcategoryIds)
+      } else if (categoryId) {
         query = query.eq('category_id', categoryId)
-      }
-
-      if (subcategoryId) {
-        query = query.eq('subcategory_id', subcategoryId)
       }
 
       if (searchQuery) {
@@ -608,7 +620,11 @@ function ProductsContent() {
           />
           <button
             type="button"
-            onClick={() => setShowFilters(!showFilters)}
+            onClick={() => {
+              const next = !showFilters
+              setShowFilters(next)
+              if (next) setFilterStep('categories')
+            }}
             className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors ${
               showFilters ? 'bg-brand-accent text-white' : 'text-text-secondary hover:text-graphite-secondary hover:bg-bg-secondary'
             }`}
@@ -642,7 +658,7 @@ function ProductsContent() {
                 <button
                   onClick={() => {
                     setCategoryId('')
-                    setSubcategoryId('')
+                    setSubcategoryIds([])
                     setCityFilter('')
                     setCityFilterInput('')
                     setFilterStep('categories')
@@ -688,7 +704,7 @@ function ProductsContent() {
                                     type="button"
                                     onClick={() => {
                                       setCategoryId(cat.id)
-                                      setSubcategoryId('')
+                                      setSubcategoryIds([])
                                       setFilterStep('subcategories')
                                     }}
                                     className={`flex flex-col overflow-hidden rounded-xl border transition-all ${
@@ -729,45 +745,21 @@ function ProductsContent() {
                 {filterStep === 'subcategories' && (
                   <div className="space-y-4">
                     <button
+                      type="button"
                       onClick={() => setFilterStep('categories')}
                       className="flex items-center gap-2 text-sm text-text-secondary hover:text-graphite-secondary font-medium mb-2"
                     >
                       ← Назад к категориям
                     </button>
-                    {categoryId && (
-                      <div className="flex items-center gap-2 p-3 bg-bg-secondary rounded-lg mb-4">
-                        {(() => {
-                          const selectedCat = productCategories.find((cat) => cat.id === categoryId)
-                          if (!selectedCat) return null
-                          const Icon = getCategoryIcon(selectedCat.slug)
-                          const showImg = !categoryImageFailed.has(selectedCat.id)
-                          const hasThumb = selectedCat.image_url && showImg
-                          return (
-                            <>
-                              <div className="w-8 h-8 rounded overflow-hidden bg-bg-secondary flex-shrink-0 flex items-center justify-center">
-                                {hasThumb ? (
-                                  <img
-                                    src={selectedCat.image_url!}
-                                    alt=""
-                                    width={32}
-                                    height={32}
-                                    loading="lazy"
-                                    decoding="async"
-                                    className="w-full h-full object-cover"
-                                    onError={() => markCategoryImageFailed(selectedCat.id)}
-                                  />
-                                ) : (
-                                  <Icon size={18} className="text-brand-accent" />
-                                )}
-                              </div>
-                              <span className="text-sm font-semibold text-graphite-secondary">
-                                {selectedCat.name}
-                              </span>
-                            </>
-                          )
-                        })()}
-                      </div>
-                    )}
+                    {categoryId && (() => {
+                      const selectedCat = productCategories.find((c) => c.id === categoryId)
+                      if (!selectedCat) return null
+                      return (
+                        <div className="p-3 bg-bg-secondary rounded-lg mb-4">
+                          <span className="text-sm font-semibold text-graphite-secondary">{selectedCat.name}</span>
+                        </div>
+                      )
+                    })()}
                     <div className="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">
                       Каталоги
                     </div>
@@ -777,12 +769,14 @@ function ProductsContent() {
                         .map((sub) => (
                           <button
                             key={sub.id}
+                            type="button"
                             onClick={() => {
-                              setSubcategoryId(sub.id)
-                              applyCityAndCloseFilters()
+                              setSubcategoryIds((prev) =>
+                                prev.includes(sub.id) ? prev.filter((id) => id !== sub.id) : [...prev, sub.id]
+                              )
                             }}
                             className={`border rounded-xl p-3 text-left text-sm transition-all ${
-                              subcategoryId === sub.id
+                              subcategoryIds.includes(sub.id)
                                 ? 'border-brand-accent bg-brand-accent/5 text-brand-accent font-medium'
                                 : 'border-border-light text-graphite-secondary hover:border-brand-accent/30 hover:bg-bg-secondary'
                             }`}
@@ -795,34 +789,18 @@ function ProductsContent() {
                 )}
               </div>
 
-              <div className="p-4 border-t border-border-light bg-white">
-                {filterStep === 'categories' && categoryId ? (
+              {/* Кнопка «Применить фильтр» только после перехода в категорию и шага выбора каталога */}
+              {filterStep === 'subcategories' && (
+                <div className="p-4 border-t border-border-light bg-white flex-shrink-0">
                   <button
-                    onClick={() => {
-                      setSubcategoryId('')
-                      setShowFilters(false)
-                    }}
+                    type="button"
+                    onClick={applyCityAndCloseFilters}
                     className="btn btn-primary w-full h-12 text-base font-semibold"
                   >
                     Применить фильтр
                   </button>
-                ) : filterStep === 'subcategories' ? (
-                  <button
-                    onClick={applyCityAndCloseFilters}
-                    className="btn btn-primary w-full h-12 text-base font-semibold"
-                    disabled={!categoryId}
-                  >
-                    {subcategoryId ? 'Применить фильтр' : 'Применить по категории'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={applyCityAndCloseFilters}
-                    className="btn btn-primary w-full h-12 text-base font-semibold"
-                  >
-                    Поиск
-                  </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -874,7 +852,7 @@ function ProductsContent() {
           }
           query={searchQuery}
           categoryId={isMasterWithCategories ? undefined : categoryId}
-          subcategoryId={isMasterWithCategories ? undefined : subcategoryId}
+          subcategoryId={isMasterWithCategories ? undefined : subcategoryIds[0]}
           categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
           subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
           role={user?.role || 'client'}
@@ -924,7 +902,7 @@ function ProductsContent() {
                       }
                       query={searchQuery}
                       categoryId={isMasterWithCategories ? undefined : categoryId}
-                      subcategoryId={isMasterWithCategories ? undefined : subcategoryId}
+                      subcategoryId={isMasterWithCategories ? undefined : subcategoryIds[0]}
                       categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
                       subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
                       role={user?.role || 'client'}

@@ -127,7 +127,10 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const [tree, setTree] = useState<Array<{ id: string; name: string; slug: string; image_url?: string | null; sort_order: number; subcategories: Array<{ id: string; category_id: string; name: string; slug: string; image_url?: string | null; sort_order: number; services: Array<{ id: string; name: string; slug: string; sort_order: number }> }> }>>([])
   const [selectedCategory, setSelectedCategory] = useState<string>(() => searchParams.get('category') || '')
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>(() => searchParams.get('subcategory') || '')
-  const [selectedService, setSelectedService] = useState<string>(() => searchParams.get('service') || '')
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(() => {
+    const s = searchParams.get('service') || ''
+    return s ? s.split(',').map((id) => id.trim()).filter(Boolean) : []
+  })
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [filterStepMasters, setFilterStepMasters] = useState<'category' | 'subcategory' | 'service'>('category')
   const [categoriesForFilter, setCategoriesForFilter] = useState<Array<{ id: string; name: string; slug: string; image_url?: string | null; masters_count?: number }>>([])
@@ -149,13 +152,15 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const randomRows = useMemo(() => buildMastersRows(randomProfiles, true), [randomProfiles])
   const filteredRows = useMemo(() => buildMastersRows(masters, false), [masters])
 
-  // Загружаем подкатегории мастера и получаем категории товаров
+  // Загружаем подкатегории мастера и получаем категории товаров для рекомендаций
+  const [masterSubcategorySlugs, setMasterSubcategorySlugs] = useState<string[]>([])
   const [masterCategorySlugs, setMasterCategorySlugs] = useState<string[]>([])
   const [loadingMasterCategories, setLoadingMasterCategories] = useState(false)
 
-  // Подкатегории мастера — отложенно, не конкурируем с первым экраном (для блока рекомендаций)
+  // Подкатегории мастера — отложенно (для блока «Рекомендации под ваши услуги»)
   useEffect(() => {
     if (user?.role !== 'master' || !user.id) {
+      setMasterSubcategorySlugs([])
       setMasterCategorySlugs([])
       setLoadingMasterCategories(false)
       return
@@ -173,15 +178,25 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
         .then(({ data, error }) => {
           if (cancelled) return
           if (!error && data) {
-            const slugs = (data as any[])
+            const subSlugs = (data as any[])
+              .map((item: any) => item.subcategory?.slug)
+              .filter(Boolean) as string[]
+            const catSlugs = (data as any[])
               .map((item: any) => item.subcategory?.category?.slug)
               .filter(Boolean) as string[]
-            setMasterCategorySlugs(Array.from(new Set(slugs)))
+            setMasterSubcategorySlugs(Array.from(new Set(subSlugs)))
+            setMasterCategorySlugs(Array.from(new Set(catSlugs)))
           } else {
+            setMasterSubcategorySlugs([])
             setMasterCategorySlugs([])
           }
         })
-        .catch(() => { if (!cancelled) setMasterCategorySlugs([]) })
+        .catch(() => {
+          if (!cancelled) {
+            setMasterSubcategorySlugs([])
+            setMasterCategorySlugs([])
+          }
+        })
         .finally(() => { if (!cancelled) setLoadingMasterCategories(false) })
     }
     const id = typeof requestIdleCallback !== 'undefined'
@@ -195,11 +210,14 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   }, [user])
 
   const masterProductCategories = useMemo(() => {
-    if (user?.role !== 'master' || masterCategorySlugs.length === 0) {
+    if (user?.role !== 'master' || (masterSubcategorySlugs.length === 0 && masterCategorySlugs.length === 0)) {
       return { categorySlugs: undefined, subcategorySlugs: undefined }
     }
+    if (masterSubcategorySlugs.length > 0) {
+      return getProductCategoriesForMasterSubcategorySlugs(masterSubcategorySlugs, masterCategorySlugs)
+    }
     return getProductCategoriesForSpecializations(masterCategorySlugs)
-  }, [user, masterCategorySlugs])
+  }, [user, masterSubcategorySlugs, masterCategorySlugs])
 
   const isMasterWithCategories = user?.role === 'master' &&
     !loadingMasterCategories &&
@@ -226,13 +244,15 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     fetchReference()
   }, [showFiltersModal])
 
+  // Поиск мастеров только когда модалка фильтра закрыта (выбор категории/подкатегории/услуги без обновления страницы)
   useEffect(() => {
+    if (showFiltersModal) return
     setMastersPage(1)
     setMasters([])
     setHasMoreMasters(true)
     performSearch()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, cityFilter, selectedCategory, selectedSubcategory, selectedService])
+  }, [query, cityFilter, selectedCategory, selectedSubcategory, selectedServiceIds, showFiltersModal])
 
   // Сначала только список мастеров; истории — с задержкой, чтобы не конкурировать за сеть
   useEffect(() => {
@@ -246,7 +266,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
       query.trim().length > 0 ||
       !!selectedCategory ||
       !!selectedSubcategory ||
-      !!selectedService ||
+      selectedServiceIds.length > 0 ||
       !!cityFilter
 
     // Если нет фильтров — показываем подборку по городу
@@ -392,7 +412,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
       if (cityFilter.trim()) params.set('city', cityFilter.trim())
       if (selectedCategory) params.set('category', selectedCategory)
       if (selectedSubcategory) params.set('subcategory', selectedSubcategory)
-      if (selectedService) params.set('service', selectedService)
+      if (selectedServiceIds.length > 0) params.set('service', selectedServiceIds.join(','))
       params.set('page', String(pageNum))
 
       const res = await fetch(`/api/search/masters?${params.toString()}`)
@@ -448,13 +468,17 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
   const fetchProfileIdsByFilters = async (): Promise<string[] | null> => {
     try {
-      if (selectedService) {
-        const { data, error } = await supabase
-          .from('profile_services')
-          .select('profile_id')
-          .eq('service_id', selectedService)
-        if (error) throw error
-        return (data || []).map((row) => row.profile_id as string)
+      if (selectedServiceIds.length > 0) {
+        const allIds: string[] = []
+        for (const sid of selectedServiceIds) {
+          const { data, error } = await supabase
+            .from('profile_services')
+            .select('profile_id')
+            .eq('service_id', sid)
+          if (error) throw error
+          allIds.push(...(data || []).map((row) => row.profile_id as string))
+        }
+        return Array.from(new Set(allIds))
       }
       if (selectedSubcategory) {
         const { data, error } = await supabase
@@ -522,7 +546,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     query.trim().length > 0 ||
     !!selectedCategory ||
     !!selectedSubcategory ||
-    !!selectedService ||
+    selectedServiceIds.length > 0 ||
     !!cityFilter
 
   return (
@@ -591,7 +615,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                     onClick={() => {
                       setSelectedCategory('')
                       setSelectedSubcategory('')
-                      setSelectedService('')
+                      setSelectedServiceIds([])
                       setCityFilter('')
                       setFilterStepMasters('category')
                     }}
@@ -603,7 +627,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
                 <div className="flex-1 overflow-y-auto px-4 py-4">
                   {/* Город показываем только после выбора категории, подкатегории или услуги */}
-                  {(selectedCategory || selectedSubcategory || selectedService) && (
+                  {(selectedCategory || selectedSubcategory || selectedServiceIds.length > 0) && (
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-graphite-secondary mb-2">Город</label>
                       <input
@@ -628,7 +652,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                             onClick={() => {
                               setSelectedCategory(cat.id)
                               setSelectedSubcategory('')
-                              setSelectedService('')
+                              setSelectedServiceIds([])
                               setFilterStepMasters('subcategory')
                             }}
                             className={`flex flex-col overflow-hidden rounded-xl border transition-all ${
@@ -666,7 +690,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                     <>
                       <button
                         type="button"
-                        onClick={() => { setFilterStepMasters('category'); setSelectedSubcategory(''); setSelectedService('') }}
+                        onClick={() => { setFilterStepMasters('category'); setSelectedSubcategory(''); setSelectedServiceIds([]) }}
                         className="flex items-center gap-2 text-sm text-text-secondary hover:text-graphite-secondary font-medium mb-4"
                       >
                         ← Назад к категориям
@@ -688,7 +712,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                             type="button"
                             onClick={() => {
                               setSelectedSubcategory(sub.id)
-                              setSelectedService('')
+                              setSelectedServiceIds([])
                               setFilterStepMasters('service')
                             }}
                             className={`border rounded-xl p-3 text-left text-sm transition-all ${
@@ -708,7 +732,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                     <>
                       <button
                         type="button"
-                        onClick={() => { setFilterStepMasters('subcategory'); setSelectedService('') }}
+                        onClick={() => { setFilterStepMasters('subcategory'); setSelectedServiceIds([]) }}
                         className="flex items-center gap-2 text-sm text-text-secondary hover:text-graphite-secondary font-medium mb-4"
                       >
                         ← Назад к подкатегориям
@@ -729,12 +753,12 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                             key={svc.id}
                             type="button"
                             onClick={() => {
-                              setSelectedService(svc.id)
-                              setShowFiltersModal(false)
-                              performSearch()
+                              setSelectedServiceIds((prev) =>
+                                prev.includes(svc.id) ? prev.filter((id) => id !== svc.id) : [...prev, svc.id]
+                              )
                             }}
                             className={`border rounded-xl p-3 text-left text-sm transition-all ${
-                              selectedService === svc.id
+                              selectedServiceIds.includes(svc.id)
                                 ? 'border-brand-accent bg-brand-accent/5 text-brand-accent font-medium'
                                 : 'border-border-light text-graphite-secondary hover:border-brand-accent/30 hover:bg-bg-secondary'
                             }`}
@@ -747,41 +771,36 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                   )}
                 </div>
 
-                <div className="p-4 border-t border-border-light bg-white">
-                  {filterStepMasters === 'category' && selectedCategory ? (
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedSubcategory(''); setSelectedService(''); setShowFiltersModal(false); performSearch() }}
-                      className="btn btn-primary w-full h-12 text-base font-semibold"
-                    >
-                      Применить по категории
-                    </button>
-                  ) : filterStepMasters === 'subcategory' && selectedSubcategory ? (
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedService(''); setShowFiltersModal(false); performSearch() }}
-                      className="btn btn-primary w-full h-12 text-base font-semibold"
-                    >
-                      Применить по подкатегории
-                    </button>
-                  ) : filterStepMasters === 'service' || selectedService ? (
-                    <button
-                      type="button"
-                      onClick={() => { setShowFiltersModal(false); performSearch() }}
-                      className="btn btn-primary w-full h-12 text-base font-semibold"
-                    >
-                      Найти
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => { setShowFiltersModal(false); performSearch() }}
-                      className="btn btn-primary w-full h-12 text-base font-semibold"
-                    >
-                      Найти
-                    </button>
-                  )}
-                </div>
+                {/* Кнопка «Найти» только после выбора категории (не показываем на шаге «Выберите категорию» без выбора) */}
+                {selectedCategory && (
+                  <div className="p-4 border-t border-border-light bg-white">
+                    {filterStepMasters === 'category' ? (
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedSubcategory(''); setSelectedServiceIds([]); setShowFiltersModal(false) }}
+                        className="btn btn-primary w-full h-12 text-base font-semibold"
+                      >
+                        Применить по категории
+                      </button>
+                    ) : filterStepMasters === 'subcategory' && selectedSubcategory ? (
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedServiceIds([]); setShowFiltersModal(false) }}
+                        className="btn btn-primary w-full h-12 text-base font-semibold"
+                      >
+                        Применить по подкатегории
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowFiltersModal(false)}
+                        className="btn btn-primary w-full h-12 text-base font-semibold"
+                      >
+                        Найти
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}

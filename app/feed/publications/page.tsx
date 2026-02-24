@@ -14,7 +14,7 @@ import { ru } from 'date-fns/locale'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
-import { getProductCategoriesForSpecializations } from '@/lib/specialization-product-mapping'
+import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs } from '@/lib/specialization-product-mapping'
 
 const RecommendationsCarousel = dynamic(() => import('@/components/RecommendationsCarousel'), {
   ssr: false,
@@ -62,8 +62,9 @@ export default function PublicationsPage() {
   const ITEMS_PER_PAGE = 12
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
 
-  // Загружаем специализации мастера и получаем категории товаров
-  const [masterSpecializations, setMasterSpecializations] = useState<Array<{ id: string; slug: string }>>([])
+  // Загружаем подкатегории мастера для рекомендаций «под ваши услуги»
+  const [masterSubcategorySlugs, setMasterSubcategorySlugs] = useState<string[]>([])
+  const [masterCategorySlugs, setMasterCategorySlugs] = useState<string[]>([])
   const [loadingSpecializations, setLoadingSpecializations] = useState(false)
   
   useEffect(() => {
@@ -76,21 +77,28 @@ export default function PublicationsPage() {
             .select('subcategory:subcategories(id, slug, category:categories(id, slug))')
             .eq('profile_id', user.id)
           if (!error && data) {
-            const slugs = (data as any[])
+            const subSlugs = (data as any[])
+              .map((item) => item.subcategory?.slug)
+              .filter(Boolean) as string[]
+            const catSlugs = (data as any[])
               .map((item) => item.subcategory?.category?.slug)
               .filter(Boolean) as string[]
-            setMasterSpecializations(Array.from(new Set(slugs)).map((slug) => ({ id: slug, slug })))
+            setMasterSubcategorySlugs(Array.from(new Set(subSlugs)))
+            setMasterCategorySlugs(Array.from(new Set(catSlugs)))
           } else {
-            setMasterSpecializations([])
+            setMasterSubcategorySlugs([])
+            setMasterCategorySlugs([])
           }
         } catch (error) {
           console.error('Error loading master categories:', error)
-          setMasterSpecializations([])
+          setMasterSubcategorySlugs([])
+          setMasterCategorySlugs([])
         } finally {
           setLoadingSpecializations(false)
         }
       } else {
-        setMasterSpecializations([])
+        setMasterSubcategorySlugs([])
+        setMasterCategorySlugs([])
         setLoadingSpecializations(false)
       }
     }
@@ -98,12 +106,14 @@ export default function PublicationsPage() {
   }, [user])
 
   const masterProductCategories = useMemo(() => {
-    if (user?.role !== 'master' || masterSpecializations.length === 0) {
+    if (user?.role !== 'master' || (masterSubcategorySlugs.length === 0 && masterCategorySlugs.length === 0)) {
       return { categorySlugs: undefined, subcategorySlugs: undefined }
     }
-    const categorySlugs = masterSpecializations.map((s) => s.slug)
-    return getProductCategoriesForSpecializations(categorySlugs)
-  }, [user, masterSpecializations])
+    if (masterSubcategorySlugs.length > 0) {
+      return getProductCategoriesForMasterSubcategorySlugs(masterSubcategorySlugs, masterCategorySlugs)
+    }
+    return getProductCategoriesForSpecializations(masterCategorySlugs)
+  }, [user, masterSubcategorySlugs, masterCategorySlugs])
 
   const isMasterWithCategories = user?.role === 'master' &&
     !loadingSpecializations &&

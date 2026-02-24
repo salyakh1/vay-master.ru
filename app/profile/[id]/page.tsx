@@ -59,7 +59,12 @@ export default function ProfilePage() {
   const [isFollowing, setIsFollowing] = useState<boolean>(false)
   const [followLoading, setFollowLoading] = useState(false)
   const [followersCount, setFollowersCount] = useState<number>(0)
+  const [followingCount, setFollowingCount] = useState<number>(0)
   const [productsCount, setProductsCount] = useState<number>(0)
+  const [showFollowModal, setShowFollowModal] = useState<'followers' | 'following' | null>(null)
+  const [followList, setFollowList] = useState<User[]>([])
+  const [followListLoading, setFollowListLoading] = useState(false)
+  const [followActionId, setFollowActionId] = useState<string | null>(null)
   const [masterReviews, setMasterReviews] = useState<any[]>([])
   const [sellerReviews, setSellerReviews] = useState<any[]>([]) // Прямые отзывы о продавце
   const [productReviews, setProductReviews] = useState<any[]>([])
@@ -249,6 +254,10 @@ export default function ProfilePage() {
     return () => observer.disconnect()
   }, [productsHasMore, loadingMoreProducts, productsPage, products.length])
 
+  useEffect(() => {
+    if (showFollowModal && profile?.id) fetchFollowList(showFollowModal)
+  }, [showFollowModal, profile?.id])
+
   const fetchProfile = async () => {
     try {
       setLoading(true)
@@ -322,6 +331,7 @@ export default function ProfilePage() {
 
       // Портфолио, отзывы, товары — после первого рендера (idle), не блокируем LCP
       const scheduleHeavy = () => {
+        if (profileId) fetchFollowCounts(profileId)
         if (userData.role === 'master' && profileId) {
           fetchPortfolio().then(() => fetchMasterReviews(profileId))
         } else if (userData.role === 'seller' && profileId) {
@@ -359,6 +369,117 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error checking follow status:', error)
       setIsFollowing(false)
+    }
+  }
+
+  const fetchFollowCounts = async (profileId: string) => {
+    try {
+      const [followersRes, followingRes] = await Promise.all([
+        supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profileId),
+        supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profileId),
+      ])
+      setFollowersCount(followersRes.count ?? 0)
+      setFollowingCount(followingRes.count ?? 0)
+    } catch (error) {
+      console.error('Error fetching follow counts:', error)
+      setFollowersCount(0)
+      setFollowingCount(0)
+    }
+  }
+
+  const fetchFollowList = async (type: 'followers' | 'following') => {
+    if (!profile?.id) return
+    setFollowListLoading(true)
+    setFollowList([])
+    try {
+      if (type === 'followers') {
+        const { data: rows, error } = await supabase
+          .from('follows')
+          .select('follower_id')
+          .eq('following_id', profile.id)
+        if (error) throw error
+        const ids = (rows || []).map((r: { follower_id: string }) => r.follower_id).filter(Boolean)
+        if (ids.length === 0) {
+          setFollowList([])
+          setFollowListLoading(false)
+          return
+        }
+        const { data: users, error: usersError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, role, city')
+          .in('id', ids)
+        if (usersError) throw usersError
+        setFollowList((users as User[]) || [])
+      } else {
+        const { data: rows, error } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', profile.id)
+        if (error) throw error
+        const ids = (rows || []).map((r: { following_id: string }) => r.following_id).filter(Boolean)
+        if (ids.length === 0) {
+          setFollowList([])
+          setFollowListLoading(false)
+          return
+        }
+        const { data: users, error: usersError } = await supabase
+          .from('profiles')
+          .select('id, full_name, avatar_url, role, city')
+          .in('id', ids)
+        if (usersError) throw usersError
+        setFollowList((users as User[]) || [])
+      }
+    } catch (error) {
+      console.error('Error fetching follow list:', error)
+      setFollowList([])
+    } finally {
+      setFollowListLoading(false)
+    }
+  }
+
+  const unfollowUser = async (followingId: string) => {
+    if (!profile?.id || !currentUser || currentUser.id !== profile.id) return
+    setFollowActionId(followingId)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) return
+      const res = await fetch('/api/follows/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ targetUserId: followingId, action: 'unfollow' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Не удалось отписаться')
+      setFollowList((prev) => prev.filter((u) => u.id !== followingId))
+      await fetchFollowCounts(profile.id)
+    } catch (error) {
+      console.error('Error unfollowing:', error)
+    } finally {
+      setFollowActionId(null)
+    }
+  }
+
+  const removeFollower = async (followerId: string) => {
+    if (!profile?.id || !currentUser || currentUser.id !== profile.id) return
+    setFollowActionId(followerId)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) return
+      const res = await fetch('/api/follows/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ targetUserId: followerId, action: 'remove_follower' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Не удалось убрать подписчика')
+      setFollowList((prev) => prev.filter((u) => u.id !== followerId))
+      await fetchFollowCounts(profile.id)
+    } catch (error) {
+      console.error('Error removing follower:', error)
+    } finally {
+      setFollowActionId(null)
     }
   }
 
@@ -462,10 +583,9 @@ export default function ProfilePage() {
           .insert({ follower_id: currentUser.id, following_id: profile.id })
         setIsFollowing(true)
       }
-      // Обновляем статистику подписчиков после изменения подписки
-      if (profile.role === 'seller') {
-        await fetchSellerStats(profile.id)
-      }
+      // Обновляем счётчики подписчиков/подписок после изменения подписки
+      await fetchFollowCounts(profile.id)
+      if (profile.role === 'seller') await fetchSellerStats(profile.id)
     } catch (error) {
       console.error('Follow error:', error)
     } finally {
@@ -1298,6 +1418,26 @@ export default function ProfilePage() {
                         <span>{profile.email}</span>
                       </div>
                     </div>
+
+                    {/* Подписчики / Подписки — для всех ролей */}
+                    <div className="mt-5 pt-5 border-t border-border-color/40 flex flex-wrap gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowFollowModal('followers')}
+                        className="text-sm font-medium text-graphite-secondary hover:text-brand-accent transition-colors"
+                      >
+                        <span className="font-normal">{followersCount}</span>{' '}
+                        подписчиков
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowFollowModal('following')}
+                        className="text-sm font-medium text-graphite-secondary hover:text-brand-accent transition-colors"
+                      >
+                        <span className="font-normal">{followingCount}</span>{' '}
+                        подписок
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1440,25 +1580,6 @@ export default function ProfilePage() {
                         </div>
                       )}
                     </div>
-
-                    {profileServices.length > 0 && (
-                      <div className="mt-8">
-                        <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-graphite-secondary">
-                          <FiBriefcase size={16} />
-                          <span>Услуги мастера</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2.5">
-                          {profileServices.map((svc) => (
-                            <span
-                              key={svc.id}
-                              className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
-                            >
-                              {svc.name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
 
                     {/* Отзывы о мастере - раскрываемая секция - Render-on-Demand */}
                     {profile.role === 'master' && (
@@ -2991,6 +3112,79 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+      {/* Модалка: список подписчиков или подписок */}
+      {showFollowModal && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-black/50" onClick={() => setShowFollowModal(null)}>
+          <div
+            className="bg-bg-card border border-border-light rounded-2xl shadow-premium w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border-light">
+              <h2 className="text-lg font-semibold text-graphite-secondary">
+                {showFollowModal === 'followers' ? 'Подписчики' : 'Подписки'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowFollowModal(null)}
+                className="p-2 hover:bg-bg-secondary rounded-lg transition-colors"
+                aria-label="Закрыть"
+              >
+                <FiX className="w-5 h-5 text-graphite-secondary" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {followListLoading ? (
+                <div className="flex justify-center py-8 text-text-secondary">Загрузка...</div>
+              ) : followList.length === 0 ? (
+                <div className="text-center py-8 text-text-secondary text-sm">
+                  {showFollowModal === 'followers' ? 'Пока нет подписчиков' : 'Нет подписок'}
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {followList.map((u) => (
+                    <li key={u.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-bg-secondary/50 transition-colors">
+                      <Link
+                        href={`/profile/${u.id}`}
+                        onClick={() => setShowFollowModal(null)}
+                        className="flex items-center gap-3 min-w-0 flex-1"
+                      >
+                        <div className="relative w-10 h-10 rounded-full overflow-hidden bg-bg-secondary flex-shrink-0">
+                          {u.avatar_url ? (
+                            <Image src={u.avatar_url} alt="" fill className="object-cover" sizes="40px" />
+                          ) : (
+                            <span className="absolute inset-0 flex items-center justify-center text-graphite-secondary font-semibold">
+                              {u.full_name?.[0]?.toUpperCase() || '?'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="font-medium text-graphite-secondary truncate block">{u.full_name || 'Без имени'}</span>
+                          {u.city && <span className="text-xs text-text-secondary truncate block">{u.city}</span>}
+                        </div>
+                      </Link>
+                      {isOwnProfile && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            if (showFollowModal === 'following') unfollowUser(u.id)
+                            else removeFollower(u.id)
+                          }}
+                          disabled={followActionId === u.id}
+                          className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg border border-border-light text-graphite-secondary hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          {followActionId === u.id ? '...' : showFollowModal === 'following' ? 'Отписаться' : 'Убрать'}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Одна метка: адрес магазина на карте (клик по адресу) */}
       {showStoreLocationMap && profile?.role === 'seller' && profile.seller_lat != null && profile.seller_lng != null && (

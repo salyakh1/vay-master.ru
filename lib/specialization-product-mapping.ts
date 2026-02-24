@@ -459,8 +459,51 @@ export const SUBCATEGORY_SLUG_TO_PRODUCT_CATEGORIES: Record<string, {
   categories: string[]
   subcategories?: string[]
 }> = {
-  // Пример: можно добавлять slug подкатегорий для более точного подбора товаров.
-  // Пока пусто — везде используется fallback по родительской категории.
+  // Кладка кирпича — только кирпич, блоки, смеси, сыпучие, ручной инструмент (без кровли и пиломатериалов)
+  'kladka-kirpicha': {
+    categories: ['masonry-blocks-jbi', 'building-mixes', 'bulk-materials', 'hand-tools', 'fasteners-hardware'],
+    subcategories: [
+      'masonry-ceramic-brick',
+      'masonry-silicate-brick',
+      'masonry-aerated-block',
+      'masonry-foam-block',
+      'masonry-brick-general',
+      'masonry-slag-block',
+      'building-mixes-cement',
+      'building-mixes-masonry',
+      'building-mixes-plaster',
+      'bulk-sand',
+      'bulk-gravel',
+      'bulk-pgs',
+      'hand-tools-trowels',
+      'hand-tools-measuring',
+      'fasteners-anchors',
+      'fasteners-dowels',
+    ],
+  },
+  // Двигатель и моторист — запчасти двигатель/КПП, автохимия (без электроинструмента вроде бензопил)
+  'dvigatel': {
+    categories: ['auto-parts-engine-gearbox', 'auto-chemicals-detailing', 'auto-parts-suspension-brakes'],
+    subcategories: [
+      'auto-engine-parts',
+      'auto-timing',
+      'auto-cooling',
+      'auto-exhaust',
+      'auto-fuel-system',
+      'auto-turbos',
+      'auto-oils-engine',
+    ],
+  },
+  // Синоним из seed специализаций (Двигатель и моторист)
+  'engine-motor': {
+    categories: ['auto-parts-engine-gearbox', 'auto-chemicals-detailing'],
+    subcategories: [
+      'auto-engine-parts',
+      'auto-cooling',
+      'auto-fuel-system',
+      'auto-oils-engine',
+    ],
+  },
 }
 
 export function getProductCategoriesForCategorySlugs(
