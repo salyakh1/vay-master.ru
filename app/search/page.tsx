@@ -40,10 +40,11 @@ function buildMastersRows(masters: User[], showCarousel: boolean): MastersRow[] 
 }
 
 function MasterCardContent({ master }: { master: User }) {
+  const specs = Array.isArray((master as any).profile_subcategories) ? (master as any).profile_subcategories : []
   return (
-    <div className="card-glossy group h-[400px] flex flex-col !p-0 overflow-hidden relative">
+    <div className="card-glossy group h-[320px] flex flex-col !p-0 overflow-hidden relative">
       <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10 rounded-[12px]" />
-      <div className="w-full h-[200px] bg-gradient-to-br from-graphite-primary to-graphite-tertiary flex items-center justify-center text-white text-2xl font-semibold rounded-t-[12px] flex-shrink-0 overflow-hidden relative group/image">
+      <div className="w-full h-[160px] bg-gradient-to-br from-graphite-primary to-graphite-tertiary flex items-center justify-center text-white text-2xl font-semibold rounded-t-[12px] flex-shrink-0 overflow-hidden relative group/image">
         {master.avatar_url ? (
           <>
             <Image
@@ -60,46 +61,43 @@ function MasterCardContent({ master }: { master: User }) {
           master.full_name[0]?.toUpperCase() || '?'
         )}
       </div>
-      <div className="flex flex-col items-center text-center p-5 pb-4 relative z-20">
-        <h3 className="font-semibold text-base bg-gradient-to-r from-graphite-secondary to-graphite-primary bg-clip-text text-transparent mb-1.5 line-clamp-2 leading-tight group-hover:from-brand-accent group-hover:to-brand-accent-hover transition-all">
+      <div className="flex flex-col items-start text-left p-2.5 pb-1.5 relative z-20 min-h-0 flex-1 overflow-hidden">
+        <h3 className="font-bold text-graphite-secondary text-[15px] leading-tight line-clamp-2 mb-0.5 w-full group-hover:text-brand-accent transition-colors">
           {master.full_name}
         </h3>
         {master.city && (
-          <div className="flex items-center gap-1 text-xs text-text-secondary mb-2.5">
-            <FiMapPin size={12} strokeWidth={2} className="text-brand-accent/60" />
-            <span>{master.city}</span>
+          <div className="flex items-center gap-1 text-[9px] text-text-muted mb-0.5 min-w-0">
+            <FiMapPin size={8} strokeWidth={2} className="text-brand-accent/60 flex-shrink-0" />
+            <span className="truncate">{master.city}</span>
           </div>
         )}
-        {master.master_reviews_count && master.master_reviews_count > 0 ? (
-          <div className="flex items-center gap-1 text-xs text-text-secondary mb-3">
+        {master.master_reviews_count != null && master.master_reviews_count > 0 ? (
+          <div className="flex items-center gap-1 text-[9px] text-text-muted mb-0.5">
             {master.master_rating && master.master_rating > 0 ? (
               <>
-                <FiStar size={12} className="fill-brand-accent text-brand-accent" strokeWidth={0} />
-                <span className="font-medium">
-                  {master.master_rating.toFixed(1)} ({master.master_reviews_count} {master.master_reviews_count === 1 ? 'отзыв' : master.master_reviews_count < 5 ? 'отзыва' : 'отзывов'})
-                </span>
+                <FiStar size={8} className="fill-brand-accent text-brand-accent flex-shrink-0" strokeWidth={0} />
+                <span>{master.master_rating.toFixed(1)} · {master.master_reviews_count} {master.master_reviews_count === 1 ? 'отзыв' : master.master_reviews_count < 5 ? 'отзыва' : 'отзывов'}</span>
               </>
             ) : (
-              <span className="font-medium">
-                ({master.master_reviews_count} {master.master_reviews_count === 1 ? 'отзыв' : master.master_reviews_count < 5 ? 'отзыва' : 'отзывов'})
-              </span>
+              <span>{master.master_reviews_count} {master.master_reviews_count === 1 ? 'отзыв' : 'отзывов'}</span>
             )}
           </div>
         ) : (
-          <div className="text-xs text-text-secondary mb-3">Без отзывов</div>
+          <div className="text-[9px] text-text-muted mb-0.5">Без отзывов</div>
         )}
-        {Array.isArray((master as any).profile_subcategories) && (master as any).profile_subcategories.length > 0 && (
-          <div className="flex flex-wrap items-center justify-center gap-1.5 pt-3 border-t border-border-light/40 w-full px-2">
-            {(master as any).profile_subcategories.slice(0, 2).map((item: any) => (
+        {specs.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-border-light/50 w-full min-h-0 overflow-hidden">
+            {specs.slice(0, 2).map((item: any) => (
               <span
                 key={item.subcategory?.id || item.subcategory_id}
-                className="px-1.5 py-0.5 bg-gradient-to-br from-brand-accent/15 to-brand-accent/10 text-brand-accent text-[9px] font-medium rounded border border-brand-accent/30 backdrop-blur-sm shadow-sm transition-all group-hover:border-brand-accent/50 group-hover:shadow-md whitespace-nowrap"
+                className="min-w-0 max-w-full px-1.5 py-0.5 text-[9px] text-text-secondary bg-bg-secondary rounded border border-border-light truncate inline-block"
+                title={item.subcategory?.name ?? item.subcategory?.category?.name}
               >
                 {item.subcategory?.name ?? item.subcategory?.category?.name}
               </span>
             ))}
-            {(master as any).profile_subcategories.length > 2 && (
-              <span className="text-[9px] text-text-secondary font-medium">...</span>
+            {specs.length > 2 && (
+              <span className="text-[9px] text-text-muted flex-shrink-0">…</span>
             )}
           </div>
         )}

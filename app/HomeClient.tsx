@@ -31,7 +31,7 @@ import {
 
 const AdBannerSlider = dynamic(() => import('@/components/AdBannerSlider'), {
   ssr: false,
-  loading: () => <div className="w-full h-[180px] md:h-[280px] min-h-[180px] md:min-h-[280px] bg-bg-secondary" aria-hidden />,
+  loading: () => <div className="w-full px-2 flex justify-center"><div className="w-[96%] h-[200px] min-h-[200px] bg-bg-secondary rounded-[36px]" aria-hidden /></div>,
 })
 
 const SpecializationCardsCarousel = dynamic(
