@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -8,14 +8,24 @@ import Navbar from '@/components/Navbar'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import {
-  FiSquare,
-  FiLayers,
   FiTrash2,
   FiCornerUpLeft,
-  FiGrid,
   FiCheckCircle,
-  FiMousePointer,
+  FiGrid,
+  FiCornerUpRight,
 } from 'react-icons/fi'
+import {
+  polygonArea,
+  polygonPerimeter,
+  wouldCloseIntersect,
+  snapToGrid,
+  snapToAngle,
+  segmentIndexNearPoint,
+  closestPointOnSegment,
+  PLANNER_GRID_STEP,
+  MIN_AREA_M2,
+  type Point,
+} from '@/lib/planner-geometry'
 
 type PlannerTab = 'room' | 'apartment' | 'yard' | 'house' | 'extension'
 type SurfaceMode = 'floor' | 'walls'
@@ -25,6 +35,7 @@ type ServiceItem = {
   id: string
   name: string
   slug?: string
+  subcategory_id?: string
   specialization_id?: string
 }
 
@@ -61,30 +72,17 @@ const TABS: Array<{ id: PlannerTab; label: string }> = [
   { id: 'extension', label: 'Пристройка' },
 ]
 
+/** Ключевые слова для фильтра услуг «Стены» — из нашей системы (services) */
 const WALL_KEYWORDS = [
-  'штукатур',
-  'шпакл',
-  'покрас',
-  'обои',
-  'плитк',
-  'панел',
-  'гипс',
-  'кирпич',
-  'блок',
-  'бетон',
-  'изоляц',
-  'утепл',
-  'потолок',
+  'штукатур', 'шпакл', 'покрас', 'обои', 'плитк', 'панел', 'гипс', 'кирпич',
+  'блок', 'бетон', 'изоляц', 'утепл', 'потолок', 'стен', 'окраск', 'штукатурк',
 ]
 
-const FLOOR_ALLOWED_NAMES = [
-  'Армирование стяжки',
-  'Бетонирование',
-  'Мокрая стяжка',
-  'Полусухая стяжка',
-  'Стяжка пола',
-  'Укладка ламината',
-  'Укладка паркета',
+/** Ключевые слова для фильтра услуг «Пол» — из нашей системы (services) */
+const FLOOR_KEYWORDS = [
+  'стяжка', 'пол', 'ламинат', 'паркет', 'бетон', 'наливной', 'плитка',
+  'полусухая', 'мокрая', 'армирован', 'укладка ламината', 'укладка паркета',
+  'бетонирован', 'теплый пол',
 ]
 
 export default function PlannerPage() {
@@ -110,13 +108,20 @@ export default function PlannerPage() {
 
   const [canvasWidth, setCanvasWidth] = useState(10)
   const [canvasHeight, setCanvasHeight] = useState(10)
-  const [gridStep, setGridStep] = useState(0.03)
-  const [snapToGrid, setSnapToGrid] = useState(true)
-  const [points, setPoints] = useState<Array<{ x: number; y: number }>>([])
+  const [gridStep] = useState(PLANNER_GRID_STEP)
+  const [snapToGridEnabled, setSnapToGridEnabled] = useState(true)
+  const [snapTo45, setSnapTo45] = useState(true)
+  const [points, setPoints] = useState<Point[]>([])
   const [isClosed, setIsClosed] = useState(false)
   const [isDrawing, setIsDrawing] = useState(false)
-  const [currentPoint, setCurrentPoint] = useState<{ x: number; y: number } | null>(null)
+  const [currentPoint, setCurrentPoint] = useState<Point | null>(null)
   const [zoom, setZoom] = useState(1)
+  const [reservePercent, setReservePercent] = useState(10)
+  const [cutouts, setCutouts] = useState<Array<{ width: number; height: number }>>([])
+  const [closeBlockedReason, setCloseBlockedReason] = useState<string | null>(null)
+  const [draggingPointIndex, setDraggingPointIndex] = useState<number | null>(null)
+  const [history, setHistory] = useState<{ points: Point[]; isClosed: boolean }[]>([])
+  const [redoStack, setRedoStack] = useState<{ points: Point[]; isClosed: boolean }[]>([])
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map())
   const pinchDistanceRef = useRef<number | null>(null)
   const isPinchingRef = useRef(false)
@@ -192,7 +197,7 @@ export default function PlannerPage() {
     try {
       const { data: servicesData, error: servicesError } = await supabase
         .from('services')
-        .select('id, name, slug, specialization_id')
+        .select('id, name, slug, subcategory_id')
         .order('name', { ascending: true })
 
       if (servicesError) throw servicesError
@@ -207,11 +212,14 @@ export default function PlannerPage() {
   }
 
   const serviceOptions = useMemo(() => {
-    const allowed = new Set(FLOOR_ALLOWED_NAMES.map((name) => name.toLowerCase()))
-    const base = services.filter((service) => allowed.has(service.name.toLowerCase()))
-    const hasWarmFloor = services.some((service) => service.name.toLowerCase().includes('теплый пол'))
-    const warmFloorOption = hasWarmFloor ? [{ id: 'warm-floor', name: 'Теплый пол' }] : []
-    return [...base, ...warmFloorOption]
+    const nameLower = (name: string) => name.toLowerCase()
+    const base = services.filter((s) =>
+      FLOOR_KEYWORDS.some((kw) => nameLower(s.name).includes(kw))
+    )
+    const hasWarmFloor = services.some((s) => nameLower(s.name).includes('теплый пол'))
+    const warmFloorOption = hasWarmFloor ? [{ id: 'warm-floor', name: 'Теплый пол', slug: undefined, subcategory_id: undefined }] : []
+    const list = [...base, ...warmFloorOption]
+    return list.length > 0 ? list : services
   }, [services])
 
   const selectedServiceName = useMemo(() => {
@@ -270,58 +278,56 @@ export default function PlannerPage() {
       }
       setRecommendationsLoading(true)
       try {
-        const keywords = extractKeywords(selectedServiceName || '')
-        const orParts = keywords.flatMap((keyword) => {
-          const safeKeyword = keyword.replace(/[%_]/g, '')
-          return [`name.ilike.%${safeKeyword}%`, `description.ilike.%${safeKeyword}%`]
-        })
-
-        const productsQuery = supabase
+        const productsBase = supabase
           .from('products')
           .select(
-            `
-            id,
-            name,
-            price,
-            images,
-            seller:profiles(id, full_name, avatar_url),
-            category_ref:product_categories(id, name, section, slug)
-          `
+            `id, name, price, images, seller:profiles(id, full_name, avatar_url), category_ref:product_categories(id, name, section, slug)`
           )
           .eq('in_stock', true)
           .eq('category_ref.section', 'construction')
           .order('created_at', { ascending: false })
           .limit(12)
 
-        const productsPromise = orParts.length > 0 ? productsQuery.or(orParts.join(',')) : productsQuery
-
         let profileIds: string[] = []
-        if (isWarmFloor) {
-          const { data: warmServices, error: warmError } = await supabase
-            .from('services')
-            .select('id')
-            .ilike('name', '%теплый пол%')
-          if (warmError) throw warmError
-          const warmIds = (warmServices || []).map((row) => row.id as string)
-          if (warmIds.length > 0) {
+        if (selectedServiceId) {
+          const keywords = extractKeywords(selectedServiceName || '')
+          const orParts = keywords.flatMap((keyword) => {
+            const safeKeyword = keyword.replace(/[%_]/g, '')
+            return [`name.ilike.%${safeKeyword}%`, `description.ilike.%${safeKeyword}%`]
+          })
+
+          if (isWarmFloor) {
+            const { data: warmServices, error: warmError } = await supabase
+              .from('services')
+              .select('id')
+              .ilike('name', '%теплый пол%')
+            if (!warmError && warmServices?.length) {
+              const warmIds = (warmServices || []).map((row) => row.id as string)
+              const { data, error } = await supabase
+                .from('profile_services')
+                .select('profile_id')
+                .in('service_id', warmIds)
+              if (!error && data) profileIds = data.map((row) => row.profile_id as string)
+            }
+          } else {
             const { data, error } = await supabase
               .from('profile_services')
               .select('profile_id')
-              .in('service_id', warmIds)
-            if (error) throw error
-            profileIds = (data || []).map((row) => row.profile_id as string)
+              .eq('service_id', selectedServiceId)
+            if (!error && data) profileIds = data.map((row) => row.profile_id as string)
           }
-        } else {
-          const { data, error } = await supabase
-            .from('profile_services')
-            .select('profile_id')
-            .eq('service_id', selectedServiceId)
-          if (error) throw error
-          profileIds = (data || []).map((row) => row.profile_id as string)
-        }
 
-        const [productsResult] = await Promise.all([productsPromise])
-        if (productsResult.error) throw productsResult.error
+          const productsResult =
+            orParts.length > 0
+              ? await productsBase.or(orParts.join(','))
+              : await productsBase
+          if (productsResult.error) throw productsResult.error
+          setRecommendedProducts((productsResult.data as RecommendedProduct[]) || [])
+        } else {
+          const productsResult = await productsBase
+          if (productsResult.error) throw productsResult.error
+          setRecommendedProducts((productsResult.data as RecommendedProduct[]) || [])
+        }
 
         let mastersData: RecommendedMaster[] = []
         if (profileIds.length > 0) {
@@ -330,13 +336,18 @@ export default function PlannerPage() {
             .select('id, full_name, avatar_url, city, master_rating, master_reviews_count')
             .eq('role', 'master')
             .in('id', profileIds)
+            .order('master_rating', { ascending: false, nullsFirst: false })
             .limit(12)
-
-          if (error) throw error
-          mastersData = (data as RecommendedMaster[]) || []
+          if (!error && data) mastersData = data as RecommendedMaster[]
+        } else {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, city, master_rating, master_reviews_count')
+            .eq('role', 'master')
+            .order('master_rating', { ascending: false, nullsFirst: false })
+            .limit(12)
+          if (!error && data) mastersData = data as RecommendedMaster[]
         }
-
-        setRecommendedProducts((productsResult.data as RecommendedProduct[]) || [])
         setRecommendedMasters(mastersData)
       } catch (error) {
         console.error('Error fetching recommendations:', error)
@@ -351,15 +362,44 @@ export default function PlannerPage() {
   }, [selectedServiceId, selectedServiceName, isWarmFloor])
 
   const filteredServices = useMemo(() => {
+    const nameLower = (name: string) => name.toLowerCase()
     if (mode === 'walls') {
-      return services.filter((item) =>
-        WALL_KEYWORDS.some((kw) => item.name.toLowerCase().includes(kw))
+      const list = services.filter((s) =>
+        WALL_KEYWORDS.some((kw) => nameLower(s.name).includes(kw))
       )
+      return list.length > 0 ? list : services
     }
-    return serviceOptions
+    return serviceOptions.length > 0 ? serviceOptions : services
   }, [services, mode, serviceOptions])
 
+  const materialsListEmpty = !servicesLoading && filteredServices.length === 0
+
   const polygonClosed = isClosed && points.length >= 3
+
+  const pushHistory = useCallback(() => {
+    setHistory((prev) => [...prev, { points: [...points], isClosed }])
+    setRedoStack([])
+  }, [points, isClosed])
+
+  const handleUndo = useCallback(() => {
+    if (history.length === 0) return
+    setRedoStack((r) => [...r, { points: [...points], isClosed }])
+    const prev = history[history.length - 1]
+    setHistory((h) => h.slice(0, -1))
+    setPoints(prev.points)
+    setIsClosed(prev.isClosed)
+    setCloseBlockedReason(null)
+    setDraggingPointIndex(null)
+  }, [history, points, isClosed])
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.length === 0) return
+    const next = redoStack[redoStack.length - 1]
+    setRedoStack((r) => r.slice(0, -1))
+    setPoints(next.points)
+    setIsClosed(next.isClosed)
+    setCloseBlockedReason(null)
+  }, [redoStack])
 
   const metersToParts = (meters: number) => {
     if (!Number.isFinite(meters)) return { m: 0, cm: 0 }
@@ -392,54 +432,88 @@ export default function PlannerPage() {
     return { segments, widths, total, gap }
   }
 
-  const floorArea = useMemo(() => {
-    if (!polygonClosed) return 0
-    let sum = 0
-    for (let i = 0; i < points.length; i += 1) {
-      const a = points[i]
-      const b = points[(i + 1) % points.length]
-      sum += a.x * b.y - b.x * a.y
-    }
-    return Math.abs(sum) / 2
-  }, [points, polygonClosed])
+  const floorArea = useMemo(() => (polygonClosed ? polygonArea(points) : 0), [points, polygonClosed])
+  const perimeter = useMemo(() => (polygonClosed ? polygonPerimeter(points) : 0), [points, polygonClosed])
 
-  const perimeter = useMemo(() => {
-    if (!polygonClosed) return 0
-    let total = 0
-    for (let i = 0; i < points.length; i += 1) {
-      const a = points[i]
-      const b = points[(i + 1) % points.length]
-      total += Math.hypot(b.x - a.x, b.y - a.y)
-    }
-    return total
-  }, [points, polygonClosed])
-
-  const wallArea = useMemo(() => {
-    const safeWallHeight = Math.max(0, wallHeight)
-    return perimeter * safeWallHeight
+  const cutoutsArea = useMemo(
+    () => cutouts.reduce((sum, c) => sum + Math.max(0, c.width) * Math.max(0, c.height), 0),
+    [cutouts]
+  )
+  const wallAreaTotal = useMemo(() => {
+    const h = Math.max(0, wallHeight)
+    return perimeter * h
   }, [perimeter, wallHeight])
+  const wallAreaNet = Math.max(0, wallAreaTotal - cutoutsArea)
 
-  const baseArea = mode === 'floor' ? floorArea : wallArea
+  const baseArea = mode === 'floor' ? floorArea : wallAreaNet
   const thicknessM = Math.max(0, thicknessCm) / 100
-  const volume = baseArea * thicknessM
-  const quantityByUnit = priceUnit === 'm3' ? volume : baseArea
+  const volume = floorArea * thicknessM
+  const reserveMultiplier = 1 + Math.max(0, reservePercent) / 100
+  const volumeWithReserve = volume * reserveMultiplier
+  const quantityByUnit =
+    mode === 'floor' && priceUnit === 'm3'
+      ? volumeWithReserve
+      : baseArea
   const workTotal = Number(workPrice || 0) * quantityByUnit
   const materialTotal = Number(materialPrice || 0) * quantityByUnit
   const grandTotal = workTotal + materialTotal
+  const showRecommendations = polygonClosed && floorArea > 5
+
+  useEffect(() => {
+    if (!showRecommendations || selectedServiceId) return
+    setRecommendationsLoading(true)
+    const loadDefaultRecommendations = async () => {
+      try {
+        const [productsResult, mastersResult] = await Promise.all([
+          supabase
+            .from('products')
+            .select(
+              `id, name, price, images, seller:profiles(id, full_name, avatar_url), category_ref:product_categories(id, name, section, slug)`
+            )
+            .eq('in_stock', true)
+            .eq('category_ref.section', 'construction')
+            .order('created_at', { ascending: false })
+            .limit(12),
+          supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, city, master_rating, master_reviews_count')
+            .eq('role', 'master')
+            .order('master_rating', { ascending: false, nullsFirst: false })
+            .limit(12),
+        ])
+        setRecommendedProducts((productsResult.data as RecommendedProduct[]) || [])
+        setRecommendedMasters((mastersResult.data as RecommendedMaster[]) || [])
+      } catch (e) {
+        console.error(e)
+        setRecommendedProducts([])
+        setRecommendedMasters([])
+      } finally {
+        setRecommendationsLoading(false)
+      }
+    }
+    loadDefaultRecommendations()
+  }, [showRecommendations, selectedServiceId])
 
   const previewWidth = Math.max(1, canvasWidth)
   const previewHeight = Math.max(1, canvasHeight)
 
-  const getPointFromEvent = (event: React.PointerEvent<SVGSVGElement>) => {
+  const getPointFromEvent = (
+    event: React.PointerEvent<SVGSVGElement>,
+    lastPoint?: Point | null
+  ): Point => {
     const rect = event.currentTarget.getBoundingClientRect()
     const rawX = ((event.clientX - rect.left) / rect.width) * previewWidth
     const rawY = ((event.clientY - rect.top) / rect.height) * previewHeight
     const x = rawX / zoom
     const y = rawY / zoom
-    const step = Math.max(0.01, gridStep)
-    const snappedX = snapToGrid ? Math.round(x / step) * step : x
-    const snappedY = snapToGrid ? Math.round(y / step) * step : y
-    return { x: snappedX, y: snappedY }
+    let p: Point = { x, y }
+    if (snapToGridEnabled) p = snapToGrid(p, gridStep)
+    if (lastPoint && snapTo45) {
+      const len = Math.hypot(p.x - lastPoint.x, p.y - lastPoint.y)
+      if (len >= 0.05) p = snapToAngle(lastPoint, p, len, true)
+      if (snapToGridEnabled) p = snapToGrid(p, gridStep)
+    }
+    return p
   }
 
   const updatePointers = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -447,11 +521,6 @@ export default function PlannerPage() {
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
     pointersRef.current.set(event.pointerId, { x, y })
-  }
-
-  const straightenPoint = (_last: { x: number; y: number }, next: { x: number; y: number }) => {
-    // disable auto-straightening to allow angled lines
-    return next
   }
 
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -469,7 +538,36 @@ export default function PlannerPage() {
       return
     }
 
-    if (isClosed) return
+    if (isClosed) {
+      const rect = event.currentTarget.getBoundingClientRect()
+      const rawX = ((event.clientX - rect.left) / rect.width) * previewWidth / zoom
+      const rawY = ((event.clientY - rect.top) / rect.height) * previewHeight / zoom
+      const p: Point = { x: rawX, y: rawY }
+      for (let i = 0; i < points.length; i++) {
+        const dist = Math.hypot(p.x - points[i].x, p.y - points[i].y)
+        if (dist <= 0.2) {
+          setDraggingPointIndex(i)
+          return
+        }
+      }
+      const segIdx = segmentIndexNearPoint(points, p, 0.25)
+      if (segIdx !== null) {
+        const a = points[segIdx]
+        const b = points[(segIdx + 1) % points.length]
+        const proj = closestPointOnSegment(p, a, b)
+        if (proj) {
+          pushHistory()
+          setPoints((prev) => {
+            const next = [...prev]
+            next.splice(segIdx + 1, 0, snapToGrid(proj.point, gridStep))
+            return next
+          })
+        }
+        return
+      }
+      return
+    }
+
     setIsDrawing(true)
     setCurrentPoint(getPointFromEvent(event))
   }
@@ -489,8 +587,19 @@ export default function PlannerPage() {
       return
     }
 
+    if (draggingPointIndex !== null) {
+      const newP = getPointFromEvent(event)
+      setPoints((prev) => {
+        const next = [...prev]
+        next[draggingPointIndex!] = newP
+        return next
+      })
+      return
+    }
+
     if (!isDrawing || isClosed) return
-    setCurrentPoint(getPointFromEvent(event))
+    const last = points.length > 0 ? points[points.length - 1] : null
+    setCurrentPoint(getPointFromEvent(event, last))
   }
 
   const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -503,45 +612,68 @@ export default function PlannerPage() {
       return
     }
 
+    if (draggingPointIndex !== null) {
+      setDraggingPointIndex(null)
+      return
+    }
+
     if (!isDrawing) return
-    let nextPoint = currentPoint || getPointFromEvent(event)
+    const last = points.length > 0 ? points[points.length - 1] : null
+    let nextPoint = currentPoint || getPointFromEvent(event, last)
+    if (snapToGridEnabled) nextPoint = snapToGrid(nextPoint, gridStep)
     setIsDrawing(false)
     setCurrentPoint(null)
 
     setPoints((prev) => {
-      const minDistance = Math.max(0.03, gridStep * 0.3)
+      const minDistance = Math.max(0.05, gridStep * 0.5)
       if (prev.length > 0) {
-        const last = prev[prev.length - 1]
-        nextPoint = straightenPoint(last, nextPoint)
-        const distance = Math.hypot(nextPoint.x - last.x, nextPoint.y - last.y)
-        if (distance < minDistance) return prev
+        const dist = Math.hypot(nextPoint.x - prev[prev.length - 1].x, nextPoint.y - prev[prev.length - 1].y)
+        if (dist < minDistance) return prev
       }
 
       if (prev.length >= 2) {
         const first = prev[0]
-        const closeDistance = Math.max(0.12, gridStep * 2)
+        const closeDistance = Math.max(0.15, gridStep * 2)
         const distance = Math.hypot(nextPoint.x - first.x, nextPoint.y - first.y)
         if (distance <= closeDistance) {
+          if (wouldCloseIntersect([...prev, nextPoint])) {
+            setCloseBlockedReason('Замыкание отменено: контур самопересекается')
+            return prev
+          }
+          setCloseBlockedReason(null)
+          pushHistory()
           setIsClosed(true)
           return prev
         }
       }
 
+      pushHistory()
       return [...prev, nextPoint]
     })
   }
 
 
   const handleUndoPoint = () => {
+    if (points.length === 0) return
+    pushHistory()
     setPoints((prev) => prev.slice(0, -1))
     setIsClosed(false)
     setCurrentPoint(null)
+    setCloseBlockedReason(null)
   }
 
   const handleClear = () => {
+    pushHistory()
     setPoints([])
     setIsClosed(false)
     setCurrentPoint(null)
+    setCloseBlockedReason(null)
+  }
+
+  const handleDeletePoint = (index: number) => {
+    if (points.length <= 3) return
+    pushHistory()
+    setPoints((prev) => prev.filter((_, i) => i !== index))
   }
 
   const centroid = useMemo(() => {
@@ -563,9 +695,14 @@ export default function PlannerPage() {
   }, [points, polygonClosed])
 
   const handleCloseShape = () => {
-    if (points.length >= 3) {
-      setIsClosed(true)
+    if (points.length < 3) return
+    if (wouldCloseIntersect(points)) {
+      setCloseBlockedReason('Контур самопересекается, замыкание невозможно')
+      return
     }
+    setCloseBlockedReason(null)
+    pushHistory()
+    setIsClosed(true)
   }
 
   if (authLoading || !user) {
@@ -613,12 +750,30 @@ export default function PlannerPage() {
             <div className="space-y-6">
               <div className="space-y-6">
                 <div className="rounded-2xl border border-border-light/60 bg-bg-card p-3">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                     <div>
                       <h2 className="text-lg font-semibold text-graphite-secondary">Полотно</h2>
                       <p className="text-xs text-text-secondary">
-                        Ведите пальцем и отпускайте, чтобы строить прямые линии по точкам.
+                        Сетка 10 см. Снап к 0°/90°/45°. Клик по сегменту — вставка точки; перетаскивание узла — редактирование.
                       </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 text-xs text-text-secondary">
+                        <input
+                          type="checkbox"
+                          checked={snapToGridEnabled}
+                          onChange={(e) => setSnapToGridEnabled(e.target.checked)}
+                        />
+                        Сетка
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-text-secondary">
+                        <input
+                          type="checkbox"
+                          checked={snapTo45}
+                          onChange={(e) => setSnapTo45(e.target.checked)}
+                        />
+                        45°
+                      </label>
                     </div>
                     <span className="text-xs text-text-secondary">
                       {isClosed ? 'Контур замкнут' : `Точек: ${points.length}`}
@@ -637,10 +792,29 @@ export default function PlannerPage() {
                       <button
                         type="button"
                         onClick={handleUndoPoint}
-                        className="w-10 h-10 rounded-full bg-white border border-border-light/60 text-graphite-secondary shadow-md flex items-center justify-center"
-                        title="Отменить"
+                        disabled={points.length === 0}
+                        className="w-10 h-10 rounded-full bg-white border border-border-light/60 text-graphite-secondary shadow-md flex items-center justify-center disabled:opacity-50"
+                        title="Удалить последнюю точку"
                       >
                         <FiCornerUpLeft size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleUndo}
+                        disabled={history.length === 0}
+                        className="w-10 h-10 rounded-full bg-white border border-border-light/60 text-graphite-secondary shadow-md flex items-center justify-center disabled:opacity-50"
+                        title="Отменить (Undo)"
+                      >
+                        <FiCornerUpLeft size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRedo}
+                        disabled={redoStack.length === 0}
+                        className="w-10 h-10 rounded-full bg-white border border-border-light/60 text-graphite-secondary shadow-md flex items-center justify-center disabled:opacity-50"
+                        title="Повторить (Redo)"
+                      >
+                        <FiCornerUpRight size={16} />
                       </button>
                       <button
                         type="button"
@@ -651,6 +825,11 @@ export default function PlannerPage() {
                         <FiTrash2 size={18} />
                       </button>
                     </div>
+                    {closeBlockedReason && (
+                      <div className="absolute left-3 bottom-3 right-24 px-2 py-1.5 rounded-lg bg-amber-100 text-amber-800 text-xs z-20">
+                        {closeBlockedReason}
+                      </div>
+                    )}
                     <svg
                       ref={svgRef}
                       viewBox={`0 0 ${previewWidth} ${previewHeight}`}
@@ -827,16 +1006,29 @@ export default function PlannerPage() {
                         })()}
 
                         {points.map((p, index) => (
-                          <circle
-                            key={`${p.x}-${p.y}-${index}`}
-                            cx={p.x}
-                            cy={p.y}
-                            r="0.07"
-                            fill="#f8fafc"
-                            stroke="#6b7280"
-                            strokeWidth="0.03"
-                            filter="url(#nodeShadow)"
-                          />
+                          <g
+                            key={`node-${index}`}
+                            onContextMenu={(e) => {
+                              if (isClosed && points.length > 3) {
+                                e.preventDefault()
+                                handleDeletePoint(index)
+                              }
+                            }}
+                            style={{ cursor: isClosed ? (draggingPointIndex === index ? 'grabbing' : 'grab') : 'default' }}
+                          >
+                            <circle
+                              cx={p.x}
+                              cy={p.y}
+                              r={isClosed ? 0.12 : 0.07}
+                              fill={draggingPointIndex === index ? '#9ecfd7' : '#f8fafc'}
+                              stroke="#6b7280"
+                              strokeWidth="0.03"
+                              filter="url(#nodeShadow)"
+                            />
+                            {isClosed && points.length > 3 && (
+                              <title>Перетащите для перемещения. ПКМ — удалить точку.</title>
+                            )}
+                          </g>
                         ))}
 
                         {points.length >= 3 && !isClosed && (
@@ -917,14 +1109,16 @@ export default function PlannerPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <label className="text-xs text-text-secondary col-span-2">
-                      Материал (услуга мастеров)
+                      Материал для {mode === 'floor' ? 'пола' : 'стен'} (из нашей системы)
                       <select
                         value={selectedServiceId}
                         onChange={(e) => setSelectedServiceId(e.target.value)}
-                        className="input w-full mt-1 h-10"
+                        className="input w-full mt-1 h-10 border border-border-light bg-bg-primary rounded-lg focus:border-brand-accent focus:ring-1 focus:ring-brand-accent [&:invalid]:border-border-light"
+                        style={{ borderColor: 'var(--border-light, #e2e8f0)' }}
+                        aria-invalid="false"
                       >
-                        <option value="" disabled>
-                          {servicesLoading ? 'Загрузка...' : 'Выберите материал'}
+                        <option value="">
+                          {servicesLoading ? 'Загрузка...' : 'Выберите материал / услугу'}
                         </option>
                         {filteredServices.map((service) => (
                           <option key={service.id} value={service.id}>
@@ -932,30 +1126,106 @@ export default function PlannerPage() {
                           </option>
                         ))}
                       </select>
+                      {materialsListEmpty && (
+                        <p className="mt-1.5 text-[11px] text-amber-600">
+                          В системе пока нет услуг. Добавьте услуги в админке (раздел «Услуги» или «Специализации»).
+                        </p>
+                      )}
                     </label>
-                    <label className="text-xs text-text-secondary">
-                      Толщина слоя (см)
-                      <input
-                        type="number"
-                        min={0}
-                        step={0.1}
-                        value={thicknessCm}
-                        onChange={(e) => setThicknessCm(Number(e.target.value))}
-                        className="input w-full mt-1 h-10"
-                      />
-                    </label>
+                    {mode === 'floor' && (
+                      <>
+                        <label className="text-xs text-text-secondary">
+                          Толщина (см)
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={thicknessCm}
+                            onChange={(e) => setThicknessCm(Number(e.target.value))}
+                            className="input w-full mt-1 h-10"
+                          />
+                        </label>
+                        <label className="text-xs text-text-secondary">
+                          Запас (%)
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={reservePercent}
+                            onChange={(e) => setReservePercent(Number(e.target.value))}
+                            className="input w-full mt-1 h-10"
+                          />
+                        </label>
+                      </>
+                    )}
                     {mode === 'walls' && (
-                      <label className="text-xs text-text-secondary">
-                        Высота стены (м)
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={wallHeight}
-                          onChange={(e) => setWallHeight(Number(e.target.value))}
-                          className="input w-full mt-1 h-10"
-                        />
-                      </label>
+                      <>
+                        <label className="text-xs text-text-secondary col-span-2">
+                          Высота потолка (м)
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={wallHeight}
+                            onChange={(e) => setWallHeight(Number(e.target.value))}
+                            className="input w-full mt-1 h-10"
+                          />
+                        </label>
+                        <div className="col-span-2 text-xs text-text-secondary">
+                          Вырезы (м) — площадь вычитается из общей
+                          <div className="mt-1 space-y-1">
+                            {cutouts.map((c, i) => (
+                              <div key={i} className="flex gap-2 items-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={0.1}
+                                  placeholder="Ширина"
+                                  value={c.width || ''}
+                                  onChange={(e) =>
+                                    setCutouts((prev) => {
+                                      const n = [...prev]
+                                      n[i] = { ...n[i], width: Number(e.target.value) || 0 }
+                                      return n
+                                    })
+                                  }
+                                  className="input flex-1 h-9"
+                                />
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={0.1}
+                                  placeholder="Высота"
+                                  value={c.height || ''}
+                                  onChange={(e) =>
+                                    setCutouts((prev) => {
+                                      const n = [...prev]
+                                      n[i] = { ...n[i], height: Number(e.target.value) || 0 }
+                                      return n
+                                    })
+                                  }
+                                  className="input flex-1 h-9"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setCutouts((prev) => prev.filter((_, j) => j !== i))}
+                                  className="text-red-600 hover:underline text-[11px]"
+                                >
+                                  Удалить
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => setCutouts((prev) => [...prev, { width: 0, height: 0 }])}
+                              className="text-brand-accent hover:underline text-[11px]"
+                            >
+                              + Добавить вырез
+                            </button>
+                          </div>
+                        </div>
+                      </>
                     )}
                     <label className="text-xs text-text-secondary">
                       Ед. цены
@@ -1000,41 +1270,54 @@ export default function PlannerPage() {
                     <FiCheckCircle size={14} />
                     Расчет
                   </div>
+                  {polygonClosed && floorArea > 0 && floorArea < MIN_AREA_M2 && (
+                    <div className="mb-2 px-2 py-1.5 rounded-lg bg-amber-100 text-amber-800 text-xs">
+                      Минимальная площадь для рекомендаций: {MIN_AREA_M2} м²
+                    </div>
+                  )}
                   <div className="text-sm text-text-secondary">
                     <div className="text-[11px] text-text-secondary mb-1">
                       {mode === 'floor' ? 'Пол' : 'Стены'}
                     </div>
                     <div className="text-lg font-semibold text-graphite-secondary">
-                      {baseArea.toFixed(2)} м²
+                      {mode === 'floor' ? (
+                        <>Площадь: {floorArea.toFixed(2)} м²</>
+                      ) : (
+                        <>Чистая площадь: {baseArea.toFixed(2)} м²</>
+                      )}
                     </div>
                   </div>
                   <div className="mt-3 text-sm text-text-secondary">
                     {!polygonClosed ? (
                       <span>Замкните контур, чтобы получить расчет.</span>
-                    ) : measureType === 'area' ? (
-                      <span>
-                        Нужно покрытия: <strong>{baseArea.toFixed(2)} м²</strong>
-                      </span>
+                    ) : mode === 'floor' ? (
+                      <>
+                        <div className="text-[11px]">Периметр: {perimeter.toFixed(2)} м</div>
+                        <div className="text-[11px]">Объем: {volume.toFixed(3)} м³</div>
+                        <div className="text-[11px]">Объем с запасом ({reservePercent}%): {volumeWithReserve.toFixed(3)} м³</div>
+                        <span className="block mt-1">
+                          Нужно покрытия: <strong>{baseArea.toFixed(2)} м²</strong>
+                          {priceUnit === 'm3' && (
+                            <> · материала с запасом: <strong>{volumeWithReserve.toFixed(3)} м³</strong></>
+                          )}
+                        </span>
+                      </>
                     ) : (
-                      <span>
-                        Нужно материала: <strong>{volume.toFixed(3)} м³</strong>
-                      </span>
+                      <>
+                        <div className="text-[11px]">Общая площадь: {wallAreaTotal.toFixed(2)} м²</div>
+                        {cutoutsArea > 0 && (
+                          <div className="text-[11px]">Площадь вырезов: {cutoutsArea.toFixed(2)} м²</div>
+                        )}
+                        <div className="text-[11px]">Периметр: {perimeter.toFixed(2)} м · Высота: {wallHeight} м</div>
+                        <span className="block mt-1">
+                          Чистая площадь: <strong>{baseArea.toFixed(2)} м²</strong>
+                        </span>
+                      </>
                     )}
                   </div>
-                  {polygonClosed && (
+                  {polygonClosed && mode === 'floor' && (
                     <div className="text-[11px] text-text-secondary mt-2">
-                      Объем: {volume.toFixed(3)} м³
-                    </div>
-                  )}
-                  {measureType === 'volume' && polygonClosed && (
-                    <div className="text-[11px] text-text-secondary mt-2">
-                      Толщина: {thicknessCm} см, площадь: {baseArea.toFixed(2)} м²
-                    </div>
-                  )}
-                  {polygonClosed && (
-                    <div className="text-[11px] text-text-secondary mt-2">
-                      Периметр: {perimeter.toFixed(2)} м
-                      {mode === 'walls' && ` · Высота: ${wallHeight} м`}
+                      Толщина: {thicknessCm} см · Запас: {reservePercent}%
                     </div>
                   )}
                   {polygonClosed && (workPrice || materialPrice) && (
@@ -1044,16 +1327,17 @@ export default function PlannerPage() {
                   )}
                 </div>
 
+                {showRecommendations && (
                 <div className="rounded-2xl border border-border-light/60 bg-bg-card p-4">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="text-sm font-semibold text-graphite-secondary">Рекомендации</div>
+                    <div className="text-sm font-semibold text-graphite-secondary">Товары и мастера из нашей системы</div>
                     <div className="text-xs text-text-secondary">
-                      {selectedServiceName || 'Выберите услугу'}
+                      {selectedServiceName ? `По услуге: ${selectedServiceName}` : 'Популярные товары и мастера'}
                     </div>
                   </div>
 
                   <div className="mb-5">
-                    <div className="text-xs text-text-secondary mb-2">Товары</div>
+                    <div className="text-xs text-text-secondary mb-2">Товары (каталог)</div>
                     {recommendationsLoading ? (
                       <div className="text-xs text-text-secondary">Загрузка...</div>
                     ) : recommendedProducts.length === 0 ? (
@@ -1118,7 +1402,7 @@ export default function PlannerPage() {
                   </div>
 
                   <div>
-                    <div className="text-xs text-text-secondary mb-2">Мастера</div>
+                    <div className="text-xs text-text-secondary mb-2">Мастера (из нашей системы)</div>
                     {recommendationsLoading ? (
                       <div className="text-xs text-text-secondary">Загрузка...</div>
                     ) : recommendedMasters.length === 0 ? (
@@ -1168,9 +1452,10 @@ export default function PlannerPage() {
                     )}
                   </div>
                 </div>
+                )}
 
                 <div className="text-[11px] text-text-secondary">
-                  Логика: вы рисуете свободную форму, контур фиксируется, затем считаем площадь и объем.
+                  Сетка 10 см, снап к углам 0°/90°/45°. После замыкания можно перетаскивать узлы, кликать по сегменту для вставки точки. Площадь — формула Шнурка; при площади &gt; 5 м² показываются рекомендации.
                 </div>
               </div>
             </div>

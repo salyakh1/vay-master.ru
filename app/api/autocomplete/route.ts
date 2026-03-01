@@ -6,11 +6,48 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const query = searchParams.get('q') || ''
+    const query = (searchParams.get('q') || '').trim().toLowerCase()
     const type = searchParams.get('type') || 'all'
+    const forSearch = searchParams.get('for') === 'search'
 
     if (!query || query.length < 2) {
-      return NextResponse.json({ suggestions: [] })
+      return NextResponse.json(forSearch ? { suggestions: [], main: null, services: [] } : { suggestions: [] })
+    }
+
+    // Режим «поиск мастеров»: 1 подсказка (категория/подкатегория) + 3 услуги (с названием категории)
+    if (forSearch) {
+      const mainList: Array<{ id: string; name: string; type: 'category' | 'subcategory' }> = []
+      const servicesList: Array<{ id: string; name: string; category_name: string | null }> = []
+
+      const [subRes, catRes, svcRes] = await Promise.all([
+        supabase.from('subcategories').select('id, name').ilike('name', `%${query}%`).limit(1),
+        supabase.from('categories').select('id, name').ilike('name', `%${query}%`).limit(1),
+        supabase
+          .from('services')
+          .select('id, name, subcategory:subcategories(id, category:categories(id, name))')
+          .ilike('name', `%${query}%`)
+          .limit(3),
+      ])
+
+      if (subRes.data?.length) {
+        mainList.push(...subRes.data.map((s) => ({ id: s.id, name: s.name, type: 'subcategory' as const })))
+      }
+      if (catRes.data?.length && mainList.length === 0) {
+        mainList.push(...catRes.data.map((c) => ({ id: c.id, name: c.name, type: 'category' as const })))
+      }
+      if (svcRes.data?.length) {
+        for (const row of svcRes.data as any[]) {
+          const catName = row.subcategory?.category?.name ?? null
+          servicesList.push({ id: row.id, name: row.name, category_name: catName })
+        }
+      }
+
+      const mainOne = mainList[0] ?? null
+      const suggestions = [
+        ...(mainOne ? [{ id: mainOne.id, name: mainOne.name, type: mainOne.type, category_name: null as string | null }] : []),
+        ...servicesList.map((s) => ({ id: s.id, name: s.name, type: 'service' as const, category_name: s.category_name })),
+      ]
+      return NextResponse.json({ suggestions, main: mainOne, services: servicesList })
     }
 
     const suggestions: Array<{

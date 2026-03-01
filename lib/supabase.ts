@@ -223,6 +223,8 @@ export interface AdBanner {
   affiliate_url?: string
   show_badge?: boolean
   badge_text?: string
+  /** Режим отображения Hero: split (текст слева + картинка справа) или full_image (картинка на весь блок) */
+  hero_layout?: 'split' | 'full_image'
 }
 
 export interface Chat {

@@ -8,7 +8,7 @@ import { supabase, User } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
-import { FiSearch, FiUser, FiFilter, FiMapPin, FiBriefcase, FiStar, FiCheckCircle } from 'react-icons/fi'
+import { FiSearch, FiUser, FiSliders, FiMapPin, FiBriefcase, FiStar, FiCheckCircle } from 'react-icons/fi'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import AdSlot from '@/components/AdSlot'
 import StoriesCircle from '@/components/StoriesCircle'
@@ -117,6 +117,11 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const { user, loading: authLoading } = useAuth()
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [loading, setLoading] = useState(false)
+  const [searchSuggestions, setSearchSuggestions] = useState<Array<{ id: string; name: string; type: string; category_name?: string | null }>>([])
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const searchInputWrapperRef = useRef<HTMLDivElement>(null)
+  const autocompleteAbortRef = useRef<AbortController | null>(null)
 
   const [masters, setMasters] = useState<User[]>([])
   const [randomProfiles, setRandomProfiles] = useState<User[]>([])
@@ -146,6 +151,49 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const loadMoreMastersSentinelRef = useRef<HTMLDivElement>(null)
 
   const ITEMS_PER_PAGE = 12
+
+  // Подсказки при вводе: 1 категория/подкатегория + 3 услуги (кровел → Кровельные работы + услуги)
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) {
+      setSearchSuggestions([])
+      setShowSearchSuggestions(false)
+      return
+    }
+    if (autocompleteAbortRef.current) autocompleteAbortRef.current.abort()
+    const ctrl = new AbortController()
+    autocompleteAbortRef.current = ctrl
+    setLoadingSuggestions(true)
+    const t = setTimeout(() => {
+      fetch(`/api/autocomplete?q=${encodeURIComponent(q)}&for=search`, { signal: ctrl.signal })
+        .then((r) => (r.ok ? r.json() : { suggestions: [] }))
+        .then((data) => {
+          if (ctrl.signal.aborted) return
+          setSearchSuggestions(data.suggestions || [])
+          setShowSearchSuggestions((data.suggestions?.length || 0) > 0)
+        })
+        .catch(() => {
+          if (!ctrl.signal.aborted) setSearchSuggestions([])
+        })
+        .finally(() => {
+          if (!ctrl.signal.aborted) setLoadingSuggestions(false)
+        })
+    }, 300)
+    return () => {
+      clearTimeout(t)
+      ctrl.abort()
+    }
+  }, [query])
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (searchInputWrapperRef.current && !searchInputWrapperRef.current.contains(e.target as Node)) {
+        setShowSearchSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
 
   const randomRows = useMemo(() => buildMastersRows(randomProfiles, true), [randomProfiles])
   const filteredRows = useMemo(() => buildMastersRows(masters, false), [masters])
@@ -505,7 +553,15 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    setShowSearchSuggestions(false)
     performSearch()
+  }
+
+  const applySuggestion = (name: string) => {
+    setQuery(name)
+    setShowSearchSuggestions(false)
+    setSearchSuggestions([])
+    // Поиск запустится из useEffect по изменению query
   }
 
   // Убираем проверку авторизации - неавторизованные могут видеть карточки мастеров
@@ -561,23 +617,59 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
           {/* Search Form */}
           <form onSubmit={handleSearch} className="mb-6">
             <div className="flex flex-col gap-3">
-              <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={16} />
+              <div className="relative" ref={searchInputWrapperRef}>
+                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" size={16} />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Поиск мастеров..."
-                  className="input pl-10 pr-10 h-10 text-sm w-full"
+                  onFocus={() => query.trim().length >= 2 && searchSuggestions.length > 0 && setShowSearchSuggestions(true)}
+                  placeholder="Например: кровел, кирпич..."
+                  className="input pl-12 pr-11 h-10 text-sm w-full"
+                  autoComplete="off"
+                  aria-autocomplete="list"
+                  aria-expanded={showSearchSuggestions && searchSuggestions.length > 0}
                 />
                 <button
                   type="button"
                   onClick={() => setShowFiltersModal(true)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors p-1"
                   title="Фильтры"
                 >
-                  <FiFilter size={16} />
+                  <FiSliders size={18} />
                 </button>
+                {showSearchSuggestions && searchSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-lg border border-border-light shadow-md overflow-hidden">
+                    {loadingSuggestions ? (
+                      <div className="px-3 py-2 text-xs text-text-muted">Загрузка…</div>
+                    ) : (
+                      <ul className="py-0.5 max-h-[220px] overflow-y-auto">
+                        {searchSuggestions.map((item) => {
+                          const isCategory = item.type === 'category' || item.type === 'subcategory'
+                          return (
+                            <li key={`${item.type}-${item.id}`}>
+                              <button
+                                type="button"
+                                onClick={() => applySuggestion(item.name)}
+                                className="w-full text-left px-3 py-1.5 hover:bg-bg-secondary transition-colors flex flex-col gap-0.5"
+                              >
+                                <span className="flex items-center gap-1.5 min-w-0">
+                                  <span className="text-xs text-graphite-secondary truncate">{item.name}</span>
+                                  {isCategory && (
+                                    <span className="flex-shrink-0 text-[10px] text-brand-accent font-medium">Категория</span>
+                                  )}
+                                </span>
+                                {!isCategory && item.category_name && (
+                                  <span className="text-[10px] text-text-muted truncate">{item.category_name}</span>
+                                )}
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
 
               <button type="submit" className="btn btn-primary h-10 w-full text-sm">

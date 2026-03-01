@@ -122,7 +122,7 @@ export default function HomeClient({
   const showGuestHero = loading || !user
 
   return (
-    <div className="min-h-screen bg-bg-primary pb-20">
+    <div className="min-h-screen bg-bg-primary pb-20 w-full max-w-[100vw] overflow-x-hidden">
       {user ? (
         <Navbar />
       ) : (
@@ -139,7 +139,7 @@ export default function HomeClient({
         </header>
       )}
 
-      <div className="w-full mb-6">
+      <div className="w-full mb-6 relative z-0 overflow-hidden">
         <AdBannerSlider page="home" initialBanners={initialBanners ?? undefined} />
       </div>
 

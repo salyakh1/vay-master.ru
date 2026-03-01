@@ -52,13 +52,18 @@ body {
   line-height: 1.6;
   font-weight: 400;
   overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
   touch-action: pan-y;
   letter-spacing: -0.01em;          /* Строгий, инженерный стиль */
 }
 
-/* Smooth scrolling */
+/* Фиксированная ширина под устройство — страница не увеличивается/не уменьшается */
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 @layer base {

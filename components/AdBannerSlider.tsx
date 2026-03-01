@@ -91,7 +91,10 @@ export default function AdBannerSlider({
       .then((data) => {
         if (cancelled) return
         if (data?.banners?.length) {
-          setBanners(data.banners)
+          // Не заменять на меньший список: если с SSR пришло 2, а с API — 1, оставляем 2 для слайдера
+          setBanners((prev) =>
+            data.banners.length >= prev.length ? data.banners : prev
+          )
           trackViewRef.current?.(data.banners[0].id)
         } else if (!initialBanners?.length) setBanners([])
       })
@@ -106,14 +109,15 @@ export default function AdBannerSlider({
       return
     }
     const cur = banners[currentIndex]
-    const duration = (cur?.duration ?? interval / 1000) * 1000
+    // duration в баннере — в секундах; interval — в мс; минимум 3 сек для автопрокрутки
+    const durationMs = Math.max(3000, (cur?.duration ?? interval / 1000) * 1000)
     autoplayRef.current = setTimeout(() => {
       setCurrentIndex((prev) => {
         const next = (prev + 1) % banners.length
-        if (banners[next] && duration >= 2000) trackView(banners[next].id)
+        if (banners[next] && durationMs >= 2000) trackView(banners[next].id)
         return next
       })
-    }, duration)
+    }, durationMs)
     return () => { if (autoplayRef.current) clearTimeout(autoplayRef.current) }
   }, [autoplay, banners.length, isPaused, currentIndex, interval])
 
@@ -159,14 +163,14 @@ export default function AdBannerSlider({
   const hasContent = !loading && banners.length > 0
 
   return (
-    <div className={`relative w-full px-2 ${className}`}>
+    <div className={`relative w-full px-2 pt-4 isolate ${className}`}>
+      {/* HeroWrapper: overflow hidden + position relative, фиксированная высота */}
       <div
         ref={containerRef}
-        className="relative overflow-hidden w-full max-w-full mx-auto bg-bg-secondary rounded-[36px]"
+        className="relative w-full overflow-hidden max-w-full mx-auto bg-bg-secondary rounded-[36px] box-border isolate"
         style={{
           width: '96%',
           height: MOBILE_HEIGHT,
-          padding: PADDING,
           minHeight: MOBILE_HEIGHT,
         }}
         onTouchStart={handleTouchStart}
@@ -177,71 +181,33 @@ export default function AdBannerSlider({
       >
         {hasContent ? (
           <>
+            {/* SlidesContainer: flex, ширина по сумме слайдов, transition, translateX в % от контейнера */}
             <div
-              className="flex h-full transition-transform duration-500 ease-out"
+              className="flex h-full transition-transform duration-[400ms] ease-out"
               style={{
-                transform: `translateX(-${safeIndex * 100}%)`,
+                transform: `translateX(-${safeIndex * (100 / banners.length)}%)`,
                 width: `${banners.length * 100}%`,
               }}
             >
-              {banners.map((banner, index) => (
+              {banners.map((banner, index) => {
+                // Режим full_image: картинка на весь блок (в БД должна быть колонка hero_layout)
+                const isFullImage = String(banner.hero_layout || '').toLowerCase() === 'full_image'
+                return (
                 <button
                   key={banner.id}
                   type="button"
-                  className="flex flex-shrink-0 flex-row w-full h-full text-left cursor-pointer border-0 p-0 m-0 overflow-hidden"
-                  style={{ width: `${100 / banners.length}%`, borderRadius: BORDER_RADIUS }}
+                  className="flex flex-shrink-0 flex-row w-full h-full text-left cursor-pointer border-0 m-0 overflow-hidden box-border rounded-[22px] min-w-0"
+                  style={{
+                    width: `${100 / banners.length}%`,
+                    minWidth: 0,
+                    padding: isFullImage ? 0 : 16,
+                    borderRadius: 22,
+                  }}
                   onClick={() => handleBannerClick(banner)}
                 >
-                  {/* Левая зона — контент (65% чтобы текст был виден) */}
-                  <div
-                    className="flex flex-col justify-center relative z-[2] min-w-0 overflow-visible"
-                    style={{
-                      width: '65%',
-                      gap: '8px',
-                      paddingRight: 12,
-                    }}
-                  >
-                    {/* Верхний левый label */}
-                    <span
-                      className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary"
-                      style={{ marginBottom: 2 }}
-                    >
-                      {getTopLabel(banner)}
-                    </span>
-                    {/* H1 */}
-                    <h1
-                      className="font-bold text-graphite-secondary leading-tight line-clamp-2"
-                      style={{ fontSize: 'clamp(20px, 5vw, 24px)' }}
-                    >
-                      {banner.title}
-                    </h1>
-                    {/* Badge (оффер) — не показываем, если тот же текст уже в верхнем лейбле (убираем дубль "Реклама") */}
-                    {getBadgeOffer(banner) && getBadgeOffer(banner) !== getTopLabel(banner) && (
-                      <span
-                        className="inline-block px-3 py-1.5 rounded-2xl text-xs font-medium bg-brand-accent text-white w-fit"
-                        style={{ padding: '6px 12px' }}
-                      >
-                        {getBadgeOffer(banner)}
-                      </span>
-                    )}
-                    {/* Подзаголовок: показываем description, если он не дублирует badge */}
-                    {banner.description && ((banner.show_badge && banner.badge_text) || !getBadgeOffer(banner)) && (
-                      <p className="text-text-secondary line-clamp-2 text-sm break-words" style={{ fontSize: 14 }}>
-                        {banner.description}
-                      </p>
-                    )}
-                    {/* Малый текст опционально — не дублируем, уже есть description */}
-                  </div>
-
-                  {/* Правая зона 35% — визуал с depth */}
-                  <div
-                    className="relative flex-shrink-0 z-[1]"
-                    style={{ width: '35%', height: '100%', minWidth: 0 }}
-                  >
-                    <div
-                      className="absolute inset-0 overflow-hidden rounded-r-2xl"
-                      style={{ right: -PADDING, top: -PADDING, bottom: -PADDING, width: 'calc(100% + 20px)' }}
-                    >
+                  {isFullImage ? (
+                    /* Режим full_image: картинка на весь блок, скруглённые края */
+                    <div className="relative w-full h-full min-h-full overflow-hidden rounded-[18px] bg-bg-secondary">
                       <img
                         src={banner.image_url}
                         alt={banner.title}
@@ -250,10 +216,78 @@ export default function AdBannerSlider({
                         decoding={index === 0 ? 'sync' : 'async'}
                         fetchPriority={index === 0 ? 'high' : 'low'}
                       />
+                      {(banner.title || getTopLabel(banner)) && (
+                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent rounded-b-[18px]">
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-white/90">
+                            {getTopLabel(banner)}
+                          </span>
+                          <h2 className="font-bold text-white leading-tight line-clamp-2 text-sm sm:text-base">
+                            {banner.title}
+                          </h2>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      {/* Режим split: текст слева, картинка справа с лёгким скруглением */}
+                      <div
+                        className="flex flex-col justify-center relative z-[2] min-w-0 overflow-hidden"
+                        style={{
+                          width: '65%',
+                          gap: '8px',
+                          paddingRight: 12,
+                        }}
+                      >
+                        <span
+                          className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary"
+                          style={{ marginBottom: 2 }}
+                        >
+                          {getTopLabel(banner)}
+                        </span>
+                        <h1
+                          className="font-bold text-graphite-secondary leading-tight line-clamp-2"
+                          style={{ fontSize: 'clamp(20px, 5vw, 24px)' }}
+                        >
+                          {banner.title}
+                        </h1>
+                        {getBadgeOffer(banner) && getBadgeOffer(banner) !== getTopLabel(banner) && (
+                          <span
+                            className="inline-block px-3 py-1.5 rounded-2xl text-xs font-medium bg-brand-accent text-white w-fit"
+                            style={{ padding: '6px 12px' }}
+                          >
+                            {getBadgeOffer(banner)}
+                          </span>
+                        )}
+                        {banner.description && ((banner.show_badge && banner.badge_text) || !getBadgeOffer(banner)) && (
+                          <p className="text-text-secondary line-clamp-2 text-sm break-words" style={{ fontSize: 14 }}>
+                            {banner.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <div
+                        className="relative flex-shrink-0 z-[1] overflow-hidden rounded-xl"
+                        style={{ width: '35%', height: '100%', minWidth: 0 }}
+                      >
+                        <div
+                          className="absolute inset-0 overflow-hidden rounded-xl"
+                          style={{ right: -16, top: -16, bottom: -16, width: 'calc(100% + 16px)' }}
+                        >
+                          <img
+                            src={banner.image_url}
+                            alt={banner.title}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            loading={index === 0 ? 'eager' : 'lazy'}
+                            decoding={index === 0 ? 'sync' : 'async'}
+                            fetchPriority={index === 0 ? 'high' : 'low'}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </button>
-              ))}
+                )
+              })}
             </div>
 
             {/* Pagination dots — absolute bottom-center */}

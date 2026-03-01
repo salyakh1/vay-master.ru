@@ -88,6 +88,7 @@ export default function AdminBannersPage() {
       image_url: '',
       type: 'image',
       ad_type: 'HERO_SPONSORED',
+      hero_layout: 'split',
       target_type: null,
       pages: [],
       priority: 0,
@@ -138,6 +139,7 @@ export default function AdminBannersPage() {
       image_url: '',
       type: defaultType as any,
       ad_type: adType as any,
+      hero_layout: adType === 'HERO_SPONSORED' ? 'split' : undefined,
       target_type: null,
       pages: defaultPages,
       priority: 0,
@@ -232,12 +234,15 @@ export default function AdminBannersPage() {
         return
       }
 
+      const isHero = editingBanner.ad_type === 'HERO_SPONSORED' || !editingBanner.ad_type
+      const heroLayout = (editingBanner as any).hero_layout
       const bannerData: any = {
         ...editingBanner,
         priority: editingBanner.priority || 0,
         duration: editingBanner.duration || 5,
         is_active: editingBanner.is_active ?? true,
         ad_type: editingBanner.ad_type || 'HERO_SPONSORED',
+        ...(isHero && { hero_layout: heroLayout === 'full_image' ? 'full_image' : 'split' }),
         category: editingBanner.category || [],
         keywords: editingBanner.keywords || [],
         regions: editingBanner.regions || ['ALL'],
@@ -778,6 +783,25 @@ export default function AdminBannersPage() {
                     Определяет, где и как будет показываться реклама
                   </p>
                 </div>
+
+                {(editingBanner.ad_type === 'HERO_SPONSORED' || !editingBanner.ad_type) && (
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1">
+                      Режим Hero-баннера
+                    </label>
+                    <select
+                      value={(editingBanner as any).hero_layout || 'split'}
+                      onChange={(e) => setEditingBanner({ ...editingBanner, hero_layout: e.target.value as 'split' | 'full_image' })}
+                      className="input w-full"
+                    >
+                      <option value="split">Текст слева + картинка справа</option>
+                      <option value="full_image">Картинка на весь блок</option>
+                    </select>
+                    <p className="text-xs text-text-secondary mt-1">
+                      full_image — картинка заполняет весь блок, заголовок поверх внизу
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-1">
