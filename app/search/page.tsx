@@ -152,6 +152,18 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
   const ITEMS_PER_PAGE = 12
 
+  // Синхронизация фильтров с URL (шаринг и перезагрузка страницы)
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (query.trim()) params.set('q', query.trim())
+    if (selectedCategory) params.set('category', selectedCategory)
+    if (selectedSubcategory) params.set('subcategory', selectedSubcategory)
+    if (selectedServiceIds.length > 0) params.set('service', selectedServiceIds.join(','))
+    if (cityFilter.trim()) params.set('city', cityFilter.trim())
+    const qs = params.toString()
+    router.replace(qs ? `/search?${qs}` : '/search', { scroll: false })
+  }, [query, selectedCategory, selectedSubcategory, selectedServiceIds, cityFilter, router])
+
   // Подсказки при вводе: 1 категория/подкатегория + 3 услуги (кровел → Кровельные работы + услуги)
   useEffect(() => {
     const q = query.trim()
@@ -300,7 +312,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, cityFilter, selectedCategory, selectedSubcategory, selectedServiceIds, showFiltersModal])
 
-  // Сначала только список мастеров; истории — с задержкой, чтобы не конкурировать за сеть
+  // Сначала загружаем список мастеров «вашего города»; истории — с задержкой
   useEffect(() => {
     fetchRandomProfiles(1, true)
     const t = setTimeout(() => fetchStories(), 800)

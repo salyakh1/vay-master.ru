@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 export async function POST(request: NextRequest) {
+  const { success } = rateLimit(getClientIp(request), 10, 60_000)
+  if (!success) return rateLimitResponse()
+
   try {
     const body = await request.json()
     const { reported_user_id, chat_id, comment } = body

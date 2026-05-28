@@ -8,6 +8,8 @@ interface OrderPaymentModalProps {
   priceRub: number
   onConfirmPaid: () => void
   loading?: boolean
+  /** true — редирект на Тинькофф; false — заглушка (сразу создаём заказ) */
+  tinkoffReady?: boolean
 }
 
 export default function OrderPaymentModal({
@@ -16,6 +18,7 @@ export default function OrderPaymentModal({
   priceRub,
   onConfirmPaid,
   loading,
+  tinkoffReady = false,
 }: OrderPaymentModalProps) {
   if (!isOpen) return null
 
@@ -63,11 +66,19 @@ export default function OrderPaymentModal({
             onClick={onConfirmPaid}
             disabled={loading}
           >
-            {loading ? 'Оплата...' : 'Оплатить и опубликовать'}
+            {loading
+              ? tinkoffReady
+                ? 'Переход к оплате...'
+                : 'Оплата...'
+              : tinkoffReady
+                ? 'Перейти к оплате'
+                : 'Оплатить и опубликовать'}
           </button>
 
           <p className="text-xs text-text-muted mt-3 text-center">
-            Здесь пока заглушка оплаты. На следующем шаге подключим реальный платежный сервис.
+            {tinkoffReady
+              ? 'Откроется защищённая страница банка (Тинькофф). После успешной оплаты заказ появится в списке.'
+              : 'Тестовый режим: заказ публикуется без реального списания. Подключите Тинькофф в админке и .env для живой оплаты.'}
           </p>
         </div>
       </div>

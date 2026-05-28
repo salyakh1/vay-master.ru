@@ -38,7 +38,17 @@ export default function LoginPage() {
         router.push('/')
       }
     } catch (error: any) {
-      setError(error.message || 'Ошибка при входе')
+      const msg = error?.message || ''
+      if (msg === 'Failed to fetch' || msg.includes('fetch') || msg.includes('NetworkError') || msg.includes('ERR_')) {
+        const isLocal = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.origin)
+        setError(
+          isLocal
+            ? 'Нет связи с Supabase с localhost. Часто режет антивирус или фаервол — добавьте в исключения или отключите для разработки. В проде при этом может работать.'
+            : 'Нет связи с сервером. Проверьте интернет, VPN, антивирус и доступ к Supabase.'
+        )
+      } else {
+        setError(msg || 'Ошибка при входе')
+      }
     } finally {
       setLoading(false)
     }

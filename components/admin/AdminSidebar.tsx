@@ -19,6 +19,7 @@ import {
   FiStar,
   FiCreditCard,
   FiLayers,
+  FiRefreshCw,
 } from 'react-icons/fi'
 
 interface AdminSidebarProps {
@@ -97,7 +98,7 @@ export default function AdminSidebar({ role, currentPath }: AdminSidebarProps) {
     {
       title: 'Подписки',
       href: '/admin/subscriptions',
-      icon: FiCreditCard,
+      icon: FiRefreshCw,
       roles: ['super_admin'],
     },
     {
@@ -111,6 +112,12 @@ export default function AdminSidebar({ role, currentPath }: AdminSidebarProps) {
       href: '/admin/analytics',
       icon: FiBarChart2,
       roles: ['super_admin', 'moderator'],
+    },
+    {
+      title: 'Оплата',
+      href: '/admin/payments',
+      icon: FiCreditCard,
+      roles: ['super_admin'],
     },
     {
       title: 'Настройки',

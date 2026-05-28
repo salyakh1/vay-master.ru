@@ -10,7 +10,11 @@ import Link from 'next/link'
 import OrderPaymentModal from '@/components/OrderPaymentModal'
 import OrderLocationPicker from '@/components/OrderLocationPicker'
 
-const ORDER_POST_PRICE_RUB = 199
+type OrderPaymentSettings = {
+  paymentOrderPublicationEnabled: boolean
+  orderPublicationPriceRub: number
+  tinkoffReady: boolean
+}
 
 export default function NewOrderPage() {
   const router = useRouter()
@@ -24,9 +28,13 @@ export default function NewOrderPage() {
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
-  const [pendingSubmit, setPendingSubmit] = useState(false)
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([])
   const [loadingCategories, setLoadingCategories] = useState(true)
+  const [paymentSettings, setPaymentSettings] = useState<OrderPaymentSettings>({
+    paymentOrderPublicationEnabled: true,
+    orderPublicationPriceRub: 199,
+    tinkoffReady: false,
+  })
 
   if (authLoading) {
     return (
@@ -65,6 +73,19 @@ export default function NewOrderPage() {
     }
   }, [user])
 
+  useEffect(() => {
+    fetch('/api/payment/order-settings')
+      .then((r) => r.json())
+      .then((data) => {
+        setPaymentSettings({
+          paymentOrderPublicationEnabled: data.paymentOrderPublicationEnabled !== false,
+          orderPublicationPriceRub: typeof data.orderPublicationPriceRub === 'number' ? data.orderPublicationPriceRub : 199,
+          tinkoffReady: data.tinkoffReady === true,
+        })
+      })
+      .catch(() => {})
+  }, [])
+
   if (!user) {
     router.push('/auth/login')
     return null
@@ -81,42 +102,44 @@ export default function NewOrderPage() {
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const uploadOrderImages = async (): Promise<string[]> => {
+    if (!user || files.length === 0) return []
+    const uploadResults = await Promise.allSettled(
+      files.map(async (file, idx) => {
+        const ext = file.name.split('.').pop()
+        const path = `${user.id}/orders/${Date.now()}-${idx}.${ext || 'jpg'}`
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(path, file, { cacheControl: '3600', upsert: false })
+        if (uploadError) {
+          console.warn(`Failed to upload image ${idx + 1}:`, uploadError.message)
+          return null
+        }
+        const { data } = supabase.storage.from('product-images').getPublicUrl(path)
+        return data.publicUrl
+      })
+    )
+    return uploadResults
+      .map((result) => (result.status === 'fulfilled' ? result.value : null))
+      .filter((url): url is string => url !== null)
+  }
+
+  const parseBudgetNum = (): number | null => {
+    if (!budget.trim()) return null
+    const budgetNum = parseFloat(budget.replace(/\s/g, '').replace(',', '.'))
+    if (!isNaN(budgetNum) && budgetNum > 0) return budgetNum
+    return null
+  }
+
   const createOrder = async () => {
     if (!user) return
 
     setSaving(true)
     try {
-      // Загружаем изображения, если есть
       let imageUrls: string[] = []
-      
       if (files.length > 0) {
         try {
-          const uploadResults = await Promise.allSettled(
-            files.map(async (file, idx) => {
-              try {
-                const ext = file.name.split('.').pop()
-                const path = `${user.id}/orders/${Date.now()}-${idx}.${ext || 'jpg'}`
-                const { error: uploadError } = await supabase.storage
-                  .from('product-images')
-                  .upload(path, file, { cacheControl: '3600', upsert: false })
-                
-                if (uploadError) {
-                  console.warn(`Failed to upload image ${idx + 1}:`, uploadError.message)
-                  return null
-                }
-                
-                const { data } = supabase.storage.from('product-images').getPublicUrl(path)
-                return data.publicUrl
-              } catch (err: any) {
-                console.warn(`Error uploading image ${idx + 1}:`, err)
-                return null
-              }
-            })
-          )
-          
-          imageUrls = uploadResults
-            .map((result) => result.status === 'fulfilled' ? result.value : null)
-            .filter((url): url is string => url !== null)
+          imageUrls = await uploadOrderImages()
         } catch (err: any) {
           console.warn('Image upload process failed:', err)
         }
@@ -137,12 +160,8 @@ export default function NewOrderPage() {
         orderData.city = location.city.trim()
       }
 
-      if (budget.trim()) {
-        const budgetNum = parseFloat(budget.replace(/\s/g, '').replace(',', '.'))
-        if (!isNaN(budgetNum) && budgetNum > 0) {
-          orderData.budget = budgetNum
-        }
-      }
+      const b = parseBudgetNum()
+      if (b != null) orderData.budget = b
 
       const { data: newOrder, error: orderError } = await supabase
         .from('orders')
@@ -176,9 +195,69 @@ export default function NewOrderPage() {
       return
     }
 
-    // По вашему плану: заказ всегда платный → показываем оплату перед публикацией
-    setPendingSubmit(true)
+    if (!paymentSettings.paymentOrderPublicationEnabled) {
+      await createOrder()
+      return
+    }
     setShowPaymentModal(true)
+  }
+
+  const handleConfirmPayment = async () => {
+    if (!user) return
+
+    if (paymentSettings.tinkoffReady) {
+      setSaving(true)
+      try {
+        const imageUrls = await uploadOrderImages()
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        if (!token) {
+          alert('Войдите в аккаунт')
+          return
+        }
+        const budgetNum = parseBudgetNum()
+        const res = await fetch('/api/payments/tinkoff/create-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: title.trim(),
+            description: description.trim(),
+            category,
+            location: { city: location!.city.trim(), address: location!.address.trim() },
+            budget: budgetNum,
+            imageUrls,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Не удалось создать сессию оплаты')
+
+        const res2 = await fetch('/api/payments/tinkoff/init', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ sessionId: data.sessionId }),
+        })
+        const initData = await res2.json()
+        if (!res2.ok || !initData.paymentUrl) {
+          throw new Error(initData.error || 'Не удалось открыть оплату')
+        }
+        setShowPaymentModal(false)
+        window.location.href = initData.paymentUrl
+      } catch (e: any) {
+        alert(e?.message || 'Ошибка оплаты')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
+    setShowPaymentModal(false)
+    await createOrder()
   }
 
   return (
@@ -350,15 +429,11 @@ export default function NewOrderPage() {
         onClose={() => {
           if (saving) return
           setShowPaymentModal(false)
-          setPendingSubmit(false)
         }}
-        priceRub={ORDER_POST_PRICE_RUB}
+        priceRub={paymentSettings.orderPublicationPriceRub}
         loading={saving}
-        onConfirmPaid={async () => {
-          setShowPaymentModal(false)
-          await createOrder()
-          setPendingSubmit(false)
-        }}
+        tinkoffReady={paymentSettings.tinkoffReady}
+        onConfirmPaid={handleConfirmPayment}
       />
     </div>
   )

@@ -142,7 +142,7 @@ export default function RegisterPage() {
         } else if (role === 'seller') {
           router.push('/onboarding/seller')
         } else {
-          router.push('/')
+          router.push('/onboarding')
         }
       }
     } catch (error: any) {

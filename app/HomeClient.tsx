@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useAuth } from './providers'
@@ -23,7 +23,6 @@ import {
   FiMessageSquare,
   FiThumbsUp,
   FiAlertCircle,
-  FiTrendingUp,
   FiTarget,
   FiLock,
   FiEye,
@@ -39,14 +38,6 @@ const SpecializationCardsCarousel = dynamic(
   { ssr: false, loading: () => <div className="mb-8 h-[220px] bg-bg-secondary/50 rounded-xl animate-pulse" aria-hidden /> }
 )
 
-interface Stats {
-  totalUsers: number
-  masters: number
-  sellers: number
-  clients: number
-  completedOrders: number
-}
-
 interface HomeClientProps {
   initialBanners?: AdBanner[] | null
   initialCategories?: MasterCategoryWithCount[] | null
@@ -60,65 +51,6 @@ export default function HomeClient({
 }: HomeClientProps) {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [stats, setStats] = useState<Stats>({
-    totalUsers: 0,
-    masters: 0,
-    sellers: 0,
-    clients: 0,
-    completedOrders: 0,
-  })
-  const [statsLoading, setStatsLoading] = useState(false)
-  const [statsFetched, setStatsFetched] = useState(false)
-  const statsSectionRef = useRef<HTMLElement>(null)
-  useEffect(() => {
-    if (statsFetched || !statsSectionRef.current) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && !statsFetched) {
-            setStatsFetched(true)
-            fetchStats()
-            observer.disconnect()
-          }
-        })
-      },
-      { rootMargin: '200px' }
-    )
-    observer.observe(statsSectionRef.current)
-    return () => observer.disconnect()
-  }, [statsFetched])
-
-  const fetchStats = async () => {
-    if (statsLoading) return
-    try {
-      setStatsLoading(true)
-      const [
-        { count: totalCount },
-        { count: mastersCount },
-        { count: sellersCount },
-        { count: clientsCount },
-        { count: completedOrdersCount },
-      ] = await Promise.all([
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'master'),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'seller'),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'client'),
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
-      ])
-      setStats({
-        totalUsers: totalCount || 0,
-        masters: mastersCount || 0,
-        sellers: sellersCount || 0,
-        clients: clientsCount || 0,
-        completedOrders: completedOrdersCount || 0,
-      })
-    } catch (error) {
-      console.error('Error fetching stats:', error)
-    } finally {
-      setStatsLoading(false)
-    }
-  }
-
   const showGuestHero = loading || !user
 
   return (
@@ -126,16 +58,17 @@ export default function HomeClient({
       {user ? (
         <Navbar />
       ) : (
-        <header className="sticky top-0 z-40 h-32 border-b border-border-light bg-bg-card flex flex-col">
-          <div className="container mx-auto px-4 h-16 flex items-center justify-between flex-shrink-0">
-            <Link href="/" className="text-xl font-semibold text-graphite-secondary tracking-tight">
-              VAY-MASTER
-            </Link>
-            <Link href="/auth/login" className="text-sm font-medium text-brand-accent hover:underline">
-              Войти
-            </Link>
+        <header className="sticky top-0 z-40 glass-strong border-b border-white/20 shadow-glass backdrop-blur-md">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between h-16">
+              <Link href="/" className="text-xl font-semibold bg-gradient-to-r from-graphite-secondary via-brand-accent to-graphite-secondary bg-clip-text text-transparent tracking-tight hover:from-brand-accent hover:via-brand-accent-hover hover:to-brand-accent transition-all">
+                VAY-MASTER
+              </Link>
+              <Link href="/auth/login" className="text-sm font-medium text-brand-accent hover:text-brand-accent-hover transition-colors">
+                Войти
+              </Link>
+            </div>
           </div>
-          <div className="flex-1 min-h-0" aria-hidden />
         </header>
       )}
 
@@ -493,63 +426,28 @@ export default function HomeClient({
           </div>
         </section>
 
-        <section ref={statsSectionRef} className="max-w-6xl mx-auto mb-32">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-semibold text-graphite-secondary mb-4 tracking-tight">
-              VAY-MASTER в цифрах
-            </h2>
-            <p className="text-lg text-text-secondary">Растущее сообщество профессионалов</p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="card text-center hover:shadow-card-hover transition-all">
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 bg-brand-accent/10 rounded-lg flex items-center justify-center">
-                  <FiUsers size={32} className="text-brand-accent" strokeWidth={2} />
-                </div>
-              </div>
-              <div className="text-4xl md:text-5xl font-bold text-graphite-secondary mb-3 tracking-tight">
-                {statsLoading ? '...' : stats.totalUsers.toLocaleString('ru-RU')}
-              </div>
-              <div className="text-base text-text-secondary font-semibold">Пользователей</div>
+        <section className="max-w-6xl mx-auto mb-32 py-12 px-4">
+          <h2 className="text-4xl md:text-5xl font-semibold text-graphite-secondary mb-4 tracking-tight text-center">
+            Почему выбирают VAY-MASTER
+          </h2>
+          <p className="text-lg text-text-secondary text-center mb-8">
+            Платформа для мастеров, продавцов и клиентов в одном месте
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="card text-center border border-border-light">
+              <div className="text-3xl mb-2">🔍</div>
+              <p className="font-medium mb-1 text-graphite-secondary">Быстрый поиск</p>
+              <p className="text-sm text-text-secondary">Находите мастеров за минуты, а не дни</p>
             </div>
-            <div className="card text-center hover:shadow-card-hover transition-all">
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 bg-brand-accent/10 rounded-lg flex items-center justify-center">
-                  <FiBriefcase size={32} className="text-brand-accent" strokeWidth={2} />
-                </div>
-              </div>
-              <div className="text-4xl md:text-5xl font-bold text-graphite-secondary mb-3 tracking-tight">
-                {statsLoading ? '...' : stats.masters.toLocaleString('ru-RU')}
-              </div>
-              <div className="text-base text-text-secondary font-semibold">Мастеров</div>
+            <div className="card text-center border border-border-light">
+              <div className="text-3xl mb-2">⭐</div>
+              <p className="font-medium mb-1 text-graphite-secondary">Реальные отзывы</p>
+              <p className="text-sm text-text-secondary">Только от клиентов с выполненными заказами</p>
             </div>
-            <div className="card text-center hover:shadow-card-hover transition-all">
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 bg-brand-accent/10 rounded-lg flex items-center justify-center">
-                  <FiPackage size={32} className="text-brand-accent" strokeWidth={2} />
-                </div>
-              </div>
-              <div className="text-4xl md:text-5xl font-bold text-graphite-secondary mb-3 tracking-tight">
-                {statsLoading ? '...' : stats.sellers.toLocaleString('ru-RU')}
-              </div>
-              <div className="text-base text-text-secondary font-semibold">Продавцов</div>
-            </div>
-            <div className="card text-center hover:shadow-card-hover transition-all">
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 bg-brand-accent/10 rounded-lg flex items-center justify-center">
-                  <FiCheckCircle size={32} className="text-brand-accent" strokeWidth={2} />
-                </div>
-              </div>
-              <div className="text-4xl md:text-5xl font-bold text-graphite-secondary mb-3 tracking-tight">
-                {statsLoading ? '...' : stats.completedOrders.toLocaleString('ru-RU')}
-              </div>
-              <div className="text-base text-text-secondary font-semibold">Выполненных заказов</div>
-            </div>
-          </div>
-          <div className="text-center mt-8">
-            <div className="inline-flex items-center gap-2 px-6 py-3 bg-bg-secondary border border-border-light rounded-md">
-              <FiTrendingUp size={20} className="text-brand-accent" strokeWidth={2.5} />
-              <span className="text-base font-semibold text-graphite-secondary">Платформа растёт каждый день</span>
+            <div className="card text-center border border-border-light">
+              <div className="text-3xl mb-2">💬</div>
+              <p className="font-medium mb-1 text-graphite-secondary">Прямой контакт</p>
+              <p className="text-sm text-text-secondary">Общайтесь с мастером без посредников</p>
             </div>
           </div>
         </section>

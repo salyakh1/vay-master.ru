@@ -1,17 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const { success } = rateLimit(getClientIp(request), 60, 60_000)
+  if (!success) return rateLimitResponse()
+
   try {
     const searchParams = request.nextUrl.searchParams
     const query = (searchParams.get('q') || '').trim().toLowerCase()
     const type = searchParams.get('type') || 'all'
     const forSearch = searchParams.get('for') === 'search'
+    const forProducts = searchParams.get('for') === 'products'
 
     if (!query || query.length < 2) {
-      return NextResponse.json(forSearch ? { suggestions: [], main: null, services: [] } : { suggestions: [] })
+      return NextResponse.json(
+        forSearch ? { suggestions: [], main: null, services: [] } : forProducts ? { suggestions: [] } : { suggestions: [] }
+      )
+    }
+
+    // Режим «поиск товаров»: 1 категория/подкатегория каталога + 3 товара (с названием категории)
+    if (forProducts) {
+      const mainList: Array<{ id: string; name: string; type: 'category' | 'subcategory' }> = []
+      const productsList: Array<{ id: string; name: string; category_name: string | null }> = []
+
+      const [subRes, catRes, prodRes] = await Promise.all([
+        supabase.from('product_subcategories').select('id, name').ilike('name', `%${query}%`).limit(1),
+        supabase.from('product_categories').select('id, name').ilike('name', `%${query}%`).limit(1),
+        supabase
+          .from('products')
+          .select('id, name, product_categories(name)')
+          .ilike('name', `%${query}%`)
+          .eq('in_stock', true)
+          .limit(3),
+      ])
+
+      if (subRes.data?.length) {
+        mainList.push(...subRes.data.map((s) => ({ id: s.id, name: s.name, type: 'subcategory' as const })))
+      }
+      if (catRes.data?.length && mainList.length === 0) {
+        mainList.push(...catRes.data.map((c) => ({ id: c.id, name: c.name, type: 'category' as const })))
+      }
+      if (prodRes.data?.length) {
+        for (const row of prodRes.data as any[]) {
+          const catName = row.product_categories?.name ?? null
+          productsList.push({ id: row.id, name: row.name, category_name: catName })
+        }
+      }
+
+      const mainOne = mainList[0] ?? null
+      const suggestions = [
+        ...(mainOne ? [{ id: mainOne.id, name: mainOne.name, type: mainOne.type, category_name: null as string | null }] : []),
+        ...productsList.map((p) => ({ id: p.id, name: p.name, type: 'product' as const, category_name: p.category_name })),
+      ]
+      return NextResponse.json({ suggestions })
     }
 
     // Режим «поиск мастеров»: 1 подсказка (категория/подкатегория) + 3 услуги (с названием категории)

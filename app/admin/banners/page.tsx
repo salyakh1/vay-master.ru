@@ -101,6 +101,8 @@ export default function AdminBannersPage() {
       pricing_model: 'fixed',
       show_badge: true,
       badge_text: 'Реклама',
+      show_title: true,
+      show_description: true,
     })
     setShowCreateModal(true)
   }
@@ -152,6 +154,8 @@ export default function AdminBannersPage() {
       pricing_model: 'fixed',
       show_badge: true,
       badge_text: 'Реклама',
+      show_title: true,
+      show_description: true,
     })
     setShowCreateModal(true)
   }
@@ -249,6 +253,8 @@ export default function AdminBannersPage() {
         pricing_model: editingBanner.pricing_model || 'fixed',
         show_badge: editingBanner.show_badge ?? true,
         badge_text: editingBanner.badge_text || 'Реклама',
+        show_title: editingBanner.show_title ?? true,
+        show_description: editingBanner.show_description ?? true,
         created_by: currentUser.id,
       }
 
@@ -702,6 +708,35 @@ export default function AdminBannersPage() {
                     rows={3}
                     placeholder="Описание (для типов с текстом)"
                   />
+                </div>
+
+                <div className="border border-border-light rounded-lg p-4 bg-bg-secondary/50">
+                  <p className="text-sm font-medium text-text-primary mb-3">
+                    Скрыть название и описание на баннере
+                  </p>
+                  <p className="text-xs text-text-secondary mb-3">
+                    Снимите галочку, чтобы не показывать название или описание на самом баннере (на сайте).
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingBanner.show_title !== false}
+                        onChange={(e) => setEditingBanner({ ...editingBanner, show_title: e.target.checked })}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-text-primary">Показывать название на баннере</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingBanner.show_description !== false}
+                        onChange={(e) => setEditingBanner({ ...editingBanner, show_description: e.target.checked })}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-text-primary">Показывать описание на баннере</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div>

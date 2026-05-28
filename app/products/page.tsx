@@ -11,7 +11,8 @@ import AdBannerSlider from '@/components/AdBannerSlider'
 import AdSlot from '@/components/AdSlot'
 import Link from 'next/link'
 import { 
-  FiFilter, 
+  FiSearch,
+  FiSliders,
   FiHome, 
   FiTool, 
   FiDroplet, 
@@ -147,6 +148,11 @@ function ProductsContent() {
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
+  const [productSuggestions, setProductSuggestions] = useState<Array<{ id: string; name: string; type: string; category_name?: string | null }>>([])
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false)
+  const [loadingProductSuggestions, setLoadingProductSuggestions] = useState(false)
+  const productSearchWrapperRef = useRef<HTMLDivElement>(null)
+  const productAutocompleteAbortRef = useRef<AbortController | null>(null)
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryIds, setSubcategoryIds] = useState<string[]>([])
   const [cityFilter, setCityFilter] = useState('')
@@ -432,6 +438,49 @@ function ProductsContent() {
     }
   }, [showFilters]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Подсказки при вводе в поиске товаров: 1 категория/подкатегория + 3 товара (с категорией)
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (q.length < 2) {
+      setProductSuggestions([])
+      setShowProductSuggestions(false)
+      return
+    }
+    if (productAutocompleteAbortRef.current) productAutocompleteAbortRef.current.abort()
+    const ctrl = new AbortController()
+    productAutocompleteAbortRef.current = ctrl
+    setLoadingProductSuggestions(true)
+    const t = setTimeout(() => {
+      fetch(`/api/autocomplete?q=${encodeURIComponent(q)}&for=products`, { signal: ctrl.signal })
+        .then((r) => (r.ok ? r.json() : { suggestions: [] }))
+        .then((data) => {
+          if (ctrl.signal.aborted) return
+          setProductSuggestions(data.suggestions || [])
+          setShowProductSuggestions((data.suggestions?.length || 0) > 0)
+        })
+        .catch(() => {
+          if (!ctrl.signal.aborted) setProductSuggestions([])
+        })
+        .finally(() => {
+          if (!ctrl.signal.aborted) setLoadingProductSuggestions(false)
+        })
+    }, 300)
+    return () => {
+      clearTimeout(t)
+      ctrl.abort()
+    }
+  }, [searchQuery])
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (productSearchWrapperRef.current && !productSearchWrapperRef.current.contains(e.target as Node)) {
+        setShowProductSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+
   // Загружаем товары только когда модалка фильтра закрыта (чтобы выбор каталогов не обновлял страницу)
   useEffect(() => {
     if (showFilters) return
@@ -610,13 +659,18 @@ function ProductsContent() {
         </div>
 
         {/* Search */}
-        <div className="mb-4 relative">
+        <div className="mb-4 relative" ref={productSearchWrapperRef}>
+          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" size={16} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск товаров..."
-            className="w-full input pr-10 h-10 text-sm"
+            onFocus={() => searchQuery.trim().length >= 2 && productSuggestions.length > 0 && setShowProductSuggestions(true)}
+            placeholder="Например: перфоратор, кирпич..."
+            className="w-full input pl-12 pr-11 h-10 text-sm"
+            autoComplete="off"
+            aria-autocomplete="list"
+            aria-expanded={showProductSuggestions && productSuggestions.length > 0}
           />
           <button
             type="button"
@@ -625,13 +679,49 @@ function ProductsContent() {
               setShowFilters(next)
               if (next) setFilterStep('categories')
             }}
-            className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors ${
+            className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors ${
               showFilters ? 'bg-brand-accent text-white' : 'text-text-secondary hover:text-graphite-secondary hover:bg-bg-secondary'
             }`}
             title="Фильтры"
           >
-            <FiFilter size={16} />
+            <FiSliders size={18} />
           </button>
+          {showProductSuggestions && productSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-lg border border-border-light shadow-md overflow-hidden">
+              {loadingProductSuggestions ? (
+                <div className="px-3 py-2 text-xs text-text-muted">Загрузка…</div>
+              ) : (
+                <ul className="py-0.5 max-h-[220px] overflow-y-auto">
+                  {productSuggestions.map((item) => {
+                    const isCategory = item.type === 'category' || item.type === 'subcategory'
+                    return (
+                      <li key={`${item.type}-${item.id}`}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery(item.name)
+                            setShowProductSuggestions(false)
+                            setProductSuggestions([])
+                          }}
+                          className="w-full text-left px-3 py-1.5 hover:bg-bg-secondary transition-colors flex flex-col gap-0.5"
+                        >
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-xs text-graphite-secondary truncate">{item.name}</span>
+                            {isCategory && (
+                              <span className="flex-shrink-0 text-[10px] text-brand-accent font-medium">Категория</span>
+                            )}
+                          </span>
+                          {!isCategory && item.category_name && (
+                            <span className="text-[10px] text-text-muted truncate">{item.category_name}</span>
+                          )}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Полноэкранная модалка фильтров: город + категория/каталог */}

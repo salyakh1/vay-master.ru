@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '../providers'
 import { isAdmin, getAdminRole, type AdminRole } from '@/lib/admin'
+import { createLogger } from '@/lib/logger'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import AdminHeader from '@/components/admin/AdminHeader'
+
+const logger = createLogger('admin')
 
 export default function AdminLayout({
   children,
@@ -38,29 +41,29 @@ export default function AdminLayout({
         return
       }
 
-      console.log('Admin check: Checking admin status for user:', user.id)
+      logger.debug('Checking admin status for user', user.id)
       try {
         const isUserAdmin = await isAdmin(user.id)
-        console.log('Admin check: isAdmin result:', isUserAdmin)
-        
+        logger.debug('isAdmin result', isUserAdmin)
+
         if (!isUserAdmin) {
-          console.log('Admin check: User is not admin')
+          logger.debug('User is not admin')
           setError(`У пользователя ${user.id} нет прав администратора.\n\nВыполните SQL скрипт supabase/assign_admin_current_user.sql в Supabase SQL Editor.`)
           setChecking(false)
           return
         }
 
         const role = await getAdminRole(user.id)
-        console.log('Admin check: Admin role:', role)
-        
+        logger.debug('Admin role', role)
+
         if (!role) {
-          console.log('Admin check: No admin role found')
+          logger.debug('No admin role found')
           setError(`Роль администратора не найдена для пользователя ${user.id}`)
           setChecking(false)
           return
         }
         
-        console.log('Admin check: Success! Role:', role)
+        logger.debug('Admin access granted', role)
         setAdminRole(role)
         setChecking(false)
         setError(null)

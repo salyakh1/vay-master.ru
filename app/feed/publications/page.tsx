@@ -59,8 +59,28 @@ export default function PublicationsPage() {
 
   const GRID_COLUMN_COUNT = 3
   const GRID_GAP = 8
-  const ITEMS_PER_PAGE = 12
+  /** Первая загрузка — сколько карточек помещается на экран в сетке; дальше подгрузка по 9 */
+  const LOAD_MORE_PAGE_SIZE = 9
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
+
+  // Сколько карточек влезает на экран (сетка 3 колонки, aspect-square)
+  const [initialPageSize, setInitialPageSize] = useState(9)
+  useEffect(() => {
+    const update = () => {
+      if (typeof window === 'undefined') return
+      const w = window.innerWidth
+      const h = window.innerHeight
+      const padding = 48
+      const headerFilters = 320
+      const cellSize = (w - padding) / 3 + GRID_GAP
+      const rows = Math.floor((h - headerFilters) / cellSize)
+      const count = Math.max(LOAD_MORE_PAGE_SIZE, rows * GRID_COLUMN_COUNT)
+      setInitialPageSize(count)
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
 
   // Загружаем подкатегории мастера для рекомендаций «под ваши услуги»
   const [masterSubcategorySlugs, setMasterSubcategorySlugs] = useState<string[]>([])
@@ -131,9 +151,9 @@ export default function PublicationsPage() {
       setPage(1)
       setItems([])
       setHasMore(true)
-      fetchAllContent(1, true)
+      fetchAllContent(0, initialPageSize, true)
     }
-  }, [user, contentType, cityFilter])
+  }, [user, contentType, cityFilter, initialPageSize])
 
   // Клик по плитке в сетке => переключаемся в ленту и скроллим к выбранному элементу
   useEffect(() => {
@@ -143,7 +163,7 @@ export default function PublicationsPage() {
     })
   }, [viewMode, activeItemId])
 
-  const fetchAllContent = async (pageNum: number = 1, reset: boolean = false) => {
+  const fetchAllContent = async (offset: number, limit: number, reset: boolean) => {
     try {
       if (reset) {
         setLoading(true)
@@ -151,8 +171,8 @@ export default function PublicationsPage() {
         setLoadingMore(true)
       }
       
-      const from = (pageNum - 1) * ITEMS_PER_PAGE
-      const to = from + ITEMS_PER_PAGE - 1
+      const from = offset
+      const to = offset + limit - 1
       
       // Загружаем работы мастеров (portfolio_items)
       let portfolioResult: any = { data: [], error: null }
@@ -285,8 +305,8 @@ export default function PublicationsPage() {
       }
       
       // Проверяем, есть ли ещё данные
-      const hasMorePortfolio = contentType !== 'products' && portfolioResult.data?.length === ITEMS_PER_PAGE
-      const hasMoreProducts = contentType !== 'portfolio' && productsResult.data?.length === ITEMS_PER_PAGE
+      const hasMorePortfolio = contentType !== 'products' && (portfolioResult.data?.length ?? 0) === limit
+      const hasMoreProducts = contentType !== 'portfolio' && (productsResult.data?.length ?? 0) === limit
       setHasMore(hasMorePortfolio || hasMoreProducts)
     } catch (error) {
       console.error('Error fetching all content:', error)
@@ -297,10 +317,9 @@ export default function PublicationsPage() {
   }
 
   const loadMore = () => {
-    if (!loadingMore && hasMore) {
-      const nextPage = page + 1
-      setPage(nextPage)
-      fetchAllContent(nextPage, false)
+    if (!loadingMore && hasMore && user) {
+      setPage((p) => p + 1)
+      fetchAllContent(items.length, LOAD_MORE_PAGE_SIZE, false)
     }
   }
 

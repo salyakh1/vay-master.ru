@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,6 +17,9 @@ const ITEMS_PER_PAGE = 20
  * Поиск мастеров: текст, город, категория, подкатегория, услуга.
  */
 export async function GET(request: NextRequest) {
+  const { success } = rateLimit(getClientIp(request), 60, 60_000)
+  if (!success) return rateLimitResponse()
+
   try {
     const { searchParams } = new URL(request.url)
     const q = (searchParams.get('q') || '').trim()

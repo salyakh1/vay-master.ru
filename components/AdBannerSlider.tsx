@@ -216,14 +216,19 @@ export default function AdBannerSlider({
                         decoding={index === 0 ? 'sync' : 'async'}
                         fetchPriority={index === 0 ? 'high' : 'low'}
                       />
-                      {(banner.title || getTopLabel(banner)) && (
+                      {(banner.show_title !== false && (banner.title || getTopLabel(banner))) && (
                         <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent rounded-b-[18px]">
                           <span className="text-[11px] font-semibold uppercase tracking-wide text-white/90">
                             {getTopLabel(banner)}
                           </span>
-                          <h2 className="font-bold text-white leading-tight line-clamp-2 text-sm sm:text-base">
-                            {banner.title}
-                          </h2>
+                          {banner.title && (
+                            <h2 className="font-bold text-white leading-tight line-clamp-2 text-sm sm:text-base">
+                              {banner.title}
+                            </h2>
+                          )}
+                          {banner.show_description !== false && banner.description && (
+                            <p className="text-white/80 text-xs line-clamp-2 mt-0.5">{banner.description}</p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -238,18 +243,24 @@ export default function AdBannerSlider({
                           paddingRight: 12,
                         }}
                       >
-                        <span
-                          className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary"
-                          style={{ marginBottom: 2 }}
-                        >
-                          {getTopLabel(banner)}
-                        </span>
-                        <h1
-                          className="font-bold text-graphite-secondary leading-tight line-clamp-2"
-                          style={{ fontSize: 'clamp(20px, 5vw, 24px)' }}
-                        >
-                          {banner.title}
-                        </h1>
+                        {banner.show_title !== false && (
+                          <>
+                            <span
+                              className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary"
+                              style={{ marginBottom: 2 }}
+                            >
+                              {getTopLabel(banner)}
+                            </span>
+                            {banner.title && (
+                              <h1
+                                className="font-bold text-graphite-secondary leading-tight line-clamp-2"
+                                style={{ fontSize: 'clamp(20px, 5vw, 24px)' }}
+                              >
+                                {banner.title}
+                              </h1>
+                            )}
+                          </>
+                        )}
                         {getBadgeOffer(banner) && getBadgeOffer(banner) !== getTopLabel(banner) && (
                           <span
                             className="inline-block px-3 py-1.5 rounded-2xl text-xs font-medium bg-brand-accent text-white w-fit"
@@ -258,7 +269,7 @@ export default function AdBannerSlider({
                             {getBadgeOffer(banner)}
                           </span>
                         )}
-                        {banner.description && ((banner.show_badge && banner.badge_text) || !getBadgeOffer(banner)) && (
+                        {banner.show_description !== false && banner.description && ((banner.show_badge && banner.badge_text) || !getBadgeOffer(banner)) && (
                           <p className="text-text-secondary line-clamp-2 text-sm break-words" style={{ fontSize: 14 }}>
                             {banner.description}
                           </p>

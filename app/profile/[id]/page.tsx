@@ -14,7 +14,7 @@ import PortfolioGrid from '@/components/PortfolioGrid'
 const PortfolioGallery = dynamic(() => import('@/components/PortfolioGallery'), {
   ssr: false,
 })
-import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock, FiArrowLeft, FiLogOut, FiUser, FiShield, FiHeart, FiShoppingBag, FiChevronDown, FiChevronUp, FiSend } from 'react-icons/fi'
+import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock, FiArrowLeft, FiLogOut, FiUser, FiShield, FiHeart, FiShoppingBag, FiChevronDown, FiChevronUp, FiSend, FiTarget } from 'react-icons/fi'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
@@ -110,6 +110,8 @@ export default function ProfilePage() {
   const [city, setCity] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
+  const [searchRadiusKm, setSearchRadiusKm] = useState<number>(25)
+  const [savingRadius, setSavingRadius] = useState(false)
   
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('')
