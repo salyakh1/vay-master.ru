@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { AdBanner, AdContext, AdType } from '@/lib/supabase'
+import { useAuth } from '@/app/providers'
+import { profileLoginUrl } from '@/lib/guest-access'
 import { FiExternalLink, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 
 interface AdSlotProps {
@@ -26,6 +28,7 @@ export default function AdSlot({
   index = 0,
 }: AdSlotProps) {
   const router = useRouter()
+  const { user } = useAuth()
   const [ad, setAd] = useState<AdBanner | null>(null)
   const [ads, setAds] = useState<AdBanner[]>([]) // Для INLINE_CONTEXT карусели
   const [currentAdIndex, setCurrentAdIndex] = useState(0)
@@ -219,7 +222,7 @@ export default function AdSlot({
     if (ad.target_type === 'external_url' && ad.external_url) {
       window.open(ad.external_url, '_blank', 'noopener,noreferrer')
     } else if (ad.target_type === 'master' && ad.target_id) {
-      router.push(`/profile/${ad.target_id}`)
+      router.push(user ? `/profile/${ad.target_id}` : profileLoginUrl(ad.target_id))
     } else if (ad.target_type === 'product' && ad.target_id) {
       router.push(`/products/${ad.target_id}`)
     } else if (ad.target_type === 'category' && ad.target_id) {

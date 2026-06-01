@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
+import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import { supabase, User, Product } from '@/lib/supabase'
 import { FiMapPin, FiShoppingBag, FiX, FiNavigation, FiFilter } from 'react-icons/fi'
 import { configureLeafletIcons } from '@/lib/leaflet'
@@ -373,12 +374,12 @@ export default function StoresMap({ masterLocation, onSellerClick, className = '
                           </div>
                         ) : null}
 
-                        <Link
-                          href={`/profile/${point.seller.id}`}
+                        <GuestAwareProfileLink
+                          profileId={point.seller.id}
                           className="block mt-3 text-center text-sm text-brand-accent font-medium hover:underline"
                         >
                           Открыть профиль продавца
-                        </Link>
+                        </GuestAwareProfileLink>
                       </div>
                     </div>
                   </Popup>

@@ -9,6 +9,8 @@ import Navbar from '@/components/Navbar'
 import { FiMessageCircle, FiShoppingCart, FiChevronLeft, FiChevronRight, FiArrowLeft, FiUser } from 'react-icons/fi'
 import Link from 'next/link'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
+import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
+import { loginUrl, sanitizeProductForGuest } from '@/lib/guest-access'
 import ReviewCard from '@/components/ReviewCard'
 import ReviewForm from '@/components/ReviewForm'
 import ReviewReplyForm from '@/components/ReviewReplyForm'
@@ -34,12 +36,6 @@ export default function ProductPage() {
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [editingReview, setEditingReview] = useState<any>(null)
   const [replyingToReview, setReplyingToReview] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      setShowAuthModal(true)
-    }
-  }, [user, authLoading])
 
   useEffect(() => {
     if (params.id) {
@@ -140,7 +136,8 @@ export default function ProductPage() {
         .single()
 
       if (error) throw error
-      setProduct(data as Product)
+      const { data: { session } } = await supabase.auth.getSession()
+      setProduct(sanitizeProductForGuest(data as Product, !!session?.user))
     } catch (error) {
       console.error('Error fetching product:', error)
     } finally {
@@ -149,9 +146,14 @@ export default function ProductPage() {
   }
 
   const handleContact = async () => {
-    if (!user || !product) return
+    if (!product) return
+    const productId = Array.isArray(params.id) ? params.id[0] : params.id
+    if (!user) {
+      router.push(loginUrl(productId ? `/products/${productId}` : '/products'))
+      return
+    }
 
-    const seller = product.seller as any
+    const seller = product.seller as { id: string }
     try {
       const { data: existingChat } = await supabase
         .from('chats')
@@ -233,16 +235,30 @@ export default function ProductPage() {
     )
   }
 
-  if (!product || !user) return null
+  if (!product) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-bg-primary">
+        <p className="text-text-secondary">Товар не найден</p>
+      </div>
+    )
+  }
 
-  const seller = product.seller as any
-  const isOwner = user.id === seller.id
+  const seller = product.seller as {
+    id: string
+    full_name?: string
+    avatar_url?: string
+    city?: string
+    store_address?: string
+    phone?: string
+    description?: string
+  }
+  const isOwner = user?.id === seller.id
   const images = product.images || []
   const mainImage = images[activeImage] || images[0]
 
   return (
     <div className="min-h-screen bg-white pb-20">
-      <Navbar />
+      {user && <Navbar />}
       <div className="container mx-auto px-4 py-4">
         <div className="max-w-6xl mx-auto">
           {/* Back Button */}
@@ -366,15 +382,15 @@ export default function ProductPage() {
                         <FiMessageCircle size={18} strokeWidth={2.5} />
                         Написать продавцу
                       </button>
-                      <Link
-                        href={`/profile/${seller.id}`}
+                      <GuestAwareProfileLink
+                        profileId={seller.id}
                         className="btn btn-outline flex items-center justify-center gap-2 px-6"
                       >
                         <FiUser size={18} strokeWidth={2.5} />
                         Профиль
-                      </Link>
+                      </GuestAwareProfileLink>
                     </div>
-                    {user.role !== 'seller' && (
+                    {user && user.role !== 'seller' && (
                       <button className="w-full btn btn-secondary flex items-center justify-center gap-2">
                         <FiShoppingCart size={18} strokeWidth={2.5} />
                         В корзину
@@ -396,7 +412,7 @@ export default function ProductPage() {
               {/* Seller Info */}
               <div className="card">
                 <h2 className="text-xl font-semibold mb-4">Продавец</h2>
-                <Link href={`/profile/${seller.id}`}>
+                <GuestAwareProfileLink profileId={seller.id} className="block">
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-16 h-16 bg-black border border-gray-200 flex items-center justify-center text-white text-sm font-bold">
                       {seller.avatar_url ? (
@@ -406,7 +422,7 @@ export default function ProductPage() {
                           className="w-full h-full rounded-full object-cover"
                         />
                       ) : (
-                        seller.full_name[0]?.toUpperCase() || '?'
+                        seller.full_name?.[0]?.toUpperCase() || '?'
                       )}
                     </div>
                     <div>
@@ -418,11 +434,17 @@ export default function ProductPage() {
                       )}
                     </div>
                   </div>
-                </Link>
-                {seller.phone && (
+                </GuestAwareProfileLink>
+                {user && seller.phone && (
                   <div className="text-sm text-gray-600 mb-2">
                     Телефон: {seller.phone}
                   </div>
+                )}
+                {!user && (
+                  <p className="text-sm text-gray-500 mb-2 flex items-center gap-1">
+                    <FiUser size={14} />
+                    Телефон и чат доступны после входа
+                  </p>
                 )}
                 {seller.description && (
                   <p className="text-sm text-gray-600">{seller.description}</p>

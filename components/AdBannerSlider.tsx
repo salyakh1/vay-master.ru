@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdBanner } from '@/lib/supabase'
+import { useAuth } from '@/app/providers'
+import { profileLoginUrl } from '@/lib/guest-access'
 
 interface AdBannerSliderProps {
   page: 'home' | 'search' | 'orders' | 'products' | 'feed'
@@ -44,6 +46,7 @@ export default function AdBannerSlider({
   initialBanners = null,
 }: AdBannerSliderProps) {
   const router = useRouter()
+  const { user } = useAuth()
   const [banners, setBanners] = useState<AdBanner[]>(initialBanners ?? [])
   const [loading, setLoading] = useState(!(initialBanners && initialBanners.length > 0))
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -133,7 +136,10 @@ export default function AdBannerSlider({
       window.open(banner.external_url, '_blank', 'noopener,noreferrer')
       return
     }
-    if (banner.target_type === 'master' && banner.target_id) { router.push(`/profile/${banner.target_id}`); return }
+    if (banner.target_type === 'master' && banner.target_id) {
+      router.push(user ? `/profile/${banner.target_id}` : profileLoginUrl(banner.target_id))
+      return
+    }
     if (banner.target_type === 'product' && banner.target_id) { router.push(`/products/${banner.target_id}`); return }
     if (banner.target_type === 'category' && banner.target_id) { router.push(`/products?category=${banner.target_id}`); return }
     if (banner.target_type === 'order' && banner.target_id) { router.push(`/orders/${banner.target_id}`); return }

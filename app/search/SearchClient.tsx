@@ -10,7 +10,8 @@ import Navbar from '@/components/Navbar'
 import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
 import { FiSearch, FiUser, FiSliders, FiMapPin, FiBriefcase, FiStar, FiCheckCircle } from 'react-icons/fi'
-import AuthRequiredModal from '@/components/AuthRequiredModal'
+import { profileLoginUrl } from '@/lib/guest-access'
+import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import AdSlot from '@/components/AdSlot'
 import StoriesCircle from '@/components/StoriesCircle'
 import dynamic from 'next/dynamic'
@@ -139,7 +140,6 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const [filterStepMasters, setFilterStepMasters] = useState<'category' | 'subcategory' | 'service'>('category')
   const [categoriesForFilter, setCategoriesForFilter] = useState<Array<{ id: string; name: string; slug: string; image_url?: string | null; masters_count?: number }>>([])
   const [filterImageFailed, setFilterImageFailed] = useState<Set<string>>(new Set())
-  const [showAuthModal, setShowAuthModal] = useState(false)
   const [stories, setStories] = useState<Story[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
   const [mastersPage, setMastersPage] = useState(1)
@@ -968,15 +968,13 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                             <div className="grid grid-cols-2 gap-2">
                               {row.masters.map((master) =>
                                 master ? (
-                                  user ? (
-                                    <Link key={master.id} href={`/profile/${master.id}`}>
-                                      <MasterCardContent master={master} />
-                                    </Link>
-                                  ) : (
-                                    <div key={master.id} onClick={() => setShowAuthModal(true)} className="cursor-pointer">
-                                      <MasterCardContent master={master} />
-                                    </div>
-                                  )
+                                  <GuestAwareProfileLink
+                                    key={master.id}
+                                    profileId={master.id}
+                                    className="block"
+                                  >
+                                    <MasterCardContent master={master} />
+                                  </GuestAwareProfileLink>
                                 ) : null
                               )}
                             </div>
@@ -1033,15 +1031,13 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                           <div className="grid grid-cols-2 gap-2">
                             {row.masters.map((master) =>
                               master ? (
-                                user ? (
-                                  <Link key={master.id} href={`/profile/${master.id}`}>
-                                    <MasterCardContent master={master} />
-                                  </Link>
-                                ) : (
-                                  <div key={master.id} onClick={() => setShowAuthModal(true)} className="cursor-pointer">
-                                    <MasterCardContent master={master} />
-                                  </div>
-                                )
+                                <GuestAwareProfileLink
+                                  key={master.id}
+                                  profileId={master.id}
+                                  className="block"
+                                >
+                                  <MasterCardContent master={master} />
+                                </GuestAwareProfileLink>
                               ) : null
                             )}
                           </div>
@@ -1078,58 +1074,15 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
         </div>
       </div>
 
-      {/* Auth Required Modal */}
-      <AuthRequiredModal 
-        isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)} 
-        type="master"
-      />
-    </div>
-  )
-}
-
-function SearchGuestPrompt({ onBrowse }: { onBrowse: () => void }) {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-bg-primary">
-      <div className="max-w-md w-full text-center">
-        <h1 className="text-2xl font-semibold mb-2 text-graphite-secondary">Найдите мастера</h1>
-        <p className="text-text-secondary mb-6">
-          Войдите, чтобы увидеть мастеров рядом с вами и написать им напрямую
-        </p>
-        <Link
-          href="/auth/login"
-          className="block w-full bg-brand-accent text-white px-6 py-3 rounded-xl font-medium mb-3"
-        >
-          Войти
-        </Link>
-        <Link
-          href="/auth/register"
-          className="block text-text-secondary underline text-sm mb-6"
-        >
-          Зарегистрироваться бесплатно
-        </Link>
-        <button
-          type="button"
-          onClick={onBrowse}
-          className="text-sm text-text-muted hover:text-text-secondary transition-colors"
-        >
-          Продолжить просмотр без входа
-        </button>
-      </div>
     </div>
   )
 }
 
 export default function SearchClient() {
-  const { user, loading: authLoading } = useAuth()
-  const [browseAsGuest, setBrowseAsGuest] = useState(false)
+  const { loading: authLoading } = useAuth()
 
   if (authLoading) {
     return <SearchLoading />
-  }
-
-  if (!user && !browseAsGuest) {
-    return <SearchGuestPrompt onBrowse={() => setBrowseAsGuest(true)} />
   }
 
   return (

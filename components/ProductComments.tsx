@@ -8,6 +8,7 @@ import { FiSend, FiEdit2, FiTrash2, FiMessageCircle } from 'react-icons/fi'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
+import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 
 const INITIAL_REPLIES_VISIBLE = 10
 
@@ -212,7 +213,7 @@ export default function ProductComments({ productId, currentUser, openReplyToId 
     return (
       <div id={`comment-${comment.id}`} className={`${level > 0 ? 'ml-8 mt-3 border-l-2 border-border-light/40 pl-4' : ''}`}>
         <div className="flex gap-3">
-          <Link href={`/profile/${comment.author_id}`} className="flex-shrink-0">
+          <GuestAwareProfileLink profileId={comment.author_id} className="flex-shrink-0 block">
             <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-border-light/60">
               {comment.author?.avatar_url ? (
                 <Image
@@ -229,13 +230,16 @@ export default function ProductComments({ productId, currentUser, openReplyToId 
                 </div>
               )}
             </div>
-          </Link>
+          </GuestAwareProfileLink>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between mb-1">
               <div className="flex-1 min-w-0">
-                <Link href={`/profile/${comment.author_id}`} className="font-semibold text-graphite-secondary hover:text-brand-accent transition-colors">
+                <GuestAwareProfileLink
+                  profileId={comment.author_id}
+                  className="font-semibold text-graphite-secondary hover:text-brand-accent transition-colors"
+                >
                   {comment.author?.full_name || 'Пользователь'}
-                </Link>
+                </GuestAwareProfileLink>
                 <span className="text-xs text-text-secondary ml-2">{timeAgo}</span>
               </div>
               {isOwnComment && (

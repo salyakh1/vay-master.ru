@@ -42,6 +42,7 @@ import {
   FiX
 } from 'react-icons/fi'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
+import { sanitizeProductsForGuest } from '@/lib/guest-access'
 import StoriesCircle from '@/components/StoriesCircle'
 import NearbyProductsCarousel from '@/components/NearbyProductsCarousel'
 import { Story } from '@/lib/supabase'
@@ -605,7 +606,7 @@ function ProductsContent() {
 
       if (error) throw error
 
-      const list = (data || []) as Product[]
+      const list = sanitizeProductsForGuest((data || []) as Product[], !!user)
 
       if (reset) {
         setProducts(list)
@@ -1045,48 +1046,11 @@ function ProductsContent() {
   )
 }
 
-function ProductsGuestPrompt({ onBrowse }: { onBrowse: () => void }) {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-bg-primary">
-      <div className="max-w-md w-full text-center">
-        <h1 className="text-2xl font-semibold mb-2 text-graphite-secondary">Каталог товаров</h1>
-        <p className="text-text-secondary mb-6">
-          Войдите, чтобы видеть товары рядом с вами и добавлять свои предложения
-        </p>
-        <Link
-          href="/auth/login"
-          className="block w-full bg-brand-accent text-white px-6 py-3 rounded-xl font-medium mb-3"
-        >
-          Войти
-        </Link>
-        <Link
-          href="/auth/register"
-          className="block text-text-secondary underline text-sm mb-6"
-        >
-          Зарегистрироваться бесплатно
-        </Link>
-        <button
-          type="button"
-          onClick={onBrowse}
-          className="text-sm text-text-muted hover:text-text-secondary transition-colors"
-        >
-          Продолжить просмотр без входа
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export default function ProductsClient() {
-  const { user, loading: authLoading } = useAuth()
-  const [browseAsGuest, setBrowseAsGuest] = useState(false)
+  const { loading: authLoading } = useAuth()
 
   if (authLoading) {
     return <ProductsLoading />
-  }
-
-  if (!user && !browseAsGuest) {
-    return <ProductsGuestPrompt onBrowse={() => setBrowseAsGuest(true)} />
   }
 
   return (

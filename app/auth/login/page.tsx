@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnTo = searchParams.get('returnTo') || '/'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -34,8 +36,7 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        // После авторизации все пользователи перенаправляются на главную страницу
-        router.push('/')
+        router.push(returnTo.startsWith('/') ? returnTo : '/')
       }
     } catch (error: any) {
       const msg = error?.message || ''
@@ -111,6 +112,18 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-lg text-gray-500">Загрузка...</div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
 

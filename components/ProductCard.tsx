@@ -1,11 +1,10 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import { Product, User } from '@/lib/supabase'
 import { FiShoppingBag, FiStar } from 'react-icons/fi'
 import Link from 'next/link'
 import Image from 'next/image'
-import AuthRequiredModal from './AuthRequiredModal'
 
 interface ProductCardProps {
   product: Product
@@ -13,8 +12,7 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product, currentUser }: ProductCardProps) {
-  const seller = product.seller as any
-  const [showAuthModal, setShowAuthModal] = useState(false)
+  const seller = product.seller as { full_name?: string } | undefined
   const categoryName = product.category_ref?.name || product.subcategory_ref?.name
 
   const ProductCardContent = (
@@ -79,25 +77,10 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
     </div>
   )
 
-  if (currentUser) {
-    return (
-      <Link href={`/products/${product.id}`} className="block h-full">
-        {ProductCardContent}
-      </Link>
-    )
-  }
-
   return (
-    <>
-      <div onClick={() => setShowAuthModal(true)} className="cursor-pointer h-full">
-        {ProductCardContent}
-      </div>
-      <AuthRequiredModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        type="product"
-      />
-    </>
+    <Link href={`/products/${product.id}`} className="block h-full">
+      {ProductCardContent}
+    </Link>
   )
 }
 

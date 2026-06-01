@@ -18,6 +18,7 @@ import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMess
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
+import { profileLoginUrl } from '@/lib/guest-access'
 import AdSlot from '@/components/AdSlot'
 import ReviewCard from '@/components/ReviewCard'
 import ReviewForm from '@/components/ReviewForm'
@@ -138,21 +139,23 @@ export default function ProfilePage() {
   const [deliveryZones, setDeliveryZones] = useState('')
   const [productCategories, setProductCategories] = useState('')
 
+  const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+
+  // Гости не могут открывать профили — редирект на вход с returnTo
   useEffect(() => {
-    if (params.id) {
-      // Render-on-Demand: сбрасываем состояния при смене профиля
-      setPortfolioFetched(false)
-      setReviewsFetched(false)
-      setPortfolioItems([])
-      setMasterReviews([])
-      setProductReviews([])
-      
-      // Сначала загружаем профиль, потом остальные данные
-      fetchProfile()
-      if (currentUser) {
+    if (authLoading || currentUser || !profileId) return
+    router.replace(profileLoginUrl(profileId))
+  }, [authLoading, currentUser, profileId, router])
+
+  useEffect(() => {
+    if (!params.id || !currentUser) return
+    setPortfolioFetched(false)
+    setReviewsFetched(false)
+    setPortfolioItems([])
+    setMasterReviews([])
+    setProductReviews([])
+    fetchProfile()
     checkFollowing()
-    }
-    }
   }, [params.id, currentUser])
 
   useEffect(() => {
@@ -1219,23 +1222,18 @@ export default function ProfilePage() {
     )
   }
 
+  if (!authLoading && !currentUser) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <p className="text-text-secondary">Перенаправление на вход…</p>
+      </div>
+    )
+  }
+
   if (!profile) {
-    // Если профиль не загружен и пользователь не авторизован, показываем модальное окно
-    if (!authLoading && !currentUser && !loading) {
-      return (
-        <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-          <AuthRequiredModal 
-            isOpen={true} 
-            onClose={() => router.push('/')} 
-            type="master"
-          />
-        </div>
-      )
-    }
-    // Показываем загрузку, если профиль еще загружается
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Загрузка...</div>
+        <div className="text-lg">{loading ? 'Загрузка...' : 'Профиль не найден'}</div>
       </div>
     )
   }

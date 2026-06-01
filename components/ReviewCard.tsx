@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import RatingStars from './RatingStars'
 import Link from 'next/link'
+import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 
 interface ReviewReply {
   id: string
@@ -92,7 +93,7 @@ export default function ReviewCard({
     <div className={`card-glossy mb-4 relative ${isOwnReview ? 'border-2 border-red-500 shadow-red-200/50 shadow-lg bg-red-50/40' : ''}`}>
       <div className="flex gap-4">
         {/* Аватар рецензента */}
-        <Link href={`/profile/${review.reviewer_id}`} className="flex-shrink-0">
+        <GuestAwareProfileLink profileId={review.reviewer_id} className="flex-shrink-0 block">
           {reviewer?.avatar_url ? (
             <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-border-light/60">
               <Image
@@ -109,18 +110,18 @@ export default function ReviewCard({
               {reviewer?.full_name?.[0]?.toUpperCase() || '?'}
             </div>
           )}
-        </Link>
+        </GuestAwareProfileLink>
 
         {/* Контент отзыва */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <Link href={`/profile/${review.reviewer_id}`} className="block">
+                <GuestAwareProfileLink profileId={review.reviewer_id} className="block">
                   <h4 className="font-semibold text-graphite-secondary hover:text-brand-accent transition-colors truncate">
                     {reviewer?.full_name || 'Пользователь'}
                   </h4>
-                </Link>
+                </GuestAwareProfileLink>
                 {isOwnReview && (
                   <span className="bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm flex-shrink-0">
                     Ваш отзыв
@@ -208,9 +209,12 @@ export default function ReviewCard({
               {replies.slice(0, showAllReplies ? replies.length : 2).map((reply: any) => (
                 <div key={reply.id} className="mb-3 last:mb-0 pl-4 border-l-2 border-border-light/40">
                   <div className="flex items-start gap-2 mb-1">
-                    <Link href={`/profile/${reply.author_id}`} className="font-medium text-sm text-graphite-secondary hover:text-brand-accent transition-colors">
+                    <GuestAwareProfileLink
+                      profileId={reply.author_id}
+                      className="font-medium text-sm text-graphite-secondary hover:text-brand-accent transition-colors"
+                    >
                       {reply.author?.full_name || 'Пользователь'}
-                    </Link>
+                    </GuestAwareProfileLink>
                     <span className="text-xs text-text-secondary">
                       {format(new Date(reply.created_at), 'd MMM yyyy', { locale: ru })}
                     </span>
