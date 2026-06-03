@@ -21,7 +21,9 @@ interface HomeClientProps {
 
 const DIVIDER = <div className="h-2 bg-[#f5f5f7]" aria-hidden />
 
-const FALLBACK_CATS = [
+type HeroCat = { label: string; emoji: string; slug: string; id?: string }
+
+const FALLBACK_CATS: HeroCat[] = [
   { label: 'Ремонт', emoji: '🔧', slug: '' },
   { label: 'Электрика', emoji: '⚡', slug: '' },
   { label: 'Сантехника', emoji: '🚿', slug: '' },
@@ -261,7 +263,7 @@ export default function HomeClient({
   const [products, setProducts] = useState<Product[]>([])
   const [stories, setStories] = useState<Story[]>([])
 
-  const heroCats = useMemo(() => {
+  const heroCats = useMemo((): HeroCat[] => {
     const fromDb = (initialCategories ?? []).slice(0, 4).map((c) => ({
       label: c.name,
       emoji: catEmoji(c.slug, c.name),
