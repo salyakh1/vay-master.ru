@@ -1,112 +1,18 @@
 'use client'
 
-import { useEffect, useState, Suspense, useRef, useMemo, useCallback } from 'react'
+import { useEffect, useState, Suspense, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Image from 'next/image'
 import { useAuth } from '@/app/providers'
 import SearchLoading from './loading'
 import { supabase, User } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import AdBannerSlider from '@/components/AdBannerSlider'
-import Link from 'next/link'
-import { FiSearch, FiUser, FiSliders, FiMapPin, FiBriefcase, FiStar, FiCheckCircle } from 'react-icons/fi'
-import { profileLoginUrl } from '@/lib/guest-access'
+import CompactPageBanner from '@/components/CompactPageBanner'
+import MasterListCard from '@/components/MasterListCard'
+import { FiSearch, FiSliders, FiBriefcase, FiArrowLeft } from 'react-icons/fi'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
-import AdSlot from '@/components/AdSlot'
-import StoriesCircle from '@/components/StoriesCircle'
-import dynamic from 'next/dynamic'
-
-const RecommendationsCarousel = dynamic(() => import('@/components/RecommendationsCarousel'), {
-  ssr: false,
-  loading: () => <div className="h-[200px] bg-bg-secondary rounded-xl animate-pulse" aria-hidden />,
-})
 import { Story } from '@/lib/supabase'
 import type { AdBanner } from '@/lib/supabase'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs, getProductCategoriesForCategorySlugs } from '@/lib/specialization-product-mapping'
-
-type MastersRow = 
-  | { type: 'cards'; masters: [User | undefined, User | undefined] }
-  | { type: 'ad'; rowIndex: number }
-  | { type: 'carousel' }
-
-function buildMastersRows(masters: User[], showCarousel: boolean): MastersRow[] {
-  const rows: MastersRow[] = []
-  let cardRowIndex = 0
-  for (let i = 0; i < masters.length; i += 2) {
-    if (cardRowIndex === 3) rows.push({ type: 'ad', rowIndex: rows.length })
-    rows.push({ type: 'cards', masters: [masters[i], masters[i + 1]] })
-    if (cardRowIndex === 4 && showCarousel) rows.push({ type: 'carousel' })
-    cardRowIndex++
-  }
-  return rows
-}
-
-function MasterCardContent({ master }: { master: User }) {
-  const specs = Array.isArray((master as any).profile_subcategories) ? (master as any).profile_subcategories : []
-  return (
-    <div className="card-glossy group h-[320px] flex flex-col !p-0 overflow-hidden relative">
-      <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10 rounded-[12px]" />
-      <div className="w-full h-[160px] bg-gradient-to-br from-graphite-primary to-graphite-tertiary flex items-center justify-center text-white text-2xl font-semibold rounded-t-[12px] flex-shrink-0 overflow-hidden relative group/image">
-        {master.avatar_url ? (
-          <>
-            <Image
-              src={master.avatar_url}
-              alt={master.full_name}
-              fill
-              className="object-cover transition-all duration-500 group-hover/image:scale-110 group-hover/image:brightness-110"
-              sizes="(max-width: 768px) 50vw, 400px"
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/20 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-500 pointer-events-none" />
-          </>
-        ) : (
-          master.full_name[0]?.toUpperCase() || '?'
-        )}
-      </div>
-      <div className="flex flex-col items-start text-left p-2.5 pb-1.5 relative z-20 min-h-0 flex-1 overflow-hidden">
-        <h3 className="font-bold text-graphite-secondary text-[15px] leading-tight line-clamp-2 mb-0.5 w-full group-hover:text-brand-accent transition-colors">
-          {master.full_name}
-        </h3>
-        {master.city && (
-          <div className="flex items-center gap-1 text-[9px] text-text-muted mb-0.5 min-w-0">
-            <FiMapPin size={8} strokeWidth={2} className="text-brand-accent/60 flex-shrink-0" />
-            <span className="truncate">{master.city}</span>
-          </div>
-        )}
-        {master.master_reviews_count != null && master.master_reviews_count > 0 ? (
-          <div className="flex items-center gap-1 text-[9px] text-text-muted mb-0.5">
-            {master.master_rating && master.master_rating > 0 ? (
-              <>
-                <FiStar size={8} className="fill-brand-accent text-brand-accent flex-shrink-0" strokeWidth={0} />
-                <span>{master.master_rating.toFixed(1)} · {master.master_reviews_count} {master.master_reviews_count === 1 ? 'отзыв' : master.master_reviews_count < 5 ? 'отзыва' : 'отзывов'}</span>
-              </>
-            ) : (
-              <span>{master.master_reviews_count} {master.master_reviews_count === 1 ? 'отзыв' : 'отзывов'}</span>
-            )}
-          </div>
-        ) : (
-          <div className="text-[9px] text-text-muted mb-0.5">Без отзывов</div>
-        )}
-        {specs.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-border-light/50 w-full min-h-0 overflow-hidden">
-            {specs.slice(0, 2).map((item: any) => (
-              <span
-                key={item.subcategory?.id || item.subcategory_id}
-                className="min-w-0 max-w-full px-1.5 py-0.5 text-[9px] text-text-secondary bg-bg-secondary rounded border border-border-light truncate inline-block"
-                title={item.subcategory?.name ?? item.subcategory?.category?.name}
-              >
-                {item.subcategory?.name ?? item.subcategory?.category?.name}
-              </span>
-            ))}
-            {specs.length > 2 && (
-              <span className="text-[9px] text-text-muted flex-shrink-0">…</span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export interface SearchContentProps {
   /** Баннеры с сервера для быстрого LCP (SSR). */
@@ -210,9 +116,6 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [])
-
-  const randomRows = useMemo(() => buildMastersRows(randomProfiles, true), [randomProfiles])
-  const filteredRows = useMemo(() => buildMastersRows(masters, false), [masters])
 
   // Загружаем подкатегории мастера и получаем категории товаров для рекомендаций
   const [masterSubcategorySlugs, setMasterSubcategorySlugs] = useState<string[]>([])
@@ -619,82 +522,150 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     selectedServiceIds.length > 0 ||
     !!cityFilter
 
-  return (
-    <div className="min-h-screen bg-bg-primary pb-20">
-      {user && <Navbar />}
-      {/* Баннеры без отступов по бокам */}
-      <div className="w-full mb-6">
-        <AdBannerSlider page="search" initialBanners={initialBanners ?? undefined} />
-      </div>
-      <div className="container mx-auto px-3 py-4">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-semibold mb-4 text-text-primary">Мастера</h1>
+  const displayMasters = useMemo(() => {
+    const list = hasFilters ? masters : randomProfiles
+    return [...list].sort((a, b) => (b.master_rating ?? 0) - (a.master_rating ?? 0))
+  }, [hasFilters, masters, randomProfiles])
 
-          {/* Search Form */}
-          <form onSubmit={handleSearch} className="mb-6">
-            <div className="flex flex-col gap-3">
-              <div className="relative" ref={searchInputWrapperRef}>
-                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" size={16} />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onFocus={() => query.trim().length >= 2 && searchSuggestions.length > 0 && setShowSearchSuggestions(true)}
-                  placeholder="Например: кровел, кирпич..."
-                  className="input pl-12 pr-11 h-10 text-sm w-full"
-                  autoComplete="off"
-                  aria-autocomplete="list"
-                  aria-expanded={showSearchSuggestions && searchSuggestions.length > 0}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowFiltersModal(true)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors p-1"
-                  title="Фильтры"
-                >
-                  <FiSliders size={18} />
-                </button>
-                {showSearchSuggestions && searchSuggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-lg border border-border-light shadow-md overflow-hidden">
-                    {loadingSuggestions ? (
-                      <div className="px-3 py-2 text-xs text-text-muted">Загрузка…</div>
-                    ) : (
-                      <ul className="py-0.5 max-h-[220px] overflow-y-auto">
-                        {searchSuggestions.map((item) => {
-                          const isCategory = item.type === 'category' || item.type === 'subcategory'
-                          return (
-                            <li key={`${item.type}-${item.id}`}>
-                              <button
-                                type="button"
-                                onClick={() => applySuggestion(item.name)}
-                                className="w-full text-left px-3 py-1.5 hover:bg-bg-secondary transition-colors flex flex-col gap-0.5"
-                              >
-                                <span className="flex items-center gap-1.5 min-w-0">
-                                  <span className="text-xs text-graphite-secondary truncate">{item.name}</span>
-                                  {isCategory && (
-                                    <span className="flex-shrink-0 text-[10px] text-brand-accent font-medium">Категория</span>
-                                  )}
-                                </span>
-                                {!isCategory && item.category_name && (
-                                  <span className="text-[10px] text-text-muted truncate">{item.category_name}</span>
-                                )}
-                              </button>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    )}
-                  </div>
+  const chipCategories = categoriesForFilter.slice(0, 6)
+
+  return (
+    <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full pb-24">
+      {user && <Navbar />}
+
+      {/* Шапка поиска */}
+      <div className="bg-white px-3.5 pt-2.5 pb-2.5 border-b border-[#f0f0f0]">
+        <form onSubmit={handleSearch} className="flex items-center gap-2 mb-2.5">
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="text-brand-accent flex-shrink-0 p-0.5"
+            aria-label="Назад"
+          >
+            <FiArrowLeft size={20} />
+          </button>
+          <div className="relative flex-1 min-w-0" ref={searchInputWrapperRef}>
+            <div className="flex items-center gap-1.5 bg-[#f5f5f7] rounded-xl px-3 py-2 border border-[#ececec]">
+              <FiSearch className="text-brand-accent flex-shrink-0" size={14} />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => query.trim().length >= 2 && searchSuggestions.length > 0 && setShowSearchSuggestions(true)}
+                placeholder="Электрик, сантехник..."
+                className="flex-1 bg-transparent text-xs text-[#111] placeholder:text-[#bbb] outline-none min-w-0"
+                autoComplete="off"
+              />
+            </div>
+            {showSearchSuggestions && searchSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-lg border border-[#f0f0f0] shadow-md overflow-hidden">
+                {loadingSuggestions ? (
+                  <div className="px-3 py-2 text-xs text-[#888]">Загрузка…</div>
+                ) : (
+                  <ul className="py-0.5 max-h-[220px] overflow-y-auto">
+                    {searchSuggestions.map((item) => (
+                      <li key={`${item.type}-${item.id}`}>
+                        <button
+                          type="button"
+                          onClick={() => applySuggestion(item.name)}
+                          className="w-full text-left px-3 py-1.5 hover:bg-[#f5f5f7] text-xs text-[#111]"
+                        >
+                          {item.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFiltersModal(true)}
+            className="flex-shrink-0 bg-[#f5f5f7] border border-[#ececec] rounded-[10px] px-2.5 py-2 text-[11px] text-[#555] font-semibold"
+          >
+            <FiSliders size={14} className="inline mr-0.5" />
+            Фильтр
+          </button>
+        </form>
 
-              <button type="submit" className="btn btn-primary h-10 w-full text-sm">
-                Найти
-              </button>
-            </div>
-          </form>
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCategory('')
+              setSelectedSubcategory('')
+              setSelectedServiceIds([])
+            }}
+            className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border ${
+              !selectedCategory
+                ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
+                : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
+            }`}
+          >
+            Все
+          </button>
+          {chipCategories.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => {
+                setSelectedCategory(cat.id)
+                setSelectedSubcategory('')
+                setSelectedServiceIds([])
+              }}
+              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap ${
+                selectedCategory === cat.id
+                  ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
+                  : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          {/* Модалка фильтров: категория → подкатегория → услуга */}
+      <CompactPageBanner page="search" initialBanners={initialBanners} />
+
+      {/* Счётчик результатов */}
+      <div className="flex items-center justify-between px-3.5 pt-2 pb-0.5">
+        <span className="text-[11px] text-[#888]">
+          Найдено:{' '}
+          <strong className="text-[#111]">
+            {displayMasters.length}{' '}
+            {displayMasters.length === 1 ? 'мастер' : displayMasters.length < 5 ? 'мастера' : 'мастеров'}
+          </strong>
+        </span>
+        <span className="text-[10px] text-brand-accent font-semibold">По рейтингу ↓</span>
+      </div>
+
+      {/* Список мастеров */}
+      {loading ? (
+        <div className="text-center py-12 text-[#888] text-sm">Поиск...</div>
+      ) : displayMasters.length === 0 ? (
+        <div className="text-center py-12 text-[#888] text-sm px-4">
+          {hasFilters ? 'Мастера не найдены' : 'Введите запрос или выберите категорию'}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 px-3.5 py-2.5">
+          {displayMasters.map((master) => (
+            <GuestAwareProfileLink key={master.id} profileId={master.id} className="block">
+              <MasterListCard master={master} />
+            </GuestAwareProfileLink>
+          ))}
+          {(hasFilters ? loadingMoreMasters : loadingMoreRandom) && (
+            <div className="text-center text-xs text-[#888] py-2">Загрузка…</div>
+          )}
+          <div
+            ref={hasFilters ? loadMoreMastersSentinelRef : loadMoreRandomSentinelRef}
+            className="h-2"
+            aria-hidden
+          />
+        </div>
+      )}
+
+      {/* Модалка фильтров */}
           {showFiltersModal && (
             <div
               className="fixed inset-0 z-50 bg-black/40"
@@ -910,169 +881,6 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
               </div>
             </div>
           )}
-
-          {/* Истории мастеров - под фильтром (видны всем) */}
-          {storiesLoading ? (
-            <div className="mb-6 text-center text-text-secondary text-sm">Загрузка историй...</div>
-          ) : stories.length > 0 ? (
-            <div className="mb-6">
-              <StoriesCircle
-                stories={stories}
-                currentUser={user || null}
-                isOwnProfile={false}
-                onStoryCreated={fetchStories}
-              />
-            </div>
-          ) : null}
-
-          <RecommendationsCarousel
-            title={
-              isMasterWithCategories && !filterProductCategories
-                ? "Рекомендации под ваши услуги"
-                : "Рекомендуемые товары"
-            }
-            query={query}
-            categorySlugs={
-              filterProductCategories?.categorySlugs?.length
-                ? filterProductCategories.categorySlugs
-                : isMasterWithCategories
-                  ? masterProductCategories.categorySlugs
-                  : undefined
-            }
-            subcategorySlugs={
-              filterProductCategories?.subcategorySlugs?.length
-                ? filterProductCategories.subcategorySlugs
-                : isMasterWithCategories
-                  ? masterProductCategories.subcategorySlugs
-                  : undefined
-            }
-            role={user?.role || 'client'}
-            limit={20}
-          />
-
-          {/* Results */}
-          {loading ? (
-            <div className="text-center py-12 text-text-secondary">Поиск...</div>
-          ) : !hasFilters ? (
-            <>
-              {randomProfiles.length > 0 ? (
-                <div className="space-y-4">
-                  <h2 className="text-xl font-semibold text-text-primary mb-1">
-                    Мастера вашего города
-                  </h2>
-                  <div className="w-full space-y-1">
-                    {randomRows.map((row, index) => {
-                      if (row.type === 'cards') {
-                        return (
-                          <div key={index} className="w-full pb-1">
-                            <div className="grid grid-cols-2 gap-2">
-                              {row.masters.map((master) =>
-                                master ? (
-                                  <GuestAwareProfileLink
-                                    key={master.id}
-                                    profileId={master.id}
-                                    className="block"
-                                  >
-                                    <MasterCardContent master={master} />
-                                  </GuestAwareProfileLink>
-                                ) : null
-                              )}
-                            </div>
-                          </div>
-                        )
-                      }
-                      if (row.type === 'ad') {
-                        return (
-                          <div key={index} className="flex items-center justify-center py-2">
-                            <AdSlot type="INLINE_CONTEXT" context={{ page: 'search' as const, category: selectedCategory ? [selectedCategory] : undefined, city: cityFilter || userCity || undefined }} index={row.rowIndex} className="my-4" />
-                          </div>
-                        )
-                      }
-                      return (
-                        <div key={index}>
-                          <RecommendationsCarousel
-                            title="Рекомендуемые товары"
-                            query={query}
-                            categorySlugs={filterProductCategories?.categorySlugs?.length ? filterProductCategories.categorySlugs : undefined}
-                            subcategorySlugs={filterProductCategories?.subcategorySlugs?.length ? filterProductCategories.subcategorySlugs : undefined}
-                            role={user?.role || 'client'}
-                            limit={20}
-                          />
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {loadingMoreRandom && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
-                  {hasMoreRandom && <div ref={loadMoreRandomSentinelRef} className="h-4" aria-hidden />}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-text-secondary">
-                  Введите запрос или выберите фильтры
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-text-primary flex items-center gap-2 mb-1">
-                <FiUser />
-                Мастера ({masters.length})
-              </h2>
-              {masters.length === 0 ? (
-                <div className="card text-center text-text-secondary py-12">
-                  Мастера не найдены
-                </div>
-              ) : (
-                <>
-                <div className="w-full space-y-1">
-                  {filteredRows.map((row, index) => {
-                    if (row.type === 'cards') {
-                      return (
-                        <div key={index} className="w-full pb-1">
-                          <div className="grid grid-cols-2 gap-2">
-                            {row.masters.map((master) =>
-                              master ? (
-                                <GuestAwareProfileLink
-                                  key={master.id}
-                                  profileId={master.id}
-                                  className="block"
-                                >
-                                  <MasterCardContent master={master} />
-                                </GuestAwareProfileLink>
-                              ) : null
-                            )}
-                          </div>
-                        </div>
-                      )
-                    }
-                    if (row.type === 'ad') {
-                      return (
-                        <div key={index} className="flex items-center justify-center py-2">
-                          <AdSlot type="INLINE_CONTEXT" context={{ page: 'search' as const, category: selectedCategory ? [selectedCategory] : undefined, keywords: query ? [query] : undefined, city: cityFilter || userCity || undefined }} index={row.rowIndex} className="my-4" />
-                        </div>
-                      )
-                    }
-                    return (
-                      <div key={index}>
-                        <RecommendationsCarousel
-                          title="Рекомендуемые товары"
-                          query={query}
-                          categorySlugs={filterProductCategories?.categorySlugs?.length ? filterProductCategories.categorySlugs : undefined}
-                          subcategorySlugs={filterProductCategories?.subcategorySlugs?.length ? filterProductCategories.subcategorySlugs : undefined}
-                          role={user?.role || 'client'}
-                          limit={20}
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-                {loadingMoreMasters && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
-                {hasMoreMasters && <div ref={loadMoreMastersSentinelRef} className="h-4" aria-hidden />}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
 
     </div>
   )

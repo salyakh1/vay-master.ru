@@ -6,139 +6,17 @@ import { useAuth } from '@/app/providers'
 import ProductsLoading from './loading'
 import { supabase, Product, ProductCategory, ProductSubcategory, PRODUCT_CATEGORY_SECTIONS, Order } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import ProductCard from '@/components/ProductCard'
-import OrderCard from '@/components/OrderCard'
-import AdBannerSlider from '@/components/AdBannerSlider'
-import AdSlot from '@/components/AdSlot'
+import CompactPageBanner from '@/components/CompactPageBanner'
+import ProductGridCardCompact from '@/components/ProductGridCardCompact'
 import Link from 'next/link'
-import { 
-  FiSearch,
-  FiSliders,
-  FiHome, 
-  FiTool, 
-  FiDroplet, 
-  FiZap, 
-  FiLayers, 
-  FiBox, 
-  FiPackage, 
-  FiGrid, 
-  FiSettings, 
-  FiHardDrive,
-  FiMonitor,
-  FiThermometer,
-  FiWind,
-  FiSun,
-  FiWifi,
-  FiLock,
-  FiShoppingBag,
-  FiTruck,
-  FiBattery,
-  FiActivity,
-  FiAward,
-  FiShield,
-  FiCompass,
-  FiMinus,
-  FiPlus,
-  FiX
-} from 'react-icons/fi'
+import { FiSearch, FiSliders, FiX, FiPackage } from 'react-icons/fi'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import { sanitizeProductsForGuest } from '@/lib/guest-access'
-import StoriesCircle from '@/components/StoriesCircle'
-import NearbyProductsCarousel from '@/components/NearbyProductsCarousel'
 import { Story } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
-
-const RecommendationsCarousel = dynamic(() => import('@/components/RecommendationsCarousel'), {
-  ssr: false,
-  loading: () => <div className="h-[200px] bg-bg-secondary rounded-xl animate-pulse" aria-hidden />,
-})
-const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs } from '@/lib/specialization-product-mapping'
 
-// Кастомная иконка гвоздя для крепежа
-const NailIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {/* Шляпка гвоздя (круглая) */}
-    <circle cx="12" cy="5" r="3.5" />
-    {/* Стержень гвоздя (вертикальная линия) */}
-    <line x1="12" y1="8.5" x2="12" y2="19" />
-    {/* Острие гвоздя (маленькая горизонтальная линия) */}
-    <line x1="11" y1="19" x2="13" y2="19" />
-  </svg>
-)
-
-// Кастомная иконка ванны для сантехники
-const BathtubIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {/* Ванна (овальная форма) */}
-    <path d="M4 10c0-1.1.9-2 2-2h12c1.1 0 2 .9 2 2v8H4v-8z" />
-    {/* Верхний край ванны */}
-    <path d="M4 10h16" />
-    {/* Ножки ванны */}
-    <circle cx="7" cy="18" r="1.5" />
-    <circle cx="17" cy="18" r="1.5" />
-    {/* Кран/смеситель */}
-    <path d="M12 4v6" />
-    <path d="M10 4h4" />
-  </svg>
-)
-
-// Маппинг категорий к иконкам
-const getCategoryIcon = (slug: string): React.ComponentType<{ size?: number; className?: string }> => {
-  const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-    'roofing-gutters': FiHome,
-    'facades-cladding': FiLayers,
-    'insulation': FiShield,
-    'waterproofing-sealants': FiDroplet,
-    'fences-gates': FiLock,
-    'landscaping-outdoor': FiCompass,
-    'building-mixes': FiPackage,
-    'bulk-materials': FiBox,
-    'masonry-blocks-jbi': FiGrid,
-    'lumber-panels': FiLayers,
-    'metalworks-welding-materials': FiTool,
-    'fasteners-hardware': NailIcon,
-    'power-tools': FiZap,
-    'hand-tools': FiTool,
-    'consumables-accessories': FiHardDrive,
-    'plumbing-water-supply': BathtubIcon,
-    'sewer-septic': FiDroplet,
-    'heating-boilers': FiThermometer,
-    'ventilation-ac': FiWind,
-    'electrical-lighting': FiZap,
-    'low-voltage-smart-home': FiWifi,
-    'windows-doors-hardware': FiHome,
-    'finishing-materials': FiLayers,
-    'flooring': FiGrid,
-    'tile-stone': FiGrid,
-    'furniture-kitchen-hardware': FiHome,
-    'auto-parts-engine-gearbox': FiActivity,
-    'auto-parts-suspension-brakes': FiActivity,
-    'auto-electronics': FiMonitor,
-    'auto-chemicals-detailing': FiDroplet,
-  }
-  return iconMap[slug] || FiPackage
-}
+const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
 
 function ProductsContent() {
   const { user } = useAuth()
@@ -163,6 +41,8 @@ function ProductsContent() {
   const [productSubcategories, setProductSubcategories] = useState<ProductSubcategory[]>([])
   const [showFilters, setShowFilters] = useState(false)
   const [filterStep, setFilterStep] = useState<'categories' | 'subcategories'>('categories')
+  const [sortPriceAsc, setSortPriceAsc] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
   const [categoryImageFailed, setCategoryImageFailed] = useState<Set<string>>(new Set())
   const [showAuthModal, setShowAuthModal] = useState(false)
 
@@ -424,7 +304,7 @@ function ProductsContent() {
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [hasMore, loadingMore, gridRows.length])
+  }, [hasMore, loadingMore, products.length])
 
   // Город применяется только при закрытии модалки — во время ввода запросы не уходят
   const applyCityAndCloseFilters = () => {
@@ -491,7 +371,7 @@ function ProductsContent() {
     setHasMore(true)
     fetchProducts(1, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, categoryId, subcategoryIds, cityFilter, showFilters])
+  }, [searchQuery, categoryId, subcategoryIds, cityFilter, showFilters, sortPriceAsc])
 
   const fetchCategories = async () => {
     try {
@@ -585,7 +465,7 @@ function ProductsContent() {
           reviews_count
         `, { count: 'exact' })
         .eq('in_stock', true)
-        .order('created_at', { ascending: false })
+        .order('price', { ascending: sortPriceAsc })
         .range(from, to)
 
       if (sellerIds && sellerIds.length > 0) {
@@ -610,8 +490,9 @@ function ProductsContent() {
 
       if (reset) {
         setProducts(list)
+        setTotalCount(count ?? list.length)
       } else {
-        setProducts(prev => [...prev, ...list])
+        setProducts((prev) => [...prev, ...list])
       }
 
       setHasMore(list.length === ITEMS_PER_PAGE && (count || 0) > pageNum * ITEMS_PER_PAGE)
@@ -631,68 +512,43 @@ function ProductsContent() {
     }
   }
 
+  const chipCategories = productCategories.slice(0, 8)
+
   if (loading) {
     return <ProductsLoading />
   }
 
   return (
-    <div className="min-h-screen bg-bg-primary pb-20">
+    <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full pb-24">
       {user && <Navbar />}
-      {/* Баннеры без отступов по бокам */}
-      <div className="w-full mb-6">
-        <AdBannerSlider page="products" />
-      </div>
-      <div className="container mx-auto px-4 py-6">
 
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold text-graphite-secondary tracking-tight">Каталог товаров</h1>
-          {user && (
-            <Link 
-              href="/products/new" 
-              className="btn btn-primary"
-            >
-              Добавить товар
-            </Link>
-          )}
-        </div>
-
-        {/* Search */}
-        <div className="mb-4 relative" ref={productSearchWrapperRef}>
-          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" size={16} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => searchQuery.trim().length >= 2 && productSuggestions.length > 0 && setShowProductSuggestions(true)}
-            placeholder="Например: перфоратор, кирпич..."
-            className="w-full input pl-12 pr-11 h-10 text-sm"
-            autoComplete="off"
-            aria-autocomplete="list"
-            aria-expanded={showProductSuggestions && productSuggestions.length > 0}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              const next = !showFilters
-              setShowFilters(next)
-              if (next) setFilterStep('categories')
-            }}
-            className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors ${
-              showFilters ? 'bg-brand-accent text-white' : 'text-text-secondary hover:text-graphite-secondary hover:bg-bg-secondary'
-            }`}
-            title="Фильтры"
-          >
-            <FiSliders size={18} />
-          </button>
-          {showProductSuggestions && productSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-lg border border-border-light shadow-md overflow-hidden">
-              {loadingProductSuggestions ? (
-                <div className="px-3 py-2 text-xs text-text-muted">Загрузка…</div>
-              ) : (
-                <ul className="py-0.5 max-h-[220px] overflow-y-auto">
-                  {productSuggestions.map((item) => {
-                    const isCategory = item.type === 'category' || item.type === 'subcategory'
-                    return (
+      {/* Шапка каталога */}
+      <div className="bg-white px-3.5 pt-2.5 pb-2.5 border-b border-[#f0f0f0]">
+        <div className="flex gap-2 mb-2.5">
+          <div className="relative flex-1 min-w-0" ref={productSearchWrapperRef}>
+            <div className="flex items-center gap-1.5 bg-[#f5f5f7] rounded-xl px-3 py-2 border border-[#ececec]">
+              <FiSearch className="text-brand-accent flex-shrink-0" size={14} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() =>
+                  searchQuery.trim().length >= 2 &&
+                  productSuggestions.length > 0 &&
+                  setShowProductSuggestions(true)
+                }
+                placeholder="Поиск товаров..."
+                className="flex-1 bg-transparent text-xs text-[#111] placeholder:text-[#bbb] outline-none min-w-0"
+                autoComplete="off"
+              />
+            </div>
+            {showProductSuggestions && productSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-lg border border-[#f0f0f0] shadow-md overflow-hidden">
+                {loadingProductSuggestions ? (
+                  <div className="px-3 py-2 text-xs text-[#888]">Загрузка…</div>
+                ) : (
+                  <ul className="py-0.5 max-h-[220px] overflow-y-auto">
+                    {productSuggestions.map((item) => (
                       <li key={`${item.type}-${item.id}`}>
                         <button
                           type="button"
@@ -701,28 +557,96 @@ function ProductsContent() {
                             setShowProductSuggestions(false)
                             setProductSuggestions([])
                           }}
-                          className="w-full text-left px-3 py-1.5 hover:bg-bg-secondary transition-colors flex flex-col gap-0.5"
+                          className="w-full text-left px-3 py-1.5 hover:bg-[#f5f5f7] text-xs text-[#111]"
                         >
-                          <span className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-xs text-graphite-secondary truncate">{item.name}</span>
-                            {isCategory && (
-                              <span className="flex-shrink-0 text-[10px] text-brand-accent font-medium">Категория</span>
-                            )}
-                          </span>
-                          {!isCategory && item.category_name && (
-                            <span className="text-[10px] text-text-muted truncate">{item.category_name}</span>
-                          )}
+                          {item.name}
                         </button>
                       </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
-          )}
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !showFilters
+              setShowFilters(next)
+              if (next) setFilterStep('categories')
+            }}
+            className="flex-shrink-0 bg-[#f5f5f7] border border-[#ececec] rounded-[10px] px-2.5 py-2 text-[#555]"
+            aria-label="Фильтры"
+          >
+            <FiSliders size={16} />
+          </button>
         </div>
 
-        {/* Полноэкранная модалка фильтров: город + категория/каталог */}
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+          <button
+            type="button"
+            onClick={() => {
+              setCategoryId('')
+              setSubcategoryIds([])
+            }}
+            className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap ${
+              !categoryId
+                ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
+                : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
+            }`}
+          >
+            Все
+          </button>
+          {chipCategories.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => {
+                setCategoryId(cat.id)
+                setSubcategoryIds([])
+              }}
+              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap ${
+                categoryId === cat.id
+                  ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
+                  : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <CompactPageBanner page="products" buttonLabel="Разместить" />
+
+      <div className="flex items-center justify-between px-3.5 pt-2 pb-0.5">
+        <span className="text-[11px] text-[#888]">
+          Товаров: <strong className="text-[#111]">{totalCount || products.length}</strong>
+        </span>
+        <button
+          type="button"
+          onClick={() => setSortPriceAsc((v) => !v)}
+          className="text-[10px] text-brand-accent font-semibold"
+        >
+          По цене {sortPriceAsc ? '↑' : '↓'}
+        </button>
+      </div>
+
+      {products.length === 0 ? (
+        <div className="text-center py-12 text-[#888] text-sm px-4">Товары не найдены</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 px-3.5 py-2.5">
+            {products.map((product) => (
+              <ProductGridCardCompact key={product.id} product={product} />
+            ))}
+          </div>
+          {loadingMore && <div className="text-center text-xs text-[#888] py-2">Загрузка…</div>}
+          <div ref={productsLoadMoreRef} className="h-2" aria-hidden />
+        </>
+      )}
+
+      {/* Модалка фильтров */}
         {showFilters && (
           <div 
             className="fixed inset-0 z-50 bg-black/40"
@@ -782,7 +706,7 @@ function ProductsContent() {
                             </div>
                             <div className="grid grid-cols-3 gap-1">
                               {categories.map((cat) => {
-                                const Icon = getCategoryIcon(cat.slug)
+                                const Icon = FiPackage
                                 const showImage = !categoryImageFailed.has(cat.id)
                                 const hasImage = cat.image_url && showImage
                                 const imgSize = 88
@@ -892,119 +816,6 @@ function ProductsContent() {
             </div>
           </div>
         )}
-
-        {/* Истории продавцов - под фильтром (видны всем) */}
-        {storiesLoading ? (
-          <div className="mb-6 text-center text-text-secondary text-sm">Загрузка историй...</div>
-        ) : stories.length > 0 ? (
-          <div className="mb-6">
-            <StoriesCircle
-              stories={stories}
-              currentUser={user || null}
-              isOwnProfile={false}
-              onStoryCreated={fetchStories}
-            />
-          </div>
-        ) : null}
-
-        {/* Товары рядом: для всех — зона мастера или геолокация пользователя */}
-        {nearbyCenter ? (
-          <NearbyProductsCarousel
-            masterLat={nearbyCenter.lat}
-            masterLng={nearbyCenter.lng}
-            radiusKm={10}
-            limit={12}
-            onShowMap={() => setShowStoresMap(true)}
-          />
-        ) : (
-          <div className="mb-6 card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <p className="text-text-secondary text-sm sm:text-base">
-              Товары и магазины рядом с вами — укажите местоположение, чтобы видеть предложения в радиусе.
-            </p>
-            <button
-              type="button"
-              onClick={requestNearbyGeolocation}
-              disabled={nearbyGeoloading}
-              className="btn btn-primary whitespace-nowrap"
-            >
-              {nearbyGeoloading ? 'Определяем…' : 'Использовать моё местоположение'}
-            </button>
-          </div>
-        )}
-
-        <RecommendationsCarousel
-          title={
-            isMasterWithCategories
-              ? "Рекомендации под ваши услуги"
-              : "Рекомендуемые товары"
-          }
-          query={searchQuery}
-          categoryId={isMasterWithCategories ? undefined : categoryId}
-          subcategoryId={isMasterWithCategories ? undefined : subcategoryIds[0]}
-          categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
-          subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
-          role={user?.role || 'client'}
-          limit={20}
-        />
-
-        {/* Products Grid */}
-        {products.length === 0 && !loading ? (
-          <div className="card text-center text-text-secondary py-12">
-            Товары не найдены
-          </div>
-        ) : (
-          <>
-            <div className="w-full space-y-2">
-              {gridRows.map((row, rowIndex) => (
-                <div key={rowIndex} className="w-full pb-2">
-                  <div className="grid grid-cols-2 gap-2 px-0">
-                    {row.items.map((product, itemIndex) => {
-                      if (row.skipFirstItem && itemIndex === 0) return null
-                      return <ProductCard key={product.id} product={product} currentUser={user} />
-                    })}
-                    {row.orderAfter ? (
-                      <OrderCard key={`order-${row.orderAfter.id}`} order={row.orderAfter} variant="product-grid" />
-                    ) : row.items.length < GRID_COLUMN_COUNT && !row.skipFirstItem ? (
-                      <div />
-                    ) : null}
-                  </div>
-                  {row.hasAd && row.adProductIndex !== undefined && (
-                    <div className="col-span-2 mt-4 px-0">
-                      <AdSlot
-                        type="INLINE_CONTEXT"
-                        context={{
-                          page: 'products',
-                          category: row.items[0]?.category_ref?.section ? [row.items[0].category_ref.section] : undefined,
-                          keywords: searchQuery ? [searchQuery] : undefined,
-                          city: cityFilter || undefined,
-                        }}
-                        index={row.adProductIndex}
-                        className="my-4"
-                      />
-                    </div>
-                  )}
-                  {rowIndex === 3 && (
-                    <RecommendationsCarousel
-                      title={
-                        isMasterWithCategories ? "Рекомендации под ваши услуги" : "Рекомендуемые товары"
-                      }
-                      query={searchQuery}
-                      categoryId={isMasterWithCategories ? undefined : categoryId}
-                      subcategoryId={isMasterWithCategories ? undefined : subcategoryIds[0]}
-                      categorySlugs={isMasterWithCategories ? masterProductCategories.categorySlugs : undefined}
-                      subcategorySlugs={isMasterWithCategories ? masterProductCategories.subcategorySlugs : undefined}
-                      role={user?.role || 'client'}
-                      limit={20}
-                    />
-                  )}
-                </div>
-              ))}
-              <div ref={productsLoadMoreRef} className="h-4" aria-hidden />
-            </div>
-            {loadingMore && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
-          </>
-        )}
-      </div>
 
       {/* Stores Map Modal */}
       {showStoresMap && (
