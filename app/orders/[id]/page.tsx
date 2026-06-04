@@ -12,6 +12,8 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { formatRemaining, getCooldownRemainingMs, getMasterAccess } from '@/lib/masterAccess'
+import OrderResponseCard from '@/components/orders/OrderResponseCard'
+import { STATUS_CONFIG, formatOrderDate } from '@/components/orders/order-utils'
 
 // Dynamic imports для модальных окон - загружаются только при открытии
 const OrderResponseModal = dynamic(() => import('@/components/OrderResponseModal'), {
@@ -381,18 +383,22 @@ export default function OrderPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-bg-primary pb-20 flex items-center justify-center">
-        <div className="text-lg text-text-secondary">Загрузка...</div>
+      <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full pb-24 flex items-center justify-center">
+        <div className="grid grid-cols-2 gap-3 px-4 w-full">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl h-32 border border-[#f0f0f0] animate-pulse" />
+          ))}
+        </div>
       </div>
     )
   }
 
   if (!order || !user) {
     return (
-      <div className="min-h-screen bg-bg-primary pb-20 flex items-center justify-center">
+      <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full pb-24 flex items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-lg font-medium text-text-primary mb-2">Заказ не найден</p>
-          <Link href="/orders" className="text-brand-accent hover:underline">
+          <p className="text-lg font-medium text-[#111] mb-2">Заказ не найден</p>
+          <Link href="/orders" className="text-[#e63946] font-semibold text-sm">
             Вернуться к списку заказов
           </Link>
         </div>
@@ -416,20 +422,47 @@ export default function OrderPage() {
   const isOwnOrder = user.id === order.client_id
   const access = getMasterAccess(user)
   const isRestrictedMaster = user.role === 'master' && !disableMasterRestrictions && !access.isPro && !access.isTrial
+  const statusCfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.new
+  const canActOnResponses =
+    isOwnOrder &&
+    (order.status === 'open' || order.status === 'new') &&
+    !order.selected_master_id
 
   return (
-    <div className="min-h-screen bg-bg-primary pb-20">
+    <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full pb-24">
       <Navbar />
-      <div className="container mx-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto">
-          {/* Back Button */}
-          <Link
-            href="/orders"
-            className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary mb-6 transition-colors"
-          >
-            <FiArrowLeft size={20} />
-            <span>Назад к заказам</span>
+
+      <div className="bg-white border-b border-[#f0f0f0] px-4 pt-3 pb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Link href="/orders" className="text-[#e63946] text-xl leading-none" aria-label="Назад">
+            ←
           </Link>
+          <h1 className="text-[15px] font-extrabold text-[#111] flex-1 truncate">{order.title}</h1>
+          <span className={`text-[8px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${statusCfg.pill}`}>
+            {statusCfg.label}
+          </span>
+        </div>
+        <div className="bg-[#f5f5f7] rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[9px] text-[#aaa] mb-0.5">Бюджет</p>
+            <p className="text-[13px] font-bold text-[#e63946]">
+              {order.budget ? `до ${order.budget.toLocaleString('ru-RU')} ₽` : 'Не указан'}
+            </p>
+          </div>
+          {isOwnOrder && (
+            <div className="text-right">
+              <p className="text-[9px] text-[#aaa] mb-0.5">Откликов</p>
+              <p className="text-[13px] font-bold text-[#111]">{responses.length}</p>
+            </div>
+          )}
+          <div className="text-right">
+            <p className="text-[9px] text-[#aaa] mb-0.5">Размещён</p>
+            <p className="text-[11px] font-semibold text-[#111]">{formatOrderDate(order.created_at)}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 py-4">
 
           {/* Images Gallery */}
           {images.length > 0 && (
@@ -688,127 +721,33 @@ export default function OrderPage() {
             </div>
           )}
 
-          {/* Responses Section - Only for Order Owner */}
           {isOwnOrder && (
-            <div className="card">
-              <h2 className="text-xl font-semibold text-text-primary mb-4">
-                Отклики мастеров ({responses.length})
-                {order.status === 'open' || order.status === 'new' ? (
-                  <span className="text-sm font-normal text-text-secondary ml-2">
-                    (максимум 30)
-                  </span>
-                ) : null}
-              </h2>
+            <>
+              <p className="text-[12px] font-bold text-[#111] mb-3">Отклики мастеров</p>
               {responses.length === 0 ? (
-                <div className="text-center py-8 text-text-secondary">
-                  <FiBriefcase size={48} className="mx-auto mb-4 opacity-50" />
+                <div className="text-center py-10 text-[#888] text-sm">
+                  <FiBriefcase size={40} className="mx-auto mb-3 opacity-40" />
                   <p>Пока нет откликов на этот заказ</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {responses.map((response) => {
-                    const master = response.master as any
-                    const isAccepted = response.status === 'accepted'
-                    const isRejected = response.status === 'rejected'
-                    const isPending = response.status === 'pending'
-                    
-                    return (
-                      <div
-                        key={response.id}
-                        className={`border rounded-lg p-4 ${
-                          isAccepted 
-                            ? 'bg-green-50 border-green-300' 
-                            : isRejected
-                            ? 'bg-gray-50 border-gray-300 opacity-60'
-                            : 'bg-bg-secondary border-border-color'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3 mb-3">
-                          <Link href={`/profile/${master?.id}?returnTo=/orders/${params.id}`}>
-                            {master?.avatar_url ? (
-                              <div className="relative w-12 h-12 border border-border-color rounded-full flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity overflow-hidden">
-                                <Image
-                                  src={master.avatar_url}
-                                  alt={master.full_name}
-                                  fill
-                                  className="object-cover rounded-full"
-                                  sizes="48px"
-                                  loading="lazy"
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-12 h-12 bg-text-primary flex items-center justify-center text-white text-sm font-semibold border border-border-color rounded-full flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
-                                {master?.full_name?.[0]?.toUpperCase() || '?'}
-                              </div>
-                            )}
-                          </Link>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <Link href={`/profile/${master?.id}?returnTo=/orders/${params.id}`} className="hover:text-brand-accent transition-colors">
-                                <h4 className="font-semibold text-text-primary">
-                                  {master?.full_name || 'Мастер'}
-                                </h4>
-                              </Link>
-                              <div className="flex items-center gap-3">
-                                {response.price && (
-                                  <div className="text-lg font-semibold text-brand-accent">
-                                    {response.price.toLocaleString('ru-RU')} ₽
-                                  </div>
-                                )}
-                                {isAccepted && (
-                                  <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 border border-green-300 rounded">
-                                    Принят
-                                  </span>
-                                )}
-                                {isRejected && (
-                                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded">
-                                    Отклонен
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {master?.city && (
-                              <div className="text-sm text-text-secondary mb-2">{master.city}</div>
-                            )}
-                            <p className="text-sm text-text-primary leading-relaxed mb-2">
-                              {response.message}
-                            </p>
-                            <div className="text-xs text-text-secondary">
-                              {format(new Date(response.created_at), 'd MMMM в HH:mm', { locale: ru })}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Action Buttons - Only for pending responses when order is open */}
-                        {isPending && (order.status === 'open' || order.status === 'new') && !order.selected_master_id && (
-                          <div className="flex gap-3 pt-3 border-t border-border-color">
-                            <button
-                              onClick={() => {
-                                setSelectedResponse(response)
-                                setShowAcceptModal(true)
-                              }}
-                              className="flex-1 btn btn-primary flex items-center justify-center gap-2"
-                            >
-                              <FiCheckCircle size={18} />
-                              <span>Принять</span>
-                            </button>
-                            <button
-                              onClick={() => handleRejectResponse(response.id)}
-                              className="flex-1 btn btn-secondary flex items-center justify-center gap-2"
-                            >
-                              <FiXCircle size={18} />
-                              <span>Отклонить</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                <div className="flex flex-col gap-3 mb-6">
+                  {responses.map((response) => (
+                    <OrderResponseCard
+                      key={response.id}
+                      response={response}
+                      orderId={order.id}
+                      canAct={canActOnResponses}
+                      onAccept={() => {
+                        setSelectedResponse(response)
+                        setShowAcceptModal(true)
+                      }}
+                      onReject={() => handleRejectResponse(response.id)}
+                    />
+                  ))}
                 </div>
               )}
-            </div>
+            </>
           )}
-        </div>
       </div>
 
       {/* Modals */}
