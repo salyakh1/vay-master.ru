@@ -1,15 +1,17 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@/app/providers'
 import { supabase, Message, User } from '@/lib/supabase'
-import Navbar from '@/components/Navbar'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import Link from 'next/link'
 import { FiPlus, FiImage, FiMoreVertical, FiTrash2, FiAlertCircle, FiSend } from 'react-icons/fi'
+import { formatDateDivider, getInitials, isSystemStyleMessage } from '@/components/chats/chat-utils'
+import { getCategoryIcon } from '@/components/orders/order-utils'
 
 // Dynamic imports для модальных окон - загружаются только при открытии
 const CalculatorModal = dynamic(() => import('@/components/CalculatorModal'), {
@@ -36,6 +38,7 @@ export default function ChatPage() {
   const [showChatMenu, setShowChatMenu] = useState(false)
   const [showComplaintModal, setShowComplaintModal] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [relatedOrder, setRelatedOrder] = useState<{ id: string; title: string; category?: string } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
@@ -172,6 +175,19 @@ export default function ChatPage() {
         .single()
 
       setOtherUser(otherUserData as User)
+
+      const { data: orderCtx } = await supabase
+        .from('orders')
+        .select('id, title, category, status')
+        .or(
+          `and(client_id.eq.${user.id},selected_master_id.eq.${otherUserId}),and(client_id.eq.${otherUserId},selected_master_id.eq.${user.id})`
+        )
+        .in('status', ['in_progress', 'open', 'new'])
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      setRelatedOrder(orderCtx ? { id: orderCtx.id, title: orderCtx.title, category: orderCtx.category } : null)
 
       // Get last messages (most recent first, then reverse for display)
       const { data, error } = await supabase
@@ -465,10 +481,34 @@ export default function ChatPage() {
     }
   }
 
+  const messageGroups = useMemo(() => {
+    const groups: { key: string; label: string; items: (Message & { sender: User })[] }[] = []
+    messages.forEach((message) => {
+      const d = new Date(message.created_at)
+      const key = format(d, 'yyyy-MM-dd')
+      const label = formatDateDivider(d)
+      const last = groups[groups.length - 1]
+      if (!last || last.key !== key) {
+        groups.push({ key, label, items: [message] })
+      } else {
+        last.items.push(message)
+      }
+    })
+    return groups
+  }, [messages])
+
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Загрузка...</div>
+      <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto flex flex-col">
+        <div className="bg-white border-b border-[#f0f0f0] h-14 animate-pulse" />
+        <div className="flex-1 p-4 space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-12 rounded-2xl bg-white animate-pulse ${i % 2 ? 'ml-auto w-2/3' : 'w-2/3'}`}
+            />
+          ))}
+        </div>
       </div>
     )
   }
@@ -476,233 +516,250 @@ export default function ChatPage() {
   if (!user || !otherUser) return null
 
   return (
-    <div className="min-h-screen bg-bg-primary flex flex-col pb-20">
-      <Navbar />
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
-        {/* Chat Header */}
-        <div className="bg-bg-primary border-b border-border-color px-4 py-3 relative">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="relative w-12 h-12 bg-text-primary border border-border-color flex items-center justify-center text-white text-sm font-semibold rounded-full overflow-hidden">
-                {otherUser.avatar_url ? (
-                  <Image
-                    src={otherUser.avatar_url}
-                    alt={otherUser.full_name}
-                    fill
-                    className="object-cover rounded-full"
-                    sizes="48px"
-                    priority
-                  />
-                ) : (
-                  otherUser.full_name[0]?.toUpperCase() || '?'
-                )}
-              </div>
-              <div>
-                <div className="font-semibold text-graphite-secondary tracking-tight">{otherUser.full_name}</div>
-                <div className="text-sm text-text-secondary">{otherUser.city || ''}</div>
-              </div>
+    <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full flex flex-col h-[100dvh]">
+      <div className="bg-white border-b border-[#f0f0f0] px-3.5 py-2.5 flex items-center gap-2.5 flex-shrink-0 relative z-10">
+        <Link href="/chats" className="text-[#e63946] text-xl leading-none flex-shrink-0" aria-label="Назад">
+          ←
+        </Link>
+        <div className="relative flex-shrink-0">
+          {otherUser.avatar_url ? (
+            <Image
+              src={otherUser.avatar_url}
+              alt=""
+              width={36}
+              height={36}
+              className="rounded-full object-cover w-9 h-9"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-[#e63946] flex items-center justify-center text-white text-xs font-bold">
+              {getInitials(otherUser.full_name)}
             </div>
-
-            {/* Menu Button */}
-            <div className="relative" ref={chatMenuRef}>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-extrabold text-[#111] truncate">{otherUser.full_name}</p>
+          <p className="text-[10px] text-[#888] font-medium truncate">
+            {otherUser.city || 'На платформе'}
+          </p>
+        </div>
+        <div className="relative flex-shrink-0" ref={chatMenuRef}>
+          <button
+            type="button"
+            onClick={() => setShowChatMenu(!showChatMenu)}
+            className="w-8 h-8 rounded-full bg-[#f5f5f7] border border-[#eee] flex items-center justify-center text-[#555]"
+            aria-label="Меню"
+          >
+            <FiMoreVertical size={18} />
+          </button>
+          {showChatMenu && (
+            <div className="absolute right-0 top-full mt-2 bg-white border border-[#f0f0f0] rounded-xl shadow-lg min-w-[200px] z-50 overflow-hidden">
               <button
                 type="button"
-                onClick={() => setShowChatMenu(!showChatMenu)}
-                className="p-2 hover:bg-bg-secondary rounded-lg transition-colors"
+                onClick={() => {
+                  setShowChatMenu(false)
+                  handleDeleteChatForMe()
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f5f5f7] text-left text-[#111] text-sm"
               >
-                <FiMoreVertical size={20} className="text-graphite-secondary" strokeWidth={2} />
+                <FiTrash2 size={16} />
+                Удалить чат у меня
               </button>
-              {showChatMenu && (
-                <div className="absolute right-0 top-full mt-2 bg-bg-card border border-border-light rounded-md shadow-card min-w-[200px] z-50">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowChatMenu(false)
-                      handleDeleteChatForMe()
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-md transition-colors text-left text-graphite-secondary font-medium"
-                  >
-                    <FiTrash2 size={18} />
-                    <span>Удалить чат у меня</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowChatMenu(false)
-                      handleDeleteChatForAll()
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-md transition-colors text-left text-graphite-secondary font-medium"
-                  >
-                    <FiTrash2 size={18} />
-                    <span>Удалить чат у всех</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowChatMenu(false)
-                      setShowComplaintModal(true)
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-lg transition-colors text-left text-red-600"
-                  >
-                    <FiAlertCircle size={18} />
-                    <span>Пожаловаться</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Messages */}
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {/* Load Older Messages Button */}
-          {hasOlderMessages && (
-            <div className="text-center py-2">
               <button
-                onClick={loadOlderMessages}
-                disabled={loadingOlder}
-                className="text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+                type="button"
+                onClick={() => {
+                  setShowChatMenu(false)
+                  handleDeleteChatForAll()
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f5f5f7] text-left text-[#111] text-sm"
               >
-                {loadingOlder ? 'Загрузка...' : 'Загрузить старые сообщения'}
+                <FiTrash2 size={16} />
+                Удалить чат у всех
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowChatMenu(false)
+                  setShowComplaintModal(true)
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f5f5f7] text-left text-[#e63946] text-sm"
+              >
+                <FiAlertCircle size={16} />
+                Пожаловаться
               </button>
             </div>
           )}
-          
-          {messages.map((message) => {
-            const isOwn = message.sender_id === user.id
-            return (
-              <div
-                key={message.id}
-                className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-              >
+        </div>
+      </div>
+
+      {relatedOrder && (
+        <Link
+          href={`/orders/${relatedOrder.id}`}
+          className="mx-3.5 mt-2 mb-1 bg-white border border-[#f0f0f0] rounded-[14px] px-3 py-2.5 flex items-center gap-2 flex-shrink-0"
+        >
+          <span className="text-lg flex-shrink-0">{getCategoryIcon(relatedOrder.category)}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[9px] text-[#aaa] font-medium">Заказ</p>
+            <p className="text-[12px] font-bold text-[#111] truncate">{relatedOrder.title}</p>
+          </div>
+          <span className="text-[#e63946] text-sm flex-shrink-0">→</span>
+        </Link>
+      )}
+
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-3.5 py-2 flex flex-col gap-1.5 min-h-0">
+        {hasOlderMessages && (
+          <div className="text-center py-2">
+            <button
+              type="button"
+              onClick={loadOlderMessages}
+              disabled={loadingOlder}
+              className="text-[11px] text-[#888] font-semibold disabled:opacity-50"
+            >
+              {loadingOlder ? 'Загрузка...' : 'Загрузить ранее'}
+            </button>
+          </div>
+        )}
+
+        {messageGroups.map((group) => (
+          <div key={group.key}>
+            <div className="flex items-center gap-1.5 py-2 text-[9px] text-[#bbb] font-semibold">
+              <span className="flex-1 h-px bg-[#f0f0f0]" />
+              {group.label}
+              <span className="flex-1 h-px bg-[#f0f0f0]" />
+            </div>
+            {group.items.map((message) => {
+              const isOwn = message.sender_id === user.id
+              const isSystem = !isOwn && message.content && isSystemStyleMessage(message.content)
+
+              if (isSystem) {
+                return (
+                  <div key={message.id} className="bg-[#f5f5f7] rounded-xl px-3 py-2 my-1 text-center">
+                    <p className="text-[10px] text-[#888] leading-relaxed whitespace-pre-wrap">
+                      {message.content.replace(/\*\*/g, '')}
+                    </p>
+                  </div>
+                )
+              }
+
+              return (
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-3 border transition-colors rounded-lg ${
-                    isOwn
-                      ? 'bg-brand-accent text-white border-brand-accent'
-                      : 'bg-bg-primary border-border-color'
-                  }`}
+                  key={message.id}
+                  className={`flex flex-col max-w-[75%] mb-1 ${isOwn ? 'self-end items-end' : 'self-start items-start'}`}
                 >
-                  {!isOwn && (
-                    <div className="text-xs font-semibold mb-1 text-text-secondary">
-                      {message.sender.full_name}
-                    </div>
-                  )}
                   {message.image_url && (
-                    <div className="relative w-full rounded-lg mb-2 overflow-hidden" style={{ maxHeight: '300px', minHeight: '200px' }}>
+                    <div className="relative w-[140px] h-[100px] rounded-xl overflow-hidden mb-1 bg-[#f0f0f0]">
                       <Image
                         src={message.image_url}
-                        alt="Message attachment"
+                        alt=""
                         fill
-                        className="object-contain rounded-lg"
-                        sizes="(max-width: 768px) 80vw, 400px"
-                        loading="lazy"
+                        className="object-cover"
+                        sizes="140px"
                       />
                     </div>
                   )}
-                  {message.content && (
-                  <div className={isOwn ? 'text-white' : 'text-graphite-secondary'}>{message.content}</div>
+                  {message.content?.trim() && (
+                    <div
+                      className={`px-3 py-2 text-[12px] leading-relaxed rounded-2xl ${
+                        isOwn
+                          ? 'bg-[#e63946] text-white rounded-br-md'
+                          : 'bg-white text-[#111] border border-[#f0f0f0] rounded-bl-md'
+                      }`}
+                    >
+                      {message.content}
+                      {isOwn && message.read && (
+                        <span className="text-[9px] text-white/70 ml-1">✓✓</span>
+                      )}
+                    </div>
                   )}
-                  <div
-                    className={`text-xs mt-1 ${
-                      isOwn ? 'text-white/70' : 'text-text-secondary'
-                    }`}
-                  >
+                  <span className="text-[9px] text-[#bbb] mt-0.5 px-0.5">
                     {format(new Date(message.created_at), 'HH:mm', { locale: ru })}
-                  </div>
+                  </span>
                 </div>
-              </div>
-            )
-          })}
-          <div ref={messagesEndRef} />
-        </div>
+              )
+            })}
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
 
-        {/* Message Input */}
-        <div className="bg-bg-primary border-t border-border-color px-4 py-3 relative menu-container">
-          {/* Menu Modal */}
-          {showMenu && (
-            <div className="absolute bottom-full left-4 mb-2 bg-bg-card border border-border-light rounded-md shadow-card p-2 min-w-[200px] z-50">
-              <button
-                type="button"
-                onClick={() => {
-                  fileInputRef.current?.click()
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-lg transition-colors text-left"
-              >
-                <FiImage size={20} className="text-graphite-secondary" strokeWidth={2} />
-                <span className="text-graphite-secondary font-medium">Отправить фото</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMenu(false)
-                  setShowCalculator(true)
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary rounded-lg transition-colors text-left"
-              >
-                <span className="text-2xl">🔢</span>
-                <span className="text-graphite-secondary font-medium">Калькулятор</span>
-              </button>
-            </div>
-          )}
-
-          <form onSubmit={sendMessage} className="flex gap-2">
+      <div className="bg-white border-t border-[#f0f0f0] px-3.5 py-2 flex items-center gap-2 flex-shrink-0 menu-container relative">
+        {showMenu && (
+          <div className="absolute bottom-full left-3.5 mb-2 bg-white border border-[#f0f0f0] rounded-xl shadow-lg p-1 min-w-[180px] z-50">
             <button
               type="button"
-              onClick={() => setShowMenu(!showMenu)}
-              className="h-10 w-10 flex items-center justify-center bg-bg-secondary hover:bg-bg-primary text-graphite-secondary border border-border-light rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-              disabled={uploadingImage}
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-[#111] rounded-lg hover:bg-[#f5f5f7]"
             >
-              <FiPlus size={20} />
+              <FiImage size={18} />
+              Фото
             </button>
-            <div className="flex-1 relative">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Написать сообщение..."
-                className="input h-10 text-sm pr-10 w-full"
-                onFocus={() => setShowMenu(false)}
-              />
-              <button
-                type="submit"
-                disabled={uploadingImage || !newMessage.trim()}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-brand-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {uploadingImage ? (
-                  <span className="text-xs">Загрузка...</span>
-                ) : (
-                  <FiSend size={18} />
-                )}
-              </button>
-            </div>
-          </form>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-        </div>
-
-        {/* Calculator Modal */}
-        <CalculatorModal
-          isOpen={showCalculator}
-          onClose={() => setShowCalculator(false)}
-          onSendResult={(result) => sendMessage(undefined, result)}
-        />
-
-        {/* Complaint Modal */}
-        {otherUser && (
-          <ComplaintModal
-            isOpen={showComplaintModal}
-            onClose={() => setShowComplaintModal(false)}
-            reportedUserId={otherUser.id}
-            chatId={params.id as string}
-          />
+            <button
+              type="button"
+              onClick={() => {
+                setShowMenu(false)
+                setShowCalculator(true)
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-[#111] rounded-lg hover:bg-[#f5f5f7]"
+            >
+              <span>🔢</span>
+              Калькулятор
+            </button>
+          </div>
         )}
+
+        <button
+          type="button"
+          onClick={() => setShowMenu(!showMenu)}
+          disabled={uploadingImage}
+          className="w-8 h-8 rounded-full bg-[#f5f5f7] border border-[#eee] flex items-center justify-center text-[#888] flex-shrink-0"
+          aria-label="Вложения"
+        >
+          <FiPlus size={18} />
+        </button>
+
+        <form onSubmit={sendMessage} className="flex-1 flex items-center gap-2 min-w-0">
+          <div className="flex-1 bg-[#f5f5f7] rounded-[22px] px-3.5 py-2 border-[1.5px] border-[#ececec] min-w-0">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Сообщение..."
+              className="w-full bg-transparent text-[12px] text-[#111] placeholder:text-[#bbb] outline-none"
+              onFocus={() => setShowMenu(false)}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={uploadingImage || !newMessage.trim()}
+            className="w-9 h-9 rounded-full bg-[#e63946] flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40"
+            aria-label="Отправить"
+          >
+            <FiSend size={16} />
+          </button>
+        </form>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+          className="hidden"
+        />
       </div>
+
+      <CalculatorModal
+        isOpen={showCalculator}
+        onClose={() => setShowCalculator(false)}
+        onSendResult={(result) => sendMessage(undefined, result)}
+      />
+
+      {otherUser && (
+        <ComplaintModal
+          isOpen={showComplaintModal}
+          onClose={() => setShowComplaintModal(false)}
+          reportedUserId={otherUser.id}
+          chatId={params.id as string}
+        />
+      )}
     </div>
   )
 }
