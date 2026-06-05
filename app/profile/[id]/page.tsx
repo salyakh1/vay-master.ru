@@ -27,6 +27,7 @@ import RatingStars from '@/components/RatingStars'
 import StoriesCircle from '@/components/StoriesCircle'
 import SellerAddressPicker from '@/components/SellerAddressPicker'
 import MasterRadiusPicker from '@/components/MasterRadiusPicker'
+import ProfileStrictHeader from '@/components/profile/ProfileStrictHeader'
 import StoreLocationMapModal from '@/components/StoreLocationMapModal'
 
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
@@ -62,6 +63,7 @@ export default function ProfilePage() {
   const [followersCount, setFollowersCount] = useState<number>(0)
   const [followingCount, setFollowingCount] = useState<number>(0)
   const [productsCount, setProductsCount] = useState<number>(0)
+  const [masterOrdersCount, setMasterOrdersCount] = useState<number>(0)
   const [showFollowModal, setShowFollowModal] = useState<'followers' | 'following' | null>(null)
   const [followList, setFollowList] = useState<User[]>([])
   const [followListLoading, setFollowListLoading] = useState(false)
@@ -338,6 +340,7 @@ export default function ProfilePage() {
       const scheduleHeavy = () => {
         if (profileId) fetchFollowCounts(profileId)
         if (userData.role === 'master' && profileId) {
+          fetchMasterOrdersCount(profileId)
           fetchPortfolio().then(() => fetchMasterReviews(profileId))
         } else if (userData.role === 'seller' && profileId) {
           fetchSellerProducts()
@@ -374,6 +377,19 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error checking follow status:', error)
       setIsFollowing(false)
+    }
+  }
+
+  const fetchMasterOrdersCount = async (profileId: string) => {
+    try {
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('selected_master_id', profileId)
+        .in('status', ['in_progress', 'completed'])
+      setMasterOrdersCount(count ?? 0)
+    } catch (error) {
+      console.error('Error fetching master orders count:', error)
     }
   }
 
@@ -1268,10 +1284,10 @@ export default function ProfilePage() {
   const returnTo = searchParams.get('returnTo')
 
   return (
-    <div className="min-h-screen bg-bg-primary pb-20">
+    <div className={`min-h-screen pb-20 ${activeTab === 'profile' ? 'bg-[#f2f2f7]' : 'bg-bg-primary'}`}>
       {currentUser && <Navbar />}
-      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
-        <div className="w-full max-w-full sm:max-w-2xl md:max-w-4xl mx-auto">
+      <div className={`w-full mx-auto py-4 sm:py-6 ${activeTab === 'profile' ? 'max-w-lg px-0' : 'max-w-7xl px-2 sm:px-4 md:px-6 lg:px-8'}`}>
+        <div className={`w-full mx-auto ${activeTab === 'profile' ? 'max-w-lg' : 'max-w-full sm:max-w-2xl md:max-w-4xl'}`}>
           {/* Back to Responses Button */}
           {returnTo && (
             <div className="mb-4">
@@ -1321,224 +1337,58 @@ export default function ProfilePage() {
           {/* Profile Tab Content */}
           {activeTab === 'profile' && (
             <>
-              {/* Cover Photo and Avatar */}
-              <div className="relative mb-8 sm:mb-10 rounded-2xl overflow-hidden h-[200px] sm:h-[250px] group/cover shadow-glossy">
-                {profile.cover_photo_url ? (
-                  <>
-                    <img
-                      src={profile.cover_photo_url}
-                      alt="Cover"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover/cover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/10 to-transparent opacity-0 group-hover/cover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                  </>
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-gray-200 via-gray-300 to-gray-400" />
-                )}
-                
-                {/* Avatar positioned on cover photo - Глянцевый, премиальный */}
-                <div className="absolute bottom-2 sm:bottom-4 left-3 sm:left-6 group/avatar">
-                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 bg-gradient-to-br from-graphite-primary to-graphite-tertiary border-2 sm:border-4 border-white/50 flex items-center justify-center text-white text-2xl sm:text-3xl md:text-4xl font-semibold rounded-full shadow-premium overflow-hidden">
-                    {profile.avatar_url ? (
-                      <>
-                        <Image
-                          src={profile.avatar_url}
-                          alt={profile.full_name}
-                          fill
-                          className="object-cover rounded-full transition-all duration-300 group-hover/avatar:scale-110"
-                          sizes="(max-width: 640px) 80px, (max-width: 768px) 96px, 128px"
-                          priority
-                        />
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                      </>
-                    ) : (
-                      profile.full_name[0]?.toUpperCase() || '?'
-                    )}
-                    {/* Блик на аватаре */}
-                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/40 to-transparent rounded-t-full opacity-60"></div>
-                  </div>
-                </div>
-              </div>
+              <ProfileStrictHeader
+                profile={profile}
+                displayRoleLabel={roleLabels[displayRole as keyof typeof roleLabels] || roleLabels.client}
+                isOwnProfile={isOwnProfile}
+                isFollowing={isFollowing}
+                followLoading={followLoading}
+                followersCount={followersCount}
+                followingCount={followingCount}
+                profileSubcategories={profileSubcategories}
+                ordersCount={masterOrdersCount}
+                productsCount={productsCount}
+                onFollow={toggleFollow}
+                onMessage={handleStartChat}
+                onFollowersClick={() => setShowFollowModal('followers')}
+                onEdit={() => setActiveTab('settings')}
+                backHref={returnTo || null}
+              />
 
-              {/* Profile Info Card */}
-              <div className="card-glossy mb-8 sm:mb-10 mt-12 sm:mt-16 md:mt-20 w-full">
-                <div className="flex flex-col md:flex-row gap-4 sm:gap-6 w-full px-4 sm:px-5">
-                  <div className="flex-1 w-full">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3 flex-wrap">
-                      <h1 className="text-xl sm:text-2xl font-semibold text-graphite-secondary tracking-tight">{profile.full_name}</h1>
-                      <span className={`px-3 py-1 border text-xs font-medium rounded-md ${
-                        adminRole 
-                          ? 'border-brand-accent text-brand-accent bg-red-50' 
-                          : 'border-border-light text-graphite-secondary bg-bg-secondary'
-                      }`}>
-                        {roleLabels[displayRole as keyof typeof roleLabels] || roleLabels.client}
+              {(profile.role === 'master' || profile.role === 'seller') && (
+                <div className="bg-white px-4 py-3 mb-2">
+                  <StoriesCircle
+                    stories={profileStories}
+                    currentUser={currentUser}
+                    isOwnProfile={isOwnProfile}
+                    onStoryCreated={() => {
+                      const pid = Array.isArray(params.id) ? params.id[0] : params.id
+                      if (pid) fetchProfileStories(pid)
+                    }}
+                  />
+                </div>
+              )}
+
+              {profile.role === 'master' && profileServices.length > 0 && (
+                <div className="bg-white px-4 py-3 mb-2">
+                  <p className="text-[10px] font-semibold text-[#8e8e93] uppercase tracking-wide mb-2">Услуги</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {profileServices.map((svc) => (
+                      <span
+                        key={svc.id}
+                        className="text-[10px] font-medium text-[#3c3c43] bg-[#f2f2f7] border border-[#e5e5ea] px-2 py-1 rounded-md"
+                      >
+                        {svc.name}
                       </span>
-                      {!isOwnProfile && (
-                        <>
-                          {profile.role !== 'client' && (
-                            <button
-                              onClick={toggleFollow}
-                              disabled={followLoading}
-                              className={`ml-2 px-4 py-1.5 text-sm border rounded-md transition-colors font-medium ${
-                                isFollowing ? 'bg-brand-accent text-white border-brand-accent' : 'bg-bg-primary text-graphite-secondary border-border-light hover:border-brand-accent'
-                              }`}
-                            >
-                              {followLoading ? '...' : isFollowing ? 'Отписаться' : 'Подписаться'}
-                            </button>
-                          )}
-                          <button
-                            onClick={handleStartChat}
-                            className="ml-0 sm:ml-2 mt-2 sm:mt-0 px-3 sm:px-4 py-1.5 text-sm border border-brand-accent text-brand-accent rounded-md transition-colors hover:bg-brand-accent hover:text-white flex items-center gap-1.5 font-medium"
-                          >
-                            <FiMessageCircle size={14} strokeWidth={2} />
-                            Написать
-                          </button>
-                        </>
-                      )}
-                    </div>
-                    {profile.description && (
-                      <p className="text-text-secondary mb-5 text-base leading-relaxed">{profile.description}</p>
-                    )}
-                    <div className="flex flex-wrap gap-4 text-sm text-text-secondary">
-                      {/* У продавцов адрес только в блоке «Адрес магазина» ниже — здесь не дублируем */}
-                      {profile.role !== 'seller' && profile.city && (
-                        <div className="flex items-center gap-1">
-                          <FiMapPin size={14} />
-                          <span>{profile.city}</span>
-                        </div>
-                      )}
-                      {profile.phone && (
-                        <div className="flex items-center gap-1">
-                          <FiPhone size={14} />
-                          <span>{profile.phone}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1">
-                        <FiMail size={14} />
-                        <span>{profile.email}</span>
-                      </div>
-                    </div>
-
-                    {/* Подписчики / Подписки — для всех ролей */}
-                    <div className="mt-5 pt-5 border-t border-border-color/40 flex flex-wrap gap-4">
-                      <button
-                        type="button"
-                        onClick={() => setShowFollowModal('followers')}
-                        className="text-sm font-medium text-graphite-secondary hover:text-brand-accent transition-colors"
-                      >
-                        <span className="font-normal">{followersCount}</span>{' '}
-                        подписчиков
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowFollowModal('following')}
-                        className="text-sm font-medium text-graphite-secondary hover:text-brand-accent transition-colors"
-                      >
-                        <span className="font-normal">{followingCount}</span>{' '}
-                        подписок
-                      </button>
-                    </div>
+                    ))}
                   </div>
                 </div>
+              )}
 
-                {/* Истории профиля (только для мастера/продавца) */}
-                {(profile.role === 'master' || profile.role === 'seller') && (
-                  <div className="mt-6 px-4 sm:px-5">
-                    <StoriesCircle
-                      stories={profileStories}
-                      currentUser={currentUser}
-                      isOwnProfile={isOwnProfile}
-                      onStoryCreated={() => {
-                        const profileId = Array.isArray(params.id) ? params.id[0] : params.id
-                        if (profileId) {
-                          fetchProfileStories(profileId)
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Master-specific information */}
-                {profile.role === 'master' && (
-                  <div className="mt-10 pt-8 px-4 sm:px-5 border-t border-border-color/40">
-                    <div className="mb-6 border border-border-light rounded-xl overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => setSpecializationsExpanded(!specializationsExpanded)}
-                        className="w-full flex items-center justify-between px-4 py-3 text-left bg-bg-secondary/50 hover:bg-bg-secondary transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <FiBriefcase size={16} className="text-graphite-secondary" />
-                          <span className="text-sm font-semibold text-graphite-secondary">Специализации и услуги</span>
-                          <span className="text-xs text-text-secondary">
-                            {profileSubcategories.length + profileServices.length > 0
-                              ? `${profileSubcategories.length} подкат., ${profileServices.length} услуг`
-                              : profile.specialization
-                                ? 'специализация'
-                                : 'пока не выбрано'}
-                          </span>
-                        </div>
-                        {specializationsExpanded ? (
-                          <FiChevronUp size={18} className="text-text-secondary" />
-                        ) : (
-                          <FiChevronDown size={18} className="text-text-secondary" />
-                        )}
-                      </button>
-                      {specializationsExpanded && (
-                        <div className="px-4 py-4 bg-white border-t border-border-light">
-                          {profileSubcategories.length > 0 && (
-                            <div className="mb-4">
-                              <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">Специализации</div>
-                              <div className="flex flex-wrap gap-2.5">
-                                {profileSubcategories.map((spec) => (
-                                  <span
-                                    key={spec.id}
-                                    className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
-                                  >
-                                    {spec.name}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {profileServices.length > 0 && (
-                            <div className={profileSubcategories.length > 0 ? 'mt-4' : ''}>
-                              <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">Услуги мастера</div>
-                              <div className="flex flex-wrap gap-2.5">
-                                {profileServices.map((svc) => (
-                                  <span
-                                    key={svc.id}
-                                    className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
-                                  >
-                                    {svc.name}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {profileSubcategories.length === 0 && profile.specialization && (
-                            <div className={profileServices.length > 0 ? 'mt-4' : ''}>
-                              <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">Специализация</div>
-                              <div className="flex flex-wrap gap-2.5">
-                                {profile.specialization.split(',').map((spec, index) => (
-                                  <span
-                                    key={index}
-                                    className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
-                                  >
-                                    {spec.trim()}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {profileSubcategories.length === 0 && profileServices.length === 0 && !profile.specialization && (
-                            <p className="text-sm text-text-secondary">Пока не выбрано. Добавьте в настройках профиля.</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
+              {profile.role === 'master' && (
+                <div className="px-4">
+                  <div className="bg-white rounded-xl p-4 mb-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {profile.services && (
                         <div>
                           <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-graphite-secondary">
@@ -1580,6 +1430,7 @@ export default function ProfilePage() {
                         </div>
                       )}
                     </div>
+                  </div>
 
                     {/* Отзывы о мастере - раскрываемая секция - Render-on-Demand */}
                     {profile.role === 'master' && (
@@ -1868,9 +1719,8 @@ export default function ProfilePage() {
                         )}
                       </div>
                     )}
-
-                  </div>
-                )}
+                </div>
+              )}
 
                 {/* Seller-specific information */}
                 {profile.role === 'seller' && (
@@ -1949,7 +1799,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 )}
-              </div>
 
               {/* PROFILE_RELATED реклама для мастеров */}
               {profile.role === 'master' && (
@@ -1967,27 +1816,7 @@ export default function ProfilePage() {
 
               {/* Products for Sellers */}
               {profile.role === 'seller' && (
-                <div className="mb-10 sm:mb-12 w-full">
-                  {/* Статистика продавца */}
-                  <div className="card mb-6">
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <div className="text-lg font-semibold text-graphite-secondary">
-                          {profile.seller_reviews_count || 0}
-                        </div>
-                        <div className="text-sm text-text-secondary">Отзывов</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-semibold text-graphite-secondary">{productsCount}</div>
-                        <div className="text-sm text-text-secondary">Товаров</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-semibold text-graphite-secondary">{followersCount}</div>
-                        <div className="text-sm text-text-secondary">Подписчиков</div>
-                      </div>
-                    </div>
-                  </div>
-
+                <div className="mb-6 w-full px-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
                     <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight">Товары</h2>
                     <div className="flex gap-2">

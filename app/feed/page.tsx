@@ -7,12 +7,11 @@ import { useAuth } from '../providers'
 import { supabase, PortfolioItem, PortfolioComment } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import AdBannerSlider from '@/components/AdBannerSlider'
-import { FiGlobe, FiHeart, FiMessageCircle, FiSend } from 'react-icons/fi'
+import Link from 'next/link'
+import { FiHeart, FiMessageCircle } from 'react-icons/fi'
 import StoriesCircle from '@/components/StoriesCircle'
 import PostImageSlider from '@/components/PostImageSlider'
 import { Story } from '@/lib/supabase'
-import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 
 const FEED_MEDIA_MAX_HEIGHT = 320
 
@@ -34,6 +33,7 @@ export default function FeedPage() {
   const [storiesLoading, setStoriesLoading] = useState(false)
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({})
   const [submittingComments, setSubmittingComments] = useState<Record<string, boolean>>({})
+  const [feedTab, setFeedTab] = useState<'all' | 'masters' | 'sellers' | 'subs'>('all')
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
 
   const ITEMS_PER_PAGE = 9
@@ -335,186 +335,132 @@ export default function FeedPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Загрузка...</div>
+      <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto">
+        <div className="h-12 bg-white animate-pulse mb-2" />
+        <div className="h-16 bg-white animate-pulse mb-2" />
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="h-48 bg-white mb-2 animate-pulse" />
+        ))}
       </div>
     )
   }
 
   if (!user) return null
 
+  const FEED_TABS = [
+    { key: 'all' as const, label: 'Все' },
+    { key: 'masters' as const, label: 'Мастера' },
+    { key: 'sellers' as const, label: 'Продавцы' },
+    { key: 'subs' as const, label: 'Подписки' },
+  ]
+
+  const filteredItems = items.filter((item) => {
+    const role = item.master?.role
+    if (feedTab === 'masters') return role === 'master'
+    if (feedTab === 'sellers') return role === 'seller'
+    return true
+  })
+
   return (
-    <div className="min-h-screen bg-bg-primary pb-20">
+    <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full pb-24">
       <Navbar />
-      <div className="w-full mb-6">
+
+      {stories.length > 0 && (
+        <div className="bg-white border-b border-[#e5e5ea]/80 px-4 py-3 overflow-x-auto">
+          <StoriesCircle stories={stories} currentUser={user} isOwnProfile={false} onStoryCreated={fetchStories} />
+        </div>
+      )}
+
+      <div className="bg-white border-b border-[#e5e5ea]/80 flex">
+        {FEED_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setFeedTab(tab.key)}
+            className={`flex-1 text-center py-2.5 text-[11px] font-medium border-b-[1.5px] -mb-px ${
+              feedTab === tab.key ? 'text-[#c0392b] font-semibold border-[#c0392b]' : 'text-[#8e8e93] border-transparent'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="w-full mb-2">
         <AdBannerSlider page="feed" />
       </div>
-      <div className="container mx-auto px-4 py-6">
-        <div className="max-w-2xl mx-auto">
 
-          <div className="flex justify-end mb-4">
-            <button
-              onClick={() => router.push('/feed/publications')}
-              className="flex items-center gap-2 px-4 py-2 border border-border-color rounded-lg hover:bg-bg-secondary transition-colors text-sm text-text-secondary hover:text-text-primary"
-              title="Все публикации и товары"
-            >
-              <FiGlobe size={18} />
-              <span>Все публикации</span>
-            </button>
+      <div className="pb-4">
+        {filteredItems.length === 0 && !loading ? (
+          <div className="bg-white text-center text-[#8e8e93] py-14 px-6">
+            <p className="text-[15px] font-semibold text-[#1c1c1e] mb-2">Лента пуста</p>
+            <p className="text-[12px] leading-relaxed">Подпишитесь на мастеров и продавцов — их работы появятся здесь</p>
           </div>
-
-          {storiesLoading ? (
-            <div className="mb-6 text-center py-4 text-text-secondary">Загрузка историй...</div>
-          ) : stories.length > 0 ? (
-            <div className="mb-6">
-              <StoriesCircle
-                stories={stories}
-                currentUser={user}
-                isOwnProfile={false}
-                onStoryCreated={fetchStories}
-              />
-            </div>
-          ) : null}
-
-          <div className="space-y-7 mt-6">
-            {items.length === 0 && !loading ? (
-              <div className="card text-center text-text-secondary py-12 animate-fade-in">
-                <p className="text-lg font-medium text-graphite-secondary">Пока нет работ от ваших подписок.</p>
-              </div>
-            ) : items.length > 0 ? (
-              <>
-                <div className="w-full space-y-6">
-                  {items.map((item) => (
-                    <div key={item.id} className="bg-bg-card rounded-lg border border-border-light/40 overflow-hidden">
-                      <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-graphite-primary text-white flex items-center justify-center text-sm font-semibold rounded-full flex-shrink-0 relative overflow-hidden">
-                            {item.master?.avatar_url ? (
-                              <Image src={item.master.avatar_url} alt={item.master.full_name} fill className="object-cover" sizes="48px" />
-                            ) : (
-                              item.master?.full_name?.[0]?.toUpperCase() || 'M'
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-base text-graphite-secondary truncate">{item.master?.full_name || 'Мастер'}</div>
-                            {item.master?.city && (
-                              <div className="text-sm text-text-secondary truncate">{item.master.city}</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      {item.images && item.images.length > 0 ? (
-                        <div className="w-full overflow-hidden flex-shrink-0" style={{ height: FEED_MEDIA_MAX_HEIGHT }}>
-                          <PostImageSlider images={item.images} alt={item.title} className="w-full h-full [&_img]:!max-h-[320px] [&_img]:!object-cover" />
-                        </div>
-                      ) : item.videos && item.videos.length > 0 ? (
-                        <div className="w-full overflow-hidden flex-shrink-0" style={{ height: FEED_MEDIA_MAX_HEIGHT }}>
-                          <video src={item.videos[0]} controls className="w-full h-full object-cover" />
-                        </div>
-                      ) : null}
-                      <div className="px-4 sm:px-5 pt-3 pb-2">
-                        <div className="flex items-center gap-4 mb-2">
-                          <button
-                            onClick={() => handleLike(item.id)}
-                            className={item.liked ? 'text-brand-accent' : 'text-graphite-secondary'}
-                          >
-                            <FiHeart size={24} className={item.liked ? 'fill-current' : ''} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              const nextOpen = !item.showComments
-                              setCommentsOpen(item.id, nextOpen)
-                              if (nextOpen) fetchAllComments(item.id)
-                            }}
-                            className="text-graphite-secondary transition-colors"
-                          >
-                            <FiMessageCircle size={24} />
-                          </button>
-                        </div>
-                        {item.likes_count > 0 && (
-                          <div className="text-sm font-semibold text-graphite-secondary mb-2">
-                            {item.likes_count} {item.likes_count === 1 ? 'лайк' : item.likes_count < 5 ? 'лайка' : 'лайков'}
-                          </div>
-                        )}
-                      </div>
-                      <div className="px-4 sm:px-5 pb-3">
-                        {item.title && (
-                          <div className="font-semibold text-base sm:text-lg text-graphite-secondary tracking-tight mb-1.5">{item.title}</div>
-                        )}
-                        {item.description && (
-                          <p
-                            className={`text-sm sm:text-base text-text-secondary leading-relaxed whitespace-pre-wrap mb-2 ${!item.showComments ? 'line-clamp-1' : ''}`}
-                          >
-                            {item.description}
-                          </p>
-                        )}
-                        {!item.showComments && (item.comments_count ?? 0) > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCommentsOpen(item.id, true)
-                              fetchAllComments(item.id)
-                            }}
-                            className="text-sm text-text-secondary hover:text-text-primary mb-2"
-                          >
-                            Показать комментарии ({item.comments_count})
-                          </button>
-                        )}
-                        {item.showComments && (
-                          <div className="mb-2">
-                            {item.comments && item.comments.length > 0 && (
-                              <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
-                                {item.comments.map((comment) => (
-                                  <div key={comment.id} className="flex gap-2">
-                                    <div className="flex-1">
-                                      <span className="font-semibold text-sm text-graphite-secondary mr-2">{comment.user?.full_name || 'Пользователь'}</span>
-                                      <span className="text-sm text-text-secondary">{comment.content}</span>
-                                      <div className="text-xs text-text-muted mt-0.5">{format(new Date(comment.created_at), 'd MMMM', { locale: ru })}</div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {user && (
-                          <form
-                            onSubmit={(e) => { e.preventDefault(); handleSubmitComment(item.id) }}
-                            className="flex items-center gap-2 pt-2 border-t border-border-light/40"
-                          >
-                            <input
-                              type="text"
-                              value={commentTexts[item.id] || ''}
-                              onChange={(e) => setCommentTexts({ ...commentTexts, [item.id]: e.target.value })}
-                              placeholder="Добавить комментарий..."
-                              className="flex-1 text-sm bg-transparent border-none outline-none text-text-secondary placeholder-text-muted"
-                            />
-                            <button
-                              type="submit"
-                              disabled={!commentTexts[item.id]?.trim() || submittingComments[item.id]}
-                              className={commentTexts[item.id]?.trim() && !submittingComments[item.id] ? 'text-brand-accent' : 'text-text-muted'}
-                            >
-                              <FiSend size={18} />
-                            </button>
-                          </form>
-                        )}
-                      </div>
+        ) : (
+          <>
+            {filteredItems.map((item) => (
+              <div key={item.id} className="bg-white mb-2">
+                <div className="flex items-center gap-2.5 px-4 pt-3 pb-0">
+                  <Link href={`/profile/${item.master?.id}`} className="w-[38px] h-[38px] rounded-full bg-[#c0392b] text-white flex items-center justify-center text-xs font-semibold overflow-hidden flex-shrink-0 relative">
+                    {item.master?.avatar_url ? (
+                      <Image src={item.master.avatar_url} alt="" fill className="object-cover" sizes="38px" />
+                    ) : (
+                      item.master?.full_name?.[0]?.toUpperCase() || 'M'
+                    )}
+                  </Link>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold text-[#1c1c1e] truncate flex items-center gap-1">
+                      {item.master?.full_name || 'Мастер'}
                     </div>
-                  ))}
-                </div>
-                <div ref={loadMoreSentinelRef} className="h-2 w-full" aria-hidden />
-                {loadingMore && <div className="text-center text-sm text-text-secondary py-2">Загрузка…</div>}
-                {hasMore && !loadingMore && (
-                  <div className="mt-4 text-center">
-                    <button type="button" onClick={loadMore} className="btn btn-secondary">
-                      Загрузить ещё
-                    </button>
+                    <div className="text-[10px] text-[#8e8e93] truncate">
+                      {item.master?.role === 'seller' ? 'Продавец' : 'Мастер'}
+                      {item.master?.city ? ` · ${item.master.city}` : ''}
+                    </div>
                   </div>
+                </div>
+                {item.description && (
+                  <p className="px-4 pt-2.5 text-[13px] text-[#3c3c43] leading-relaxed">{item.description}</p>
                 )}
-              </>
-            ) : null}
-          </div>
-        </div>
+                {item.images && item.images.length > 0 ? (
+                  <div className="mt-2.5 h-[180px] bg-[#f2f2f7] overflow-hidden">
+                    <PostImageSlider images={item.images} alt={item.title} className="w-full h-full [&_img]:!h-[180px] [&_img]:!object-cover" />
+                  </div>
+                ) : item.videos && item.videos.length > 0 ? (
+                  <div className="mt-2.5 h-[180px] bg-[#f2f2f7] overflow-hidden">
+                    <video src={item.videos[0]} controls className="w-full h-full object-cover" />
+                  </div>
+                ) : null}
+                <div className="flex items-center px-3 py-2 border-t border-[#f2f2f7] gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleLike(item.id)}
+                    className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium ${item.liked ? 'text-[#c0392b]' : 'text-[#6d6d72]'}`}
+                  >
+                    <FiHeart size={14} className={item.liked ? 'fill-current' : ''} />
+                    {item.likes_count > 0 ? item.likes_count : ''}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextOpen = !item.showComments
+                      setCommentsOpen(item.id, nextOpen)
+                      if (nextOpen) fetchAllComments(item.id)
+                    }}
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-[#6d6d72]"
+                  >
+                    <FiMessageCircle size={14} />
+                    {(item.comments_count ?? 0) > 0 ? item.comments_count : ''}
+                  </button>
+                </div>
+                {item.title && (
+                  <p className="px-4 pb-2 text-[12px] font-semibold text-[#1c1c1e]">{item.title}</p>
+                )}
+              </div>
+            ))}
+            <div ref={loadMoreSentinelRef} className="h-2 w-full" aria-hidden />
+            {loadingMore && <div className="text-center text-xs text-[#8e8e93] py-2">Загрузка…</div>}
+          </>
+        )}
       </div>
     </div>
   )
