@@ -8,9 +8,10 @@ import {
   SURFACE_LABELS,
   SURFACES_BY_OBJECT,
   MATS_BY_SURFACE,
+  unitLabel,
   type ObjectTypeId,
   type SurfaceId,
-  type MaterialOption,
+  type SurfacePrices,
 } from './planner-ui-data'
 import type { RecommendedMaster, RecommendedProduct } from './planner-types'
 
@@ -41,6 +42,8 @@ type PlannerSinglePageProps = {
   onBrickSize: (size: BrickSize) => void
   wastePercent: number
   onWastePercent: (v: number) => void
+  surfacePrices: SurfacePrices
+  onSurfacePriceChange: (surface: SurfaceId, field: 'material' | 'work', value: number) => void
   calcLines: CalcLine[]
   materialTotal: number
   workTotal: number
@@ -81,6 +84,8 @@ export default function PlannerSinglePage({
   onBrickSize,
   wastePercent,
   onWastePercent,
+  surfacePrices,
+  onSurfacePriceChange,
   calcLines,
   materialTotal,
   workTotal,
@@ -305,6 +310,44 @@ export default function PlannerSinglePage({
             </button>
           ))}
         </div>
+
+        {selectedMat && enabledSurfaces[activeSurface] && (
+          <div className="mt-3 bg-white rounded-xl border border-[#e5e5ea]/80 px-3.5 py-3">
+            <p className="text-[12px] font-semibold text-[#1c1c1e] mb-2">
+              Цены за {unitLabel(selectedMat.unit)}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-[10px] text-[#8e8e93]">
+                Материал, ₽
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={surfacePrices[activeSurface]?.material ?? ''}
+                  placeholder="0"
+                  onChange={(e) =>
+                    onSurfacePriceChange(activeSurface, 'material', Number(e.target.value) || 0)
+                  }
+                  className="mt-1 w-full h-9 px-2 rounded-lg border border-[#e5e5ea] text-[12px] font-semibold text-[#1c1c1e]"
+                />
+              </label>
+              <label className="text-[10px] text-[#8e8e93]">
+                Работа, ₽
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={surfacePrices[activeSurface]?.work ?? ''}
+                  placeholder="0"
+                  onChange={(e) =>
+                    onSurfacePriceChange(activeSurface, 'work', Number(e.target.value) || 0)
+                  }
+                  className="mt-1 w-full h-9 px-2 rounded-lg border border-[#e5e5ea] text-[12px] font-semibold text-[#1c1c1e]"
+                />
+              </label>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Brick / block params for house facade */}

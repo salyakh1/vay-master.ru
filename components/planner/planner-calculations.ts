@@ -85,6 +85,7 @@ export function buildCalcLines(input: {
   wallThick: number
   brickSize: BrickSize
   wastePercent: number
+  surfacePrices: Partial<Record<SurfaceId, { material: number; work: number }>>
 }): CalcLine[] {
   const lines: CalcLine[] = []
   const { areas, enabledSurfaces, selections, matsBySurface } = input
@@ -118,16 +119,20 @@ export function buildCalcLines(input: {
       input.wastePercent
     )
 
+    const prices = input.surfacePrices[surface]
+    const materialPrice = Math.max(0, prices?.material ?? 0)
+    const workPrice = Math.max(0, prices?.work ?? 0)
+
     lines.push({
       id: `${surface}-${mat.id}`,
       surface,
       label: `${mat.icon} ${mat.name}`,
       quantity,
       unit,
-      materialPrice: mat.materialPrice,
-      workPrice: mat.workPrice,
-      materialTotal: Math.round(quantity * mat.materialPrice),
-      workTotal: Math.round(quantity * mat.workPrice),
+      materialPrice,
+      workPrice,
+      materialTotal: Math.round(quantity * materialPrice),
+      workTotal: Math.round(quantity * workPrice),
       note,
     })
   })

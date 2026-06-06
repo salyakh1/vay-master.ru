@@ -122,6 +122,27 @@ export function defaultEnabledSurfaces(objectType: ObjectTypeId): Record<Surface
   }
 }
 
+export type SurfacePriceEntry = { material: number; work: number }
+export type SurfacePrices = Partial<Record<SurfaceId, SurfacePriceEntry>>
+
+export function unitLabel(unit: MaterialOption['unit']): string {
+  const map = { m2: 'м²', m3: 'м³', pcs: 'шт', lm: 'п.м' } as const
+  return map[unit]
+}
+
+export function pricesFromSelections(
+  selections: Partial<Record<SurfaceId, string>>
+): SurfacePrices {
+  const out: SurfacePrices = {}
+  for (const surface of Object.keys(selections) as SurfaceId[]) {
+    const matId = selections[surface]
+    if (!matId) continue
+    const mat = findMatById(matId)
+    if (mat) out[surface] = { material: mat.materialPrice, work: mat.workPrice }
+  }
+  return out
+}
+
 export function defaultSelections(objectType: ObjectTypeId): Partial<Record<SurfaceId, string>> {
   if (objectType === 'yard') return { paving: 'pavers' }
   if (objectType === 'house') {

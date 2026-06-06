@@ -11,12 +11,14 @@ import {
   SURFACES_BY_OBJECT,
   defaultEnabledSurfaces,
   defaultSelections,
+  pricesFromSelections,
   DEFAULT_BRICK_SIZE,
   BRICK_PRESETS,
   findMatById,
   type MatOption,
   type ObjectTypeId,
   type SurfaceId,
+  type SurfacePrices,
 } from '@/components/planner/planner-ui-data'
 import type { RecommendedMaster, RecommendedProduct } from '@/components/planner/planner-types'
 import {
@@ -73,6 +75,9 @@ export default function PlannerPage() {
   const [activeSurface, setActiveSurface] = useState<SurfaceId>('floor')
   const [enabledSurfaces, setEnabledSurfaces] = useState(defaultEnabledSurfaces('room'))
   const [selections, setSelections] = useState<Partial<Record<SurfaceId, string>>>(defaultSelections('room'))
+  const [surfacePrices, setSurfacePrices] = useState<SurfacePrices>(() =>
+    pricesFromSelections(defaultSelections('room'))
+  )
   const [brickSize, setBrickSize] = useState<BrickSize>(DEFAULT_BRICK_SIZE)
   const [savedHint, setSavedHint] = useState(false)
   const [floorThick, setFloorThick] = useState(5)
@@ -83,10 +88,6 @@ export default function PlannerPage() {
   const [servicesLoading, setServicesLoading] = useState(false)
 
   const [wallHeight, setWallHeight] = useState(2.7)
-  const [thicknessCm, setThicknessCm] = useState(1)
-  const [workPrice, setWorkPrice] = useState('')
-  const [materialPrice, setMaterialPrice] = useState('')
-  const [priceUnit, setPriceUnit] = useState<'m2' | 'm3'>('m2')
 
   const [recommendedMasters, setRecommendedMasters] = useState<RecommendedMaster[]>([])
   const [recommendedProducts, setRecommendedProducts] = useState<RecommendedProduct[]>([])
@@ -435,6 +436,7 @@ export default function PlannerPage() {
         wallThick,
         brickSize,
         wastePercent: reservePercent,
+        surfacePrices,
       }),
     [
       objectType,
@@ -449,6 +451,7 @@ export default function PlannerPage() {
       wallThick,
       brickSize,
       reservePercent,
+      surfacePrices,
     ]
   )
 
@@ -475,6 +478,7 @@ export default function PlannerPage() {
         wallHeight?: number
         objectType?: ObjectTypeId
         selections?: Partial<Record<SurfaceId, string>>
+        surfacePrices?: SurfacePrices
         enabledSurfaces?: Record<SurfaceId, boolean>
         floorThick?: number
         wallThick?: number
@@ -489,6 +493,7 @@ export default function PlannerPage() {
         setActiveSurface(SURFACES_BY_OBJECT[data.objectType][0])
       }
       if (data.selections) setSelections(data.selections)
+      if (data.surfacePrices) setSurfacePrices(data.surfacePrices)
       if (data.enabledSurfaces) setEnabledSurfaces(data.enabledSurfaces)
       if (data.floorThick) setFloorThick(data.floorThick)
       if (data.wallThick) setWallThick(data.wallThick)
@@ -723,6 +728,7 @@ export default function PlannerPage() {
           wallHeight,
           objectType,
           selections,
+          surfacePrices,
           enabledSurfaces,
           floorThick,
           wallThick,
@@ -742,9 +748,11 @@ export default function PlannerPage() {
   }
 
   const handleObjectType = (t: ObjectTypeId) => {
+    const sel = defaultSelections(t)
     setObjectType(t)
     setEnabledSurfaces(defaultEnabledSurfaces(t))
-    setSelections(defaultSelections(t))
+    setSelections(sel)
+    setSurfacePrices(pricesFromSelections(sel))
     setActiveSurface(SURFACES_BY_OBJECT[t][0])
   }
 
@@ -754,8 +762,25 @@ export default function PlannerPage() {
 
   const handleSelectMaterial = (surface: SurfaceId, matId: string) => {
     setSelections((prev) => ({ ...prev, [surface]: matId }))
+    const mat = findMatById(matId)
+    if (mat) {
+      setSurfacePrices((prev) => ({
+        ...prev,
+        [surface]: { material: mat.materialPrice, work: mat.workPrice },
+      }))
+    }
     const preset = BRICK_PRESETS[matId]
     if (preset) setBrickSize((prev) => ({ ...prev, ...preset }))
+  }
+
+  const handleSurfacePriceChange = (surface: SurfaceId, field: 'material' | 'work', value: number) => {
+    setSurfacePrices((prev) => ({
+      ...prev,
+      [surface]: {
+        material: field === 'material' ? value : (prev[surface]?.material ?? 0),
+        work: field === 'work' ? value : (prev[surface]?.work ?? 0),
+      },
+    }))
   }
 
   const showCanvasHint = points.length === 0 && !isClosed
@@ -800,6 +825,8 @@ export default function PlannerPage() {
       onBrickSize={setBrickSize}
       wastePercent={reservePercent}
       onWastePercent={setReservePercent}
+      surfacePrices={surfacePrices}
+      onSurfacePriceChange={handleSurfacePriceChange}
       calcLines={calcLines}
       materialTotal={materialTotal}
       workTotal={workTotalCalc}
