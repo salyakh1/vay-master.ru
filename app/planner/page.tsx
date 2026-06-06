@@ -2,18 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
-import Link from 'next/link'
-import Navbar from '@/components/Navbar'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
+import PlannerWizard from '@/components/planner/PlannerWizard'
 import {
-  FiTrash2,
-  FiCornerUpLeft,
-  FiCheckCircle,
-  FiGrid,
-  FiCornerUpRight,
-} from 'react-icons/fi'
+  FLOOR_MATS,
+  WALL_MATS,
+  CEIL_MATS,
+  findMatLabel,
+  type MatOption,
+} from '@/components/planner/planner-ui-data'
+import type { RecommendedMaster, RecommendedProduct } from '@/components/planner/planner-types'
 import {
   polygonArea,
   polygonPerimeter,
@@ -27,7 +26,6 @@ import {
   type Point,
 } from '@/lib/planner-geometry'
 
-type PlannerTab = 'room' | 'apartment' | 'yard' | 'house' | 'extension'
 type SurfaceMode = 'floor' | 'walls'
 type MeasureType = 'area' | 'volume'
 
@@ -39,38 +37,18 @@ type ServiceItem = {
   specialization_id?: string
 }
 
-type RecommendedMaster = {
-  id: string
-  full_name: string
-  avatar_url?: string | null
-  city?: string | null
-  master_rating?: number | null
-  master_reviews_count?: number | null
-}
+const PLANNER_STORAGE_KEY = 'vay-planner-draft'
 
-type RecommendedProduct = {
-  id: string
-  name: string
-  price: number
-  images?: string[] | null
-  seller?: {
-    id?: string
-    full_name?: string | null
-    avatar_url?: string | null
-  } | null
-  category_ref?: {
-    name?: string | null
-    section?: string | null
-  } | null
+function findServiceForMat(mats: MatOption[], matId: string, list: ServiceItem[]): string {
+  const mat = mats.find((m) => m.id === matId)
+  if (!mat) return ''
+  const lower = (v: string) => v.toLowerCase()
+  for (const kw of mat.keywords) {
+    const hit = list.find((s) => lower(s.name).includes(kw.toLowerCase()))
+    if (hit) return hit.id
+  }
+  return ''
 }
-
-const TABS: Array<{ id: PlannerTab; label: string }> = [
-  { id: 'room', label: 'Комната' },
-  { id: 'apartment', label: 'Квартира' },
-  { id: 'yard', label: 'Двор' },
-  { id: 'house', label: 'Дом' },
-  { id: 'extension', label: 'Пристройка' },
-]
 
 /** Ключевые слова для фильтра услуг «Стены» — из нашей системы (services) */
 const WALL_KEYWORDS = [
@@ -89,7 +67,14 @@ export default function PlannerPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
 
-  const [activeTab, setActiveTab] = useState<PlannerTab>('room')
+  const [wizardStep, setWizardStep] = useState(1)
+  const [floorMat, setFloorMat] = useState('laminate')
+  const [wallMat, setWallMat] = useState('paint')
+  const [ceilMat, setCeilMat] = useState('paint')
+  const [floorThick, setFloorThick] = useState(5)
+  const [wallThick, setWallThick] = useState(1.5)
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({})
+  const [drawTool, setDrawTool] = useState<'draw' | 'door' | 'window'>('draw')
   const [mode, setMode] = useState<SurfaceMode>('floor')
   const [measureType, setMeasureType] = useState<MeasureType>('area')
   const [selectedServiceId, setSelectedServiceId] = useState<string>('')
@@ -271,11 +256,8 @@ export default function PlannerPage() {
 
   useEffect(() => {
     const fetchRecommendations = async () => {
-      if (!selectedServiceId) {
-        setRecommendedMasters([])
-        setRecommendedProducts([])
-        return
-      }
+      if (wizardStep < 4) return
+      if (!selectedServiceId) return
       setRecommendationsLoading(true)
       try {
         const productsBase = supabase
@@ -359,7 +341,7 @@ export default function PlannerPage() {
     }
 
     fetchRecommendations()
-  }, [selectedServiceId, selectedServiceName, isWarmFloor])
+  }, [selectedServiceId, selectedServiceName, isWarmFloor, wizardStep])
 
   const filteredServices = useMemo(() => {
     const nameLower = (name: string) => name.toLowerCase()
@@ -382,14 +364,21 @@ export default function PlannerPage() {
   }, [points, isClosed])
 
   const handleUndo = useCallback(() => {
-    if (history.length === 0) return
-    setRedoStack((r) => [...r, { points: [...points], isClosed }])
-    const prev = history[history.length - 1]
-    setHistory((h) => h.slice(0, -1))
-    setPoints(prev.points)
-    setIsClosed(prev.isClosed)
+    if (history.length > 0) {
+      setRedoStack((r) => [...r, { points: [...points], isClosed }])
+      const prev = history[history.length - 1]
+      setHistory((h) => h.slice(0, -1))
+      setPoints(prev.points)
+      setIsClosed(prev.isClosed)
+      setCloseBlockedReason(null)
+      setDraggingPointIndex(null)
+      return
+    }
+    if (points.length === 0) return
+    setPoints((prev) => prev.slice(0, -1))
+    setIsClosed(false)
+    setCurrentPoint(null)
     setCloseBlockedReason(null)
-    setDraggingPointIndex(null)
   }, [history, points, isClosed])
 
   const handleRedo = useCallback(() => {
@@ -416,7 +405,7 @@ export default function PlannerPage() {
   }
 
   const buildLabelParts = (meters: number) => {
-    const label = meters.toFixed(2)
+    const label = `${meters.toFixed(1)} м`
     const segments = label.split('')
     const gap = 0.09
     const widths = segments.map((segment) => estimateCharWidth(segment))
@@ -457,7 +446,49 @@ export default function PlannerPage() {
   const workTotal = Number(workPrice || 0) * quantityByUnit
   const materialTotal = Number(materialPrice || 0) * quantityByUnit
   const grandTotal = workTotal + materialTotal
-  const showRecommendations = polygonClosed && floorArea > 5
+  const ceilingArea = floorArea
+  const showRecommendations = wizardStep >= 4
+
+  useEffect(() => {
+    setThicknessCm(floorThick)
+  }, [floorThick])
+
+  useEffect(() => {
+    const floorId = findServiceForMat(FLOOR_MATS, floorMat, services)
+    const wallId = findServiceForMat(WALL_MATS, wallMat, services)
+    const ceilId = findServiceForMat(CEIL_MATS, ceilMat, services)
+    const next = floorId || wallId || ceilId
+    if (next) setSelectedServiceId(next)
+  }, [floorMat, wallMat, ceilMat, services])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PLANNER_STORAGE_KEY)
+      if (!raw) return
+      const data = JSON.parse(raw) as {
+        points?: Point[]
+        isClosed?: boolean
+        wallHeight?: number
+        floorMat?: string
+        wallMat?: string
+        ceilMat?: string
+        floorThick?: number
+        wallThick?: number
+        checkedItems?: Record<string, boolean>
+      }
+      if (data.points?.length) setPoints(data.points)
+      if (data.isClosed) setIsClosed(true)
+      if (data.wallHeight) setWallHeight(data.wallHeight)
+      if (data.floorMat) setFloorMat(data.floorMat)
+      if (data.wallMat) setWallMat(data.wallMat)
+      if (data.ceilMat) setCeilMat(data.ceilMat)
+      if (data.floorThick) setFloorThick(data.floorThick)
+      if (data.wallThick) setWallThick(data.wallThick)
+      if (data.checkedItems) setCheckedItems(data.checkedItems)
+    } catch {
+      /* ignore corrupt draft */
+    }
+  }, [])
 
   useEffect(() => {
     if (!showRecommendations || selectedServiceId) return
@@ -524,6 +555,7 @@ export default function PlannerPage() {
   }
 
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (drawTool !== 'draw') return
     if (event.pointerType === 'touch' && isPinchingRef.current) return
     svgRef.current?.setPointerCapture(event.pointerId)
     updatePointers(event)
@@ -573,6 +605,7 @@ export default function PlannerPage() {
   }
 
   const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (drawTool !== 'draw') return
     if (event.pointerType === 'touch' && isPinchingRef.current) return
     updatePointers(event)
 
@@ -603,6 +636,7 @@ export default function PlannerPage() {
   }
 
   const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (drawTool !== 'draw') return
     pointersRef.current.delete(event.pointerId)
     svgRef.current?.releasePointerCapture(event.pointerId)
 
@@ -705,135 +739,110 @@ export default function PlannerPage() {
     setIsClosed(true)
   }
 
+  const handleSave = () => {
+    try {
+      localStorage.setItem(
+        PLANNER_STORAGE_KEY,
+        JSON.stringify({
+          points,
+          isClosed,
+          wallHeight,
+          floorMat,
+          wallMat,
+          ceilMat,
+          floorThick,
+          wallThick,
+          checkedItems,
+        })
+      )
+    } catch {
+      /* storage full / private mode */
+    }
+  }
+
+  const handleCreateOrder = () => {
+    const floorLabel = findMatLabel(FLOOR_MATS, floorMat)
+    const wallLabel = findMatLabel(WALL_MATS, wallMat)
+    const ceilLabel = findMatLabel(CEIL_MATS, ceilMat)
+    const description = [
+      `Планировщик комнаты:`,
+      `пол ${floorArea.toFixed(1)} м² (${floorLabel?.name || '—'})`,
+      `стены ${wallAreaNet.toFixed(1)} м² (${wallLabel?.name || '—'})`,
+      `потолок ${ceilingArea.toFixed(1)} м² (${ceilLabel?.name || '—'})`,
+      `высота ${wallHeight.toFixed(2)} м`,
+    ].join(', ')
+    try {
+      sessionStorage.setItem(
+        'planner-order-draft',
+        JSON.stringify({ title: 'Ремонт комнаты по планировщику', description })
+      )
+    } catch {
+      /* ignore */
+    }
+    router.push('/orders/new')
+  }
+
+  const toggleCheckItem = (id: string) => {
+    setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  const showCanvasHint = points.length === 0 && !isClosed
+
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg text-text-secondary">Загрузка...</div>
+      <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full pb-28">
+        <div className="bg-white border-b border-[#e5e5ea]/80 px-4 py-3 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-[#f2f2f7] animate-pulse" />
+          <div className="h-4 flex-1 bg-[#f2f2f7] rounded animate-pulse" />
+          <div className="h-8 w-16 bg-[#f2f2f7] rounded-lg animate-pulse" />
+        </div>
+        <div className="mx-3 mt-3 h-[280px] bg-white rounded-xl border border-[#e5e5ea]/80 animate-pulse" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-bg-primary pb-24">
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col gap-3 mb-8">
-            <h1 className="text-3xl font-semibold tracking-tight text-graphite-secondary">Планерка</h1>
-            <p className="text-sm text-text-secondary">
-              Свободно рисуйте контур пальцем, замкните его и получите расчет.
-            </p>
+    <PlannerWizard
+      step={wizardStep}
+      onStepChange={setWizardStep}
+      onBack={() => router.back()}
+      onSave={handleSave}
+      onCreateOrder={handleCreateOrder}
+      floorArea={floorArea}
+      wallArea={wallAreaNet}
+      ceilingArea={ceilingArea}
+      wallHeight={wallHeight}
+      onWallHeightChange={setWallHeight}
+      floorMat={floorMat}
+      wallMat={wallMat}
+      ceilMat={ceilMat}
+      onFloorMat={setFloorMat}
+      onWallMat={setWallMat}
+      onCeilMat={setCeilMat}
+      floorThick={floorThick}
+      wallThick={wallThick}
+      onFloorThick={setFloorThick}
+      onWallThick={setWallThick}
+      checked={checkedItems}
+      onToggleCheck={toggleCheckItem}
+      drawTool={drawTool}
+      onDrawTool={setDrawTool}
+      onUndo={handleUndo}
+      showCanvasHint={showCanvasHint}
+      recommendedMasters={recommendedMasters}
+      recommendedProducts={recommendedProducts}
+      recommendationsLoading={recommendationsLoading}
+    >
+      <div className="relative">
+        {closeBlockedReason && (
+          <div className="absolute left-3 bottom-3 right-3 px-2 py-1.5 rounded-lg bg-amber-100 text-amber-800 text-xs z-20">
+            {closeBlockedReason}
           </div>
-
-          <div className="flex flex-wrap gap-2 mb-8">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                disabled={tab.id !== 'room'}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors border ${
-                  activeTab === tab.id
-                    ? 'bg-brand-accent text-white border-brand-accent'
-                    : 'bg-bg-card text-text-secondary border-border-light/60'
-                } ${tab.id !== 'room' ? 'opacity-40 cursor-not-allowed' : ''}`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {activeTab !== 'room' ? (
-            <div className="rounded-2xl border border-border-light/60 bg-bg-card p-10 text-center text-text-secondary">
-              Этот раздел в разработке. Сейчас доступен только режим «Комната».
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="space-y-6">
-                <div className="rounded-2xl border border-border-light/60 bg-bg-card p-3">
-                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                    <div>
-                      <h2 className="text-lg font-semibold text-graphite-secondary">Полотно</h2>
-                      <p className="text-xs text-text-secondary">
-                        Сетка 10 см. Снап к 0°/90°/45°. Клик по сегменту — вставка точки; перетаскивание узла — редактирование.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-1.5 text-xs text-text-secondary">
-                        <input
-                          type="checkbox"
-                          checked={snapToGridEnabled}
-                          onChange={(e) => setSnapToGridEnabled(e.target.checked)}
-                        />
-                        Сетка
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs text-text-secondary">
-                        <input
-                          type="checkbox"
-                          checked={snapTo45}
-                          onChange={(e) => setSnapTo45(e.target.checked)}
-                        />
-                        45°
-                      </label>
-                    </div>
-                    <span className="text-xs text-text-secondary">
-                      {isClosed ? 'Контур замкнут' : `Точек: ${points.length}`}
-                    </span>
-                  </div>
-                  <div className="rounded-xl border border-border-light/60 bg-white p-0 relative">
-                    <div className="absolute right-3 bottom-3 flex flex-row gap-2 z-20">
-                      <button
-                        type="button"
-                        onClick={handleCloseShape}
-                        className="w-10 h-10 rounded-full bg-brand-accent text-white shadow-md flex items-center justify-center"
-                        title="Замкнуть"
-                      >
-                        <FiCheckCircle size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleUndoPoint}
-                        disabled={points.length === 0}
-                        className="w-10 h-10 rounded-full bg-white border border-border-light/60 text-graphite-secondary shadow-md flex items-center justify-center disabled:opacity-50"
-                        title="Удалить последнюю точку"
-                      >
-                        <FiCornerUpLeft size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleUndo}
-                        disabled={history.length === 0}
-                        className="w-10 h-10 rounded-full bg-white border border-border-light/60 text-graphite-secondary shadow-md flex items-center justify-center disabled:opacity-50"
-                        title="Отменить (Undo)"
-                      >
-                        <FiCornerUpLeft size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleRedo}
-                        disabled={redoStack.length === 0}
-                        className="w-10 h-10 rounded-full bg-white border border-border-light/60 text-graphite-secondary shadow-md flex items-center justify-center disabled:opacity-50"
-                        title="Повторить (Redo)"
-                      >
-                        <FiCornerUpRight size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleClear}
-                        className="w-10 h-10 rounded-full bg-white border border-border-light/60 text-graphite-secondary shadow-md flex items-center justify-center"
-                        title="Очистить"
-                      >
-                        <FiTrash2 size={18} />
-                      </button>
-                    </div>
-                    {closeBlockedReason && (
-                      <div className="absolute left-3 bottom-3 right-24 px-2 py-1.5 rounded-lg bg-amber-100 text-amber-800 text-xs z-20">
-                        {closeBlockedReason}
-                      </div>
-                    )}
-                    <svg
+        )}
+        <svg
                       ref={svgRef}
                       viewBox={`0 0 ${previewWidth} ${previewHeight}`}
-                      className="w-full h-[480px] touch-none block"
+          className="w-full h-[280px] touch-none block"
                       style={{ touchAction: 'none' }}
                       preserveAspectRatio="none"
                       onPointerDown={handlePointerDown}
@@ -846,62 +855,34 @@ export default function PlannerPage() {
                       <defs>
                         <pattern id="grid" width={gridStep} height={gridStep} patternUnits="userSpaceOnUse">
                           <path
-                            d={`M 0 0 L 0 ${gridStep} ${gridStep} ${gridStep}`}
+                            d={`M ${gridStep} 0 L 0 0 0 ${gridStep}`}
                             fill="none"
-                            stroke="#eef2f6"
+                            stroke="#f0f0f5"
                             strokeWidth="0.02"
                           />
                         </pattern>
-                        <pattern id="gridBold" width={gridStep * 5} height={gridStep * 5} patternUnits="userSpaceOnUse">
-                          <path
-                            d={`M 0 0 L 0 ${gridStep * 5} ${gridStep * 5} ${gridStep * 5}`}
-                            fill="none"
-                            stroke="#dde5ee"
-                            strokeWidth="0.03"
-                          />
-                        </pattern>
-                        <filter id="shapeShadow" x="-30%" y="-30%" width="160%" height="160%">
-                          <feDropShadow dx="0" dy="0.03" stdDeviation="0.06" floodColor="#0f172a" floodOpacity="0.08" />
-                        </filter>
-                        <filter id="nodeShadow" x="-30%" y="-30%" width="160%" height="160%">
-                          <feDropShadow dx="0" dy="0.02" stdDeviation="0.04" floodColor="#0f172a" floodOpacity="0.18" />
-                        </filter>
                       </defs>
                       <g transform={`scale(${zoom})`} transformOrigin="50% 50%">
-                        <rect width="100%" height="100%" fill="#f8fafc" />
+                        <rect width="100%" height="100%" fill="#ffffff" />
                         <rect width="100%" height="100%" fill="url(#grid)" />
-                        <rect width="100%" height="100%" fill="url(#gridBold)" />
 
                         {points.length > 1 && !isClosed && (
                           <polyline
                             points={points.map((p) => `${p.x},${p.y}`).join(' ')}
                             fill="none"
-                            stroke="#9ecfd7"
-                            strokeWidth="0.08"
+                            stroke="#1c1c1e"
+                            strokeWidth="0.12"
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            filter="url(#shapeShadow)"
                           />
                         )}
 
                         {points.length > 2 && isClosed && (
                           <polygon
                             points={points.map((p) => `${p.x},${p.y}`).join(' ')}
-                            fill="#ffffff"
-                            stroke="#9ecfd7"
-                            strokeWidth="0.16"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            filter="url(#shapeShadow)"
-                          />
-                        )}
-
-                        {points.length > 2 && isClosed && (
-                          <polygon
-                            points={points.map((p) => `${p.x},${p.y}`).join(' ')}
-                            fill="none"
-                            stroke="#cdd9e2"
-                            strokeWidth="0.03"
+                            fill="rgba(192,57,43,0.06)"
+                            stroke="#1c1c1e"
+                            strokeWidth="0.12"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           />
@@ -926,15 +907,23 @@ export default function PlannerPage() {
                             const labelY = midY + ny * offset
                             return (
                               <g key={`len-${index}`} transform={`translate(${labelX} ${labelY}) rotate(${angle})`}>
+                                <rect
+                                  x={-labelParts.total / 2 - 0.08}
+                                  y={-0.22}
+                                  width={labelParts.total + 0.16}
+                                  height={0.44}
+                                  fill="rgba(255,255,255,0.85)"
+                                  rx={0.04}
+                                />
                                 <text
                                   x={0}
                                   y={0}
                                   textAnchor="middle"
                                   dominantBaseline="middle"
-                                  fontSize="0.32"
-                                  fill="#1f2937"
-                                  fontWeight="500"
-                                  letterSpacing="0.03em"
+                                  fontSize="0.28"
+                                  fill="#c0392b"
+                                  fontWeight="700"
+                                  letterSpacing="0.02em"
                                   direction="ltr"
                                   unicodeBidi="plaintext"
                                 >
@@ -960,9 +949,9 @@ export default function PlannerPage() {
                             y1={points[points.length - 1].y}
                             x2={currentPoint.x}
                             y2={currentPoint.y}
-                            stroke="#94a3b8"
-                            strokeWidth="0.03"
-                            strokeDasharray="0.06 0.06"
+                            stroke="rgba(192,57,43,0.5)"
+                            strokeWidth="0.08"
+                            strokeDasharray="0.08 0.08"
                             strokeLinecap="round"
                           />
                         )}
@@ -977,15 +966,23 @@ export default function PlannerPage() {
                           const midY = (points[points.length - 1].y + currentPoint.y) / 2
                           return (
                             <g transform={`translate(${midX} ${midY})`}>
+                              <rect
+                                x={-labelParts.total / 2 - 0.08}
+                                y={-0.67}
+                                width={labelParts.total + 0.16}
+                                height={0.44}
+                                fill="rgba(255,255,255,0.85)"
+                                rx={0.04}
+                              />
                               <text
                                 x={0}
                                 y={-0.45}
                                 textAnchor="middle"
                                 dominantBaseline="middle"
-                                fontSize="0.32"
-                                fill="#64748b"
-                                fontWeight="500"
-                                letterSpacing="0.03em"
+                                fontSize="0.28"
+                                fill="#c0392b"
+                                fontWeight="700"
+                                letterSpacing="0.02em"
                                 direction="ltr"
                                 unicodeBidi="plaintext"
                               >
@@ -1019,11 +1016,10 @@ export default function PlannerPage() {
                             <circle
                               cx={p.x}
                               cy={p.y}
-                              r={isClosed ? 0.12 : 0.07}
-                              fill={draggingPointIndex === index ? '#9ecfd7' : '#f8fafc'}
-                              stroke="#6b7280"
-                              strokeWidth="0.03"
-                              filter="url(#nodeShadow)"
+                              r={isClosed ? 0.1 : 0.08}
+                              fill="#c0392b"
+                              stroke="#ffffff"
+                              strokeWidth="0.02"
                             />
                             {isClosed && points.length > 3 && (
                               <title>Перетащите для перемещения. ПКМ — удалить точку.</title>
@@ -1037,7 +1033,7 @@ export default function PlannerPage() {
                             cy={points[0].y}
                             r="0.1"
                             fill="none"
-                            stroke="#9ecfd7"
+                            stroke="#c0392b"
                             strokeWidth="0.04"
                             strokeDasharray="0.06 0.04"
                           />
@@ -1050,9 +1046,9 @@ export default function PlannerPage() {
                               y={centroid.y}
                               textAnchor="start"
                               dominantBaseline="middle"
-                              fontSize="0.3"
-                              fill="#111827"
-                              fontWeight="600"
+                              fontSize="0.28"
+                              fill="#c0392b"
+                              fontWeight="700"
                               letterSpacing="0.02em"
                               direction="ltr"
                               unicodeBidi="plaintext"
@@ -1076,392 +1072,7 @@ export default function PlannerPage() {
                         )}
                       </g>
                     </svg>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-border-light/60 bg-bg-card p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-xs text-text-secondary">Материал и нанесение</div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setMode('floor')}
-                        className={`px-3 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                          mode === 'floor'
-                            ? 'bg-brand-accent text-white border-brand-accent'
-                            : 'bg-white text-text-secondary border-border-light/60'
-                        }`}
-                      >
-                        Пол
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMode('walls')}
-                        className={`px-3 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                          mode === 'walls'
-                            ? 'bg-brand-accent text-white border-brand-accent'
-                            : 'bg-white text-text-secondary border-border-light/60'
-                        }`}
-                      >
-                        Стены
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="text-xs text-text-secondary col-span-2">
-                      Материал для {mode === 'floor' ? 'пола' : 'стен'} (из нашей системы)
-                      <select
-                        value={selectedServiceId}
-                        onChange={(e) => setSelectedServiceId(e.target.value)}
-                        className="input w-full mt-1 h-10 border border-border-light bg-bg-primary rounded-lg focus:border-brand-accent focus:ring-1 focus:ring-brand-accent [&:invalid]:border-border-light"
-                        style={{ borderColor: 'var(--border-light, #e2e8f0)' }}
-                        aria-invalid="false"
-                      >
-                        <option value="">
-                          {servicesLoading ? 'Загрузка...' : 'Выберите материал / услугу'}
-                        </option>
-                        {filteredServices.map((service) => (
-                          <option key={service.id} value={service.id}>
-                            {service.name}
-                          </option>
-                        ))}
-                      </select>
-                      {materialsListEmpty && (
-                        <p className="mt-1.5 text-[11px] text-amber-600">
-                          В системе пока нет услуг. Добавьте услуги в админке (раздел «Услуги» или «Специализации»).
-                        </p>
-                      )}
-                    </label>
-                    {mode === 'floor' && (
-                      <>
-                        <label className="text-xs text-text-secondary">
-                          Толщина (см)
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.1}
-                            value={thicknessCm}
-                            onChange={(e) => setThicknessCm(Number(e.target.value))}
-                            className="input w-full mt-1 h-10"
-                          />
-                        </label>
-                        <label className="text-xs text-text-secondary">
-                          Запас (%)
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            step={1}
-                            value={reservePercent}
-                            onChange={(e) => setReservePercent(Number(e.target.value))}
-                            className="input w-full mt-1 h-10"
-                          />
-                        </label>
-                      </>
-                    )}
-                    {mode === 'walls' && (
-                      <>
-                        <label className="text-xs text-text-secondary col-span-2">
-                          Высота потолка (м)
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.1}
-                            value={wallHeight}
-                            onChange={(e) => setWallHeight(Number(e.target.value))}
-                            className="input w-full mt-1 h-10"
-                          />
-                        </label>
-                        <div className="col-span-2 text-xs text-text-secondary">
-                          Вырезы (м) — площадь вычитается из общей
-                          <div className="mt-1 space-y-1">
-                            {cutouts.map((c, i) => (
-                              <div key={i} className="flex gap-2 items-center">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={0.1}
-                                  placeholder="Ширина"
-                                  value={c.width || ''}
-                                  onChange={(e) =>
-                                    setCutouts((prev) => {
-                                      const n = [...prev]
-                                      n[i] = { ...n[i], width: Number(e.target.value) || 0 }
-                                      return n
-                                    })
-                                  }
-                                  className="input flex-1 h-9"
-                                />
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={0.1}
-                                  placeholder="Высота"
-                                  value={c.height || ''}
-                                  onChange={(e) =>
-                                    setCutouts((prev) => {
-                                      const n = [...prev]
-                                      n[i] = { ...n[i], height: Number(e.target.value) || 0 }
-                                      return n
-                                    })
-                                  }
-                                  className="input flex-1 h-9"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setCutouts((prev) => prev.filter((_, j) => j !== i))}
-                                  className="text-red-600 hover:underline text-[11px]"
-                                >
-                                  Удалить
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={() => setCutouts((prev) => [...prev, { width: 0, height: 0 }])}
-                              className="text-brand-accent hover:underline text-[11px]"
-                            >
-                              + Добавить вырез
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    <label className="text-xs text-text-secondary">
-                      Ед. цены
-                      <select
-                        value={priceUnit}
-                        onChange={(e) => setPriceUnit(e.target.value as 'm2' | 'm3')}
-                        className="input w-full mt-1 h-10"
-                      >
-                        <option value="m2">за м²</option>
-                        <option value="m3">за м³</option>
-                      </select>
-                    </label>
-                    <label className="text-xs text-text-secondary">
-                      Цена работы
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={workPrice}
-                        onChange={(e) => setWorkPrice(e.target.value)}
-                        className="input w-full mt-1 h-10"
-                        placeholder="₽"
-                      />
-                    </label>
-                    <label className="text-xs text-text-secondary">
-                      Цена материала
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={materialPrice}
-                        onChange={(e) => setMaterialPrice(e.target.value)}
-                        className="input w-full mt-1 h-10"
-                        placeholder="₽"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-border-light/60 bg-bg-card p-4">
-                  <div className="flex items-center gap-2 text-xs text-text-secondary mb-3">
-                    <FiCheckCircle size={14} />
-                    Расчет
-                  </div>
-                  {polygonClosed && floorArea > 0 && floorArea < MIN_AREA_M2 && (
-                    <div className="mb-2 px-2 py-1.5 rounded-lg bg-amber-100 text-amber-800 text-xs">
-                      Минимальная площадь для рекомендаций: {MIN_AREA_M2} м²
-                    </div>
-                  )}
-                  <div className="text-sm text-text-secondary">
-                    <div className="text-[11px] text-text-secondary mb-1">
-                      {mode === 'floor' ? 'Пол' : 'Стены'}
-                    </div>
-                    <div className="text-lg font-semibold text-graphite-secondary">
-                      {mode === 'floor' ? (
-                        <>Площадь: {floorArea.toFixed(2)} м²</>
-                      ) : (
-                        <>Чистая площадь: {baseArea.toFixed(2)} м²</>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-3 text-sm text-text-secondary">
-                    {!polygonClosed ? (
-                      <span>Замкните контур, чтобы получить расчет.</span>
-                    ) : mode === 'floor' ? (
-                      <>
-                        <div className="text-[11px]">Периметр: {perimeter.toFixed(2)} м</div>
-                        <div className="text-[11px]">Объем: {volume.toFixed(3)} м³</div>
-                        <div className="text-[11px]">Объем с запасом ({reservePercent}%): {volumeWithReserve.toFixed(3)} м³</div>
-                        <span className="block mt-1">
-                          Нужно покрытия: <strong>{baseArea.toFixed(2)} м²</strong>
-                          {priceUnit === 'm3' && (
-                            <> · материала с запасом: <strong>{volumeWithReserve.toFixed(3)} м³</strong></>
-                          )}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-[11px]">Общая площадь: {wallAreaTotal.toFixed(2)} м²</div>
-                        {cutoutsArea > 0 && (
-                          <div className="text-[11px]">Площадь вырезов: {cutoutsArea.toFixed(2)} м²</div>
-                        )}
-                        <div className="text-[11px]">Периметр: {perimeter.toFixed(2)} м · Высота: {wallHeight} м</div>
-                        <span className="block mt-1">
-                          Чистая площадь: <strong>{baseArea.toFixed(2)} м²</strong>
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {polygonClosed && mode === 'floor' && (
-                    <div className="text-[11px] text-text-secondary mt-2">
-                      Толщина: {thicknessCm} см · Запас: {reservePercent}%
-                    </div>
-                  )}
-                  {polygonClosed && (workPrice || materialPrice) && (
-                    <div className="text-[11px] text-text-secondary mt-2">
-                      Работа: {workTotal.toLocaleString('ru-RU')} ₽ · Материал: {materialTotal.toLocaleString('ru-RU')} ₽ · Итог: {grandTotal.toLocaleString('ru-RU')} ₽
-                    </div>
-                  )}
-                </div>
-
-                {showRecommendations && (
-                <div className="rounded-2xl border border-border-light/60 bg-bg-card p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="text-sm font-semibold text-graphite-secondary">Товары и мастера из нашей системы</div>
-                    <div className="text-xs text-text-secondary">
-                      {selectedServiceName ? `По услуге: ${selectedServiceName}` : 'Популярные товары и мастера'}
-                    </div>
-                  </div>
-
-                  <div className="mb-5">
-                    <div className="text-xs text-text-secondary mb-2">Товары (каталог)</div>
-                    {recommendationsLoading ? (
-                      <div className="text-xs text-text-secondary">Загрузка...</div>
-                    ) : recommendedProducts.length === 0 ? (
-                      <div className="text-xs text-text-secondary">Нет товаров по выбранной услуге.</div>
-                    ) : (
-                      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
-                        {recommendedProducts.map((product) => (
-                          <Link
-                            key={product.id}
-                            href={`/products/${product.id}`}
-                            className="min-w-[220px] max-w-[220px] rounded-xl border border-border-light/60 bg-white shadow-sm overflow-hidden"
-                          >
-                            <div className="relative h-28 bg-bg-secondary overflow-hidden">
-                              {product.images && product.images.length > 0 ? (
-                                <Image
-                                  src={product.images[0]}
-                                  alt={product.name}
-                                  fill
-                                  className="object-cover"
-                                  sizes="220px"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-text-secondary text-xs">
-                                  Нет фото
-                                </div>
-                              )}
-                              <span className="absolute left-2 top-2 bg-brand-accent text-white text-[10px] px-2 py-0.5 rounded-full shadow">
-                                Рекомендация
-                              </span>
-                            </div>
-                            <div className="p-3">
-                              <div className="text-[10px] text-text-secondary mb-1 truncate">
-                                {selectedServiceName || 'Материал'}
-                              </div>
-                              <div className="text-sm font-semibold text-graphite-secondary line-clamp-2 min-h-[36px]">
-                                {product.name}
-                              </div>
-                              <div className="text-sm font-semibold text-graphite-secondary mt-2">
-                                {product.price.toLocaleString('ru-RU')} ₽
-                              </div>
-                              <div className="flex items-center gap-2 mt-2 text-[11px] text-text-secondary">
-                                <div className="w-6 h-6 rounded-full bg-graphite-primary text-white flex items-center justify-center overflow-hidden text-[10px] relative">
-                                  {product.seller?.avatar_url ? (
-                                    <Image
-                                      src={product.seller.avatar_url}
-                                      alt={product.seller.full_name || 'Продавец'}
-                                      fill
-                                      className="object-cover"
-                                      sizes="24px"
-                                    />
-                                  ) : (
-                                    product.seller?.full_name?.[0]?.toUpperCase() || 'П'
-                                  )}
-                                </div>
-                                <span className="truncate">{product.seller?.full_name || 'Продавец'}</span>
-                              </div>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <div className="text-xs text-text-secondary mb-2">Мастера (из нашей системы)</div>
-                    {recommendationsLoading ? (
-                      <div className="text-xs text-text-secondary">Загрузка...</div>
-                    ) : recommendedMasters.length === 0 ? (
-                      <div className="text-xs text-text-secondary">Нет мастеров по выбранной услуге.</div>
-                    ) : (
-                      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
-                        {recommendedMasters.map((master) => (
-                          <Link
-                            key={master.id}
-                            href={`/profile/${master.id}`}
-                            className="min-w-[220px] max-w-[220px] rounded-xl border border-border-light/60 bg-white shadow-sm overflow-hidden p-3 flex flex-col gap-3"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-full bg-graphite-primary text-white flex items-center justify-center overflow-hidden text-sm font-semibold relative">
-                                {master.avatar_url ? (
-                                  <Image
-                                    src={master.avatar_url}
-                                    alt={master.full_name}
-                                    fill
-                                    className="object-cover"
-                                    sizes="48px"
-                                  />
-                                ) : (
-                                  master.full_name?.[0]?.toUpperCase() || 'М'
-                                )}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-sm font-semibold text-graphite-secondary truncate">
-                                  {master.full_name}
-                                </div>
-                                <div className="text-[11px] text-text-secondary truncate">
-                                  {master.city || 'Город не указан'}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-white bg-brand-accent px-2 py-0.5 rounded-full">
-                                Рекомендация
-                              </span>
-                              <span className="text-[11px] text-text-secondary truncate">
-                                {selectedServiceName || 'Услуга'}
-                              </span>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                )}
-
-                <div className="text-[11px] text-text-secondary">
-                  Сетка 10 см, снап к углам 0°/90°/45°. После замыкания можно перетаскивать узлы, кликать по сегменту для вставки точки. Площадь — формула Шнурка; при площади &gt; 5 м² показываются рекомендации.
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
-    </div>
+    </PlannerWizard>
   )
 }
