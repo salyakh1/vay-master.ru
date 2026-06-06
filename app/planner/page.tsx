@@ -4,13 +4,19 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
-import PlannerWizard from '@/components/planner/PlannerWizard'
+import PlannerSinglePage from '@/components/planner/PlannerSinglePage'
+import { buildCalcLines, type BrickSize } from '@/components/planner/planner-calculations'
 import {
-  FLOOR_MATS,
-  WALL_MATS,
-  CEIL_MATS,
-  findMatLabel,
+  MATS_BY_SURFACE,
+  SURFACES_BY_OBJECT,
+  defaultEnabledSurfaces,
+  defaultSelections,
+  DEFAULT_BRICK_SIZE,
+  BRICK_PRESETS,
+  findMatById,
   type MatOption,
+  type ObjectTypeId,
+  type SurfaceId,
 } from '@/components/planner/planner-ui-data'
 import type { RecommendedMaster, RecommendedProduct } from '@/components/planner/planner-types'
 import {
@@ -22,12 +28,8 @@ import {
   segmentIndexNearPoint,
   closestPointOnSegment,
   PLANNER_GRID_STEP,
-  MIN_AREA_M2,
   type Point,
 } from '@/lib/planner-geometry'
-
-type SurfaceMode = 'floor' | 'walls'
-type MeasureType = 'area' | 'volume'
 
 type ServiceItem = {
   id: string
@@ -67,16 +69,15 @@ export default function PlannerPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
 
-  const [wizardStep, setWizardStep] = useState(1)
-  const [floorMat, setFloorMat] = useState('laminate')
-  const [wallMat, setWallMat] = useState('paint')
-  const [ceilMat, setCeilMat] = useState('paint')
+  const [objectType, setObjectType] = useState<ObjectTypeId>('room')
+  const [activeSurface, setActiveSurface] = useState<SurfaceId>('floor')
+  const [enabledSurfaces, setEnabledSurfaces] = useState(defaultEnabledSurfaces('room'))
+  const [selections, setSelections] = useState<Partial<Record<SurfaceId, string>>>(defaultSelections('room'))
+  const [brickSize, setBrickSize] = useState<BrickSize>(DEFAULT_BRICK_SIZE)
+  const [savedHint, setSavedHint] = useState(false)
   const [floorThick, setFloorThick] = useState(5)
   const [wallThick, setWallThick] = useState(1.5)
-  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({})
   const [drawTool, setDrawTool] = useState<'draw' | 'door' | 'window'>('draw')
-  const [mode, setMode] = useState<SurfaceMode>('floor')
-  const [measureType, setMeasureType] = useState<MeasureType>('area')
   const [selectedServiceId, setSelectedServiceId] = useState<string>('')
   const [services, setServices] = useState<ServiceItem[]>([])
   const [servicesLoading, setServicesLoading] = useState(false)
@@ -256,8 +257,6 @@ export default function PlannerPage() {
 
   useEffect(() => {
     const fetchRecommendations = async () => {
-      if (wizardStep < 4) return
-      if (!selectedServiceId) return
       setRecommendationsLoading(true)
       try {
         const productsBase = supabase
@@ -341,20 +340,7 @@ export default function PlannerPage() {
     }
 
     fetchRecommendations()
-  }, [selectedServiceId, selectedServiceName, isWarmFloor, wizardStep])
-
-  const filteredServices = useMemo(() => {
-    const nameLower = (name: string) => name.toLowerCase()
-    if (mode === 'walls') {
-      const list = services.filter((s) =>
-        WALL_KEYWORDS.some((kw) => nameLower(s.name).includes(kw))
-      )
-      return list.length > 0 ? list : services
-    }
-    return serviceOptions.length > 0 ? serviceOptions : services
-  }, [services, mode, serviceOptions])
-
-  const materialsListEmpty = !servicesLoading && filteredServices.length === 0
+  }, [selectedServiceId, selectedServiceName, isWarmFloor])
 
   const polygonClosed = isClosed && points.length >= 3
 
@@ -434,32 +420,50 @@ export default function PlannerPage() {
   }, [perimeter, wallHeight])
   const wallAreaNet = Math.max(0, wallAreaTotal - cutoutsArea)
 
-  const baseArea = mode === 'floor' ? floorArea : wallAreaNet
-  const thicknessM = Math.max(0, thicknessCm) / 100
-  const volume = floorArea * thicknessM
-  const reserveMultiplier = 1 + Math.max(0, reservePercent) / 100
-  const volumeWithReserve = volume * reserveMultiplier
-  const quantityByUnit =
-    mode === 'floor' && priceUnit === 'm3'
-      ? volumeWithReserve
-      : baseArea
-  const workTotal = Number(workPrice || 0) * quantityByUnit
-  const materialTotal = Number(materialPrice || 0) * quantityByUnit
-  const grandTotal = workTotal + materialTotal
   const ceilingArea = floorArea
-  const showRecommendations = wizardStep >= 4
+
+  const calcLines = useMemo(
+    () =>
+      buildCalcLines({
+        objectType,
+        enabledSurfaces,
+        selections,
+        matsBySurface: MATS_BY_SURFACE,
+        areas: { floor: floorArea, walls: wallAreaNet, ceiling: ceilingArea, perimeter },
+        wallHeight,
+        floorThick,
+        wallThick,
+        brickSize,
+        wastePercent: reservePercent,
+      }),
+    [
+      objectType,
+      enabledSurfaces,
+      selections,
+      floorArea,
+      wallAreaNet,
+      ceilingArea,
+      perimeter,
+      wallHeight,
+      floorThick,
+      wallThick,
+      brickSize,
+      reservePercent,
+    ]
+  )
+
+  const materialTotal = calcLines.reduce((s, l) => s + l.materialTotal, 0)
+  const workTotalCalc = calcLines.reduce((s, l) => s + l.workTotal, 0)
+  const grandTotalCalc = materialTotal + workTotalCalc
 
   useEffect(() => {
-    setThicknessCm(floorThick)
-  }, [floorThick])
-
-  useEffect(() => {
-    const floorId = findServiceForMat(FLOOR_MATS, floorMat, services)
-    const wallId = findServiceForMat(WALL_MATS, wallMat, services)
-    const ceilId = findServiceForMat(CEIL_MATS, ceilMat, services)
-    const next = floorId || wallId || ceilId
+    const matId = selections[activeSurface]
+    if (!matId) return
+    const mat = findMatById(matId)
+    if (!mat) return
+    const next = findServiceForMat(MATS_BY_SURFACE[mat.surface], matId, services)
     if (next) setSelectedServiceId(next)
-  }, [floorMat, wallMat, ceilMat, services])
+  }, [selections, activeSurface, services])
 
   useEffect(() => {
     try {
@@ -469,61 +473,31 @@ export default function PlannerPage() {
         points?: Point[]
         isClosed?: boolean
         wallHeight?: number
-        floorMat?: string
-        wallMat?: string
-        ceilMat?: string
+        objectType?: ObjectTypeId
+        selections?: Partial<Record<SurfaceId, string>>
+        enabledSurfaces?: Record<SurfaceId, boolean>
         floorThick?: number
         wallThick?: number
-        checkedItems?: Record<string, boolean>
+        brickSize?: BrickSize
+        reservePercent?: number
       }
       if (data.points?.length) setPoints(data.points)
       if (data.isClosed) setIsClosed(true)
       if (data.wallHeight) setWallHeight(data.wallHeight)
-      if (data.floorMat) setFloorMat(data.floorMat)
-      if (data.wallMat) setWallMat(data.wallMat)
-      if (data.ceilMat) setCeilMat(data.ceilMat)
+      if (data.objectType) {
+        setObjectType(data.objectType)
+        setActiveSurface(SURFACES_BY_OBJECT[data.objectType][0])
+      }
+      if (data.selections) setSelections(data.selections)
+      if (data.enabledSurfaces) setEnabledSurfaces(data.enabledSurfaces)
       if (data.floorThick) setFloorThick(data.floorThick)
       if (data.wallThick) setWallThick(data.wallThick)
-      if (data.checkedItems) setCheckedItems(data.checkedItems)
+      if (data.brickSize) setBrickSize(data.brickSize)
+      if (data.reservePercent != null) setReservePercent(data.reservePercent)
     } catch {
       /* ignore corrupt draft */
     }
   }, [])
-
-  useEffect(() => {
-    if (!showRecommendations || selectedServiceId) return
-    setRecommendationsLoading(true)
-    const loadDefaultRecommendations = async () => {
-      try {
-        const [productsResult, mastersResult] = await Promise.all([
-          supabase
-            .from('products')
-            .select(
-              `id, name, price, images, seller:profiles(id, full_name, avatar_url), category_ref:product_categories(id, name, section, slug)`
-            )
-            .eq('in_stock', true)
-            .eq('category_ref.section', 'construction')
-            .order('created_at', { ascending: false })
-            .limit(12),
-          supabase
-            .from('profiles')
-            .select('id, full_name, avatar_url, city, master_rating, master_reviews_count')
-            .eq('role', 'master')
-            .order('master_rating', { ascending: false, nullsFirst: false })
-            .limit(12),
-        ])
-        setRecommendedProducts((productsResult.data as RecommendedProduct[]) || [])
-        setRecommendedMasters((mastersResult.data as RecommendedMaster[]) || [])
-      } catch (e) {
-        console.error(e)
-        setRecommendedProducts([])
-        setRecommendedMasters([])
-      } finally {
-        setRecommendationsLoading(false)
-      }
-    }
-    loadDefaultRecommendations()
-  }, [showRecommendations, selectedServiceId])
 
   const previewWidth = Math.max(1, canvasWidth)
   const previewHeight = Math.max(1, canvasHeight)
@@ -747,43 +721,41 @@ export default function PlannerPage() {
           points,
           isClosed,
           wallHeight,
-          floorMat,
-          wallMat,
-          ceilMat,
+          objectType,
+          selections,
+          enabledSurfaces,
           floorThick,
           wallThick,
-          checkedItems,
+          brickSize,
+          reservePercent,
+          calcLines,
+          materialTotal,
+          workTotal: workTotalCalc,
+          grandTotal: grandTotalCalc,
         })
       )
+      setSavedHint(true)
+      window.setTimeout(() => setSavedHint(false), 2500)
     } catch {
       /* storage full / private mode */
     }
   }
 
-  const handleCreateOrder = () => {
-    const floorLabel = findMatLabel(FLOOR_MATS, floorMat)
-    const wallLabel = findMatLabel(WALL_MATS, wallMat)
-    const ceilLabel = findMatLabel(CEIL_MATS, ceilMat)
-    const description = [
-      `Планировщик комнаты:`,
-      `пол ${floorArea.toFixed(1)} м² (${floorLabel?.name || '—'})`,
-      `стены ${wallAreaNet.toFixed(1)} м² (${wallLabel?.name || '—'})`,
-      `потолок ${ceilingArea.toFixed(1)} м² (${ceilLabel?.name || '—'})`,
-      `высота ${wallHeight.toFixed(2)} м`,
-    ].join(', ')
-    try {
-      sessionStorage.setItem(
-        'planner-order-draft',
-        JSON.stringify({ title: 'Ремонт комнаты по планировщику', description })
-      )
-    } catch {
-      /* ignore */
-    }
-    router.push('/orders/new')
+  const handleObjectType = (t: ObjectTypeId) => {
+    setObjectType(t)
+    setEnabledSurfaces(defaultEnabledSurfaces(t))
+    setSelections(defaultSelections(t))
+    setActiveSurface(SURFACES_BY_OBJECT[t][0])
   }
 
-  const toggleCheckItem = (id: string) => {
-    setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }))
+  const handleToggleSurface = (s: SurfaceId) => {
+    setEnabledSurfaces((prev) => ({ ...prev, [s]: !prev[s] }))
+  }
+
+  const handleSelectMaterial = (surface: SurfaceId, matId: string) => {
+    setSelections((prev) => ({ ...prev, [surface]: matId }))
+    const preset = BRICK_PRESETS[matId]
+    if (preset) setBrickSize((prev) => ({ ...prev, ...preset }))
   }
 
   const showCanvasHint = points.length === 0 && !isClosed
@@ -802,33 +774,36 @@ export default function PlannerPage() {
   }
 
   return (
-    <PlannerWizard
-      step={wizardStep}
-      onStepChange={setWizardStep}
+    <PlannerSinglePage
+      objectType={objectType}
+      onObjectType={handleObjectType}
       onBack={() => router.back()}
       onSave={handleSave}
-      onCreateOrder={handleCreateOrder}
-      floorArea={floorArea}
-      wallArea={wallAreaNet}
-      ceilingArea={ceilingArea}
-      wallHeight={wallHeight}
-      onWallHeightChange={setWallHeight}
-      floorMat={floorMat}
-      wallMat={wallMat}
-      ceilMat={ceilMat}
-      onFloorMat={setFloorMat}
-      onWallMat={setWallMat}
-      onCeilMat={setCeilMat}
-      floorThick={floorThick}
-      wallThick={wallThick}
-      onFloorThick={setFloorThick}
-      onWallThick={setWallThick}
-      checked={checkedItems}
-      onToggleCheck={toggleCheckItem}
+      savedHint={savedHint}
       drawTool={drawTool}
       onDrawTool={setDrawTool}
       onUndo={handleUndo}
       showCanvasHint={showCanvasHint}
+      floorArea={floorArea}
+      wallArea={wallAreaNet}
+      ceilingArea={ceilingArea}
+      perimeter={perimeter}
+      wallHeight={wallHeight}
+      onWallHeightChange={setWallHeight}
+      activeSurface={activeSurface}
+      onActiveSurface={setActiveSurface}
+      enabledSurfaces={enabledSurfaces}
+      onToggleSurface={handleToggleSurface}
+      selections={selections}
+      onSelectMaterial={handleSelectMaterial}
+      brickSize={brickSize}
+      onBrickSize={setBrickSize}
+      wastePercent={reservePercent}
+      onWastePercent={setReservePercent}
+      calcLines={calcLines}
+      materialTotal={materialTotal}
+      workTotal={workTotalCalc}
+      grandTotal={grandTotalCalc}
       recommendedMasters={recommendedMasters}
       recommendedProducts={recommendedProducts}
       recommendationsLoading={recommendationsLoading}
@@ -1073,6 +1048,6 @@ export default function PlannerPage() {
                       </g>
                     </svg>
       </div>
-    </PlannerWizard>
+    </PlannerSinglePage>
   )
 }
