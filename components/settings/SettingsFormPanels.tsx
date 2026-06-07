@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@/app/providers'
 import { supabase, User, Service } from '@/lib/supabase'
+import { fetchMasterCategoriesTree, type CategoryNode } from '@/lib/masterCategoriesTree'
+import SpecializationsEditor from '@/components/settings/SpecializationsEditor'
 import { FiCamera } from 'react-icons/fi'
 import Image from 'next/image'
 
@@ -18,23 +20,13 @@ export type SettingsPanelId =
   | 'password'
   | 'email'
 
-type TreeCategory = {
-  id: string
-  name: string
-  slug: string
-  sort_order: number
-  subcategories: Array<{
-    id: string
-    name: string
-    slug: string
-    sort_order: number
-    services: Array<{ id: string; name: string; slug: string; sort_order: number }>
-  }>
-}
+type TreeCategory = CategoryNode
 
 export function useSettingsForms(onSaved?: () => void) {
   const { user, refreshUser } = useAuth()
   const [tree, setTree] = useState<TreeCategory[]>([])
+  const [treeLoading, setTreeLoading] = useState(false)
+  const [treeError, setTreeError] = useState('')
   const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState<string[]>([])
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
 
@@ -84,12 +76,20 @@ export function useSettingsForms(onSaved?: () => void) {
   }, [user, hydrateFromUser])
 
   const fetchTree = useCallback(async () => {
+    setTreeLoading(true)
+    setTreeError('')
     try {
-      const res = await fetch('/api/master-categories/tree')
-      const data = await res.json().catch(() => ({}))
-      setTree((data?.tree as TreeCategory[]) || [])
+      const nextTree = await fetchMasterCategoriesTree(supabase)
+      setTree(nextTree)
+      if (nextTree.length === 0) {
+        setTreeError('Каталог категорий пуст')
+      }
     } catch (e) {
       console.error(e)
+      setTree([])
+      setTreeError('Не удалось загрузить категории и услуги')
+    } finally {
+      setTreeLoading(false)
     }
   }, [])
 
@@ -271,6 +271,9 @@ export function useSettingsForms(onSaved?: () => void) {
   return {
     user,
     tree,
+    treeLoading,
+    treeError,
+    reloadTree: fetchTree,
     fullName,
     setFullName,
     phone,
@@ -426,40 +429,27 @@ export function ProfileEditPanel({ forms }: { forms: ReturnType<typeof useSettin
 }
 
 export function SpecializationsPanel({ forms }: { forms: ReturnType<typeof useSettingsForms> }) {
+  const { tree, treeLoading, treeError, reloadTree, selectedSubcategoryIds, selectedServiceIds, saving, toggleSubcategory, toggleService, saveSpecializations } = forms
+
+  useEffect(() => {
+    if (tree.length === 0 && !treeLoading && !treeError) {
+      void reloadTree()
+    }
+  }, [tree.length, treeLoading, treeError, reloadTree])
+
   return (
-    <div className="space-y-3 pt-2">
-      <div className="max-h-48 overflow-y-auto space-y-3">
-        {forms.tree.map((cat) => (
-          <div key={cat.id}>
-            <p className="text-xs font-semibold text-[#1c1c1e] mb-1.5">{cat.name}</p>
-            <div className="space-y-1 pl-1">
-              {cat.subcategories.map((sub) => (
-                <label key={sub.id} className="flex items-center gap-2 text-xs text-[#333]">
-                  <input type="checkbox" checked={forms.selectedSubcategoryIds.includes(sub.id)} onChange={() => forms.toggleSubcategory(sub.id)} className="w-3.5 h-3.5" />
-                  {sub.name}
-                </label>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      {forms.filteredServices.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-[#1c1c1e] mb-1.5">Услуги</p>
-          <div className="max-h-36 overflow-y-auto space-y-1">
-            {forms.filteredServices.map((svc) => (
-              <label key={svc.id} className="flex items-center gap-2 text-xs text-[#333]">
-                <input type="checkbox" checked={forms.selectedServiceIds.includes(svc.id)} onChange={() => forms.toggleService(svc.id)} className="w-3.5 h-3.5" />
-                {svc.name}
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-      <button type="button" onClick={forms.saveSpecializations} disabled={forms.saving} className="w-full bg-brand-accent text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50">
-        {forms.saving ? 'Сохранение…' : 'Сохранить'}
-      </button>
-    </div>
+    <SpecializationsEditor
+      tree={tree}
+      treeLoading={treeLoading}
+      treeError={treeError}
+      selectedSubcategoryIds={selectedSubcategoryIds}
+      selectedServiceIds={selectedServiceIds}
+      saving={saving}
+      onToggleSubcategory={toggleSubcategory}
+      onToggleService={toggleService}
+      onSave={saveSpecializations}
+      onRetry={() => void reloadTree()}
+    />
   )
 }
 
