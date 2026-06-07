@@ -25,11 +25,9 @@ import ReviewForm from '@/components/ReviewForm'
 import ReviewReplyForm from '@/components/ReviewReplyForm'
 import RatingStars from '@/components/RatingStars'
 import StoriesCircle from '@/components/StoriesCircle'
-import SellerAddressPicker from '@/components/SellerAddressPicker'
-import MasterRadiusPicker from '@/components/MasterRadiusPicker'
 import ProfileStrictHeader from '@/components/profile/ProfileStrictHeader'
-import StoreLocationMapModal from '@/components/StoreLocationMapModal'
 
+const StoreLocationMapModal = dynamic(() => import('@/components/StoreLocationMapModal'), { ssr: false })
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
 
 // Dynamic import для создания истории - загружается только при открытии
@@ -49,13 +47,7 @@ export default function ProfilePage() {
   const [selectedPortfolioIndex, setSelectedPortfolioIndex] = useState<number | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile')
-  const [settingsTab, setSettingsTab] = useState<'edit' | 'specializations' | 'security' | 'account'>('edit')
   const [adminRole, setAdminRole] = useState<string | null>(null)
-  type TreeCategory = { id: string; name: string; slug: string; sort_order: number; subcategories: Array<{ id: string; name: string; slug: string; sort_order: number; services: Array<{ id: string; name: string; slug: string; sort_order: number }> }> }
-  const [tree, setTree] = useState<TreeCategory[]>([])
-  const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState<string[]>([])
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
   const [profileSubcategories, setProfileSubcategories] = useState<Array<{ id: string; name: string; slug: string; category?: { id: string; name: string; slug: string } }>>([])
   const [profileServices, setProfileServices] = useState<Service[]>([])
   const [isFollowing, setIsFollowing] = useState<boolean>(false)
@@ -82,15 +74,6 @@ export default function ProfilePage() {
   const [sendingQuickReview, setSendingQuickReview] = useState(false)
   const [existingUserReview, setExistingUserReview] = useState<any>(null)
   const [profileStories, setProfileStories] = useState<Story[]>([])
-  const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [uploadingCover, setUploadingCover] = useState(false)
-  const [showAvatarModal, setShowAvatarModal] = useState(false)
-  const [showCoverModal, setShowCoverModal] = useState(false)
-  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
-  const [deleteEmail, setDeleteEmail] = useState('')
-  const [deletePassword, setDeletePassword] = useState('')
-  const [deletingAccount, setDeletingAccount] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
   
   // Render-on-Demand: состояния для отслеживания загрузки данных по секциям
   const [portfolioFetched, setPortfolioFetched] = useState(false)
@@ -106,42 +89,11 @@ export default function ProfilePage() {
   const portfolioLoadMoreSentinelRef = useRef<HTMLDivElement>(null)
   const productsLoadMoreSentinelRef = useRef<HTMLDivElement>(null)
   const PROFILE_ITEMS_PER_PAGE = 12
-  
-  // Settings form state - common
-  const [fullName, setFullName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [city, setCity] = useState('')
-  const [description, setDescription] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [searchRadiusKm, setSearchRadiusKm] = useState<number>(25)
-  const [savingRadius, setSavingRadius] = useState(false)
-  
-  // Password change state
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [changingPassword, setChangingPassword] = useState(false)
-  const [passwordError, setPasswordError] = useState('')
-  const [passwordSuccess, setPasswordSuccess] = useState('')
-  
-  // Master fields
-  const [servicesText, setServicesText] = useState('')
-  const [serviceLocation, setServiceLocation] = useState<'home' | 'workshop' | 'both'>('both')
-  const [experienceYears, setExperienceYears] = useState<number | ''>('')
-  const [specialization, setSpecialization] = useState('')
-  const [workSchedule, setWorkSchedule] = useState('')
-  
-  // Seller fields
-  const [storeAddress, setStoreAddress] = useState('')
+
+  const profileId = Array.isArray(params.id) ? params.id[0] : params.id
   const [showStoresMap, setShowStoresMap] = useState(false)
   const [showStoreLocationMap, setShowStoreLocationMap] = useState(false)
   const [showCatalogModal, setShowCatalogModal] = useState(false)
-  const [workHours, setWorkHours] = useState('')
-  const [deliveryAvailable, setDeliveryAvailable] = useState(false)
-  const [deliveryZones, setDeliveryZones] = useState('')
-  const [productCategories, setProductCategories] = useState('')
-
-  const profileId = Array.isArray(params.id) ? params.id[0] : params.id
 
   // Гости не могут открывать профили — редирект на вход с returnTo
   useEffect(() => {
@@ -159,11 +111,6 @@ export default function ProfilePage() {
     fetchProfile()
     checkFollowing()
   }, [params.id, currentUser])
-
-  useEffect(() => {
-    // Загружаем справочные данные только один раз
-    fetchReferenceData()
-  }, [])
 
   // Render-on-Demand: Intersection Observer для секции портфолио (только для мастеров)
   useEffect(() => {
@@ -237,20 +184,6 @@ export default function ProfilePage() {
     if (idx >= 0) setSelectedPortfolioIndex(idx)
   }, [searchParams, portfolioItems])
 
-  useEffect(() => {
-    const tab = searchParams.get('tab')
-    const section = searchParams.get('section')
-    if (tab === 'settings') setActiveTab('settings')
-    if (
-      section === 'edit' ||
-      section === 'specializations' ||
-      section === 'security' ||
-      section === 'account'
-    ) {
-      setSettingsTab(section)
-      setActiveTab('settings')
-    }
-  }, [searchParams])
 
   // Бесконечный скролл: портфолио
   useEffect(() => {
@@ -280,6 +213,33 @@ export default function ProfilePage() {
     if (showFollowModal && profile?.id) fetchFollowList(showFollowModal)
   }, [showFollowModal, profile?.id])
 
+  const fetchSelections = async (profileId: string) => {
+    try {
+      const [{ data: subRows }, { data: svcRows }] = await Promise.all([
+        supabase
+          .from('profile_subcategories')
+          .select('subcategory:subcategories(id, name, slug, category:categories(id, name, slug))')
+          .eq('profile_id', profileId),
+        supabase
+          .from('profile_services')
+          .select('service:services(id, name, slug, subcategory_id)')
+          .eq('profile_id', profileId),
+      ])
+      const subs = (subRows || [])
+        .map((row: any) => row.subcategory)
+        .filter(Boolean) as Array<{ id: string; name: string; slug: string; category?: { id: string; name: string; slug: string } }>
+      const svcs = (svcRows || [])
+        .map((row: any) => row.service)
+        .filter(Boolean) as Service[]
+      setProfileSubcategories(subs)
+      setProfileServices(svcs)
+    } catch (error) {
+      console.error('Error fetching profile selections:', error)
+      setProfileSubcategories([])
+      setProfileServices([])
+    }
+  }
+
   const fetchProfile = async () => {
     try {
       setLoading(true)
@@ -306,23 +266,6 @@ export default function ProfilePage() {
       const userData = data as User
       setProfile(userData)
 
-      // Initialize form with profile data - common
-      setFullName(userData.full_name || '')
-      setPhone(userData.phone || '')
-      setCity(userData.city || '')
-      setDescription(userData.description || '')
-      // Master fields
-      setServicesText(userData.services || '')
-      setServiceLocation(userData.service_location || 'both')
-      setExperienceYears(userData.experience_years || '')
-      setSpecialization(userData.specialization || '')
-      setWorkSchedule(userData.work_schedule || '')
-      // Seller fields
-      setStoreAddress(userData.store_address || '')
-      setWorkHours(userData.work_hours || '')
-      setDeliveryAvailable(userData.delivery_available || false)
-      setDeliveryZones(userData.delivery_zones || '')
-      setProductCategories(userData.product_categories || '')
 
       const profileId = Array.isArray(params.id) ? params.id[0] : params.id
       
@@ -341,7 +284,9 @@ export default function ProfilePage() {
       }
       
       // Специализации и услуги
-      await fetchSelections()
+      if (profileId) {
+        await fetchSelections(profileId)
+      }
       
       // Истории профиля (для всех ролей) — нужны для шапки
       if (profileId) {
@@ -516,89 +461,6 @@ export default function ProfilePage() {
       console.error('Error removing follower:', error)
     } finally {
       setFollowActionId(null)
-    }
-  }
-
-  const fetchReferenceData = async () => {
-    try {
-      const res = await fetch('/api/master-categories/tree')
-      const data = await res.json().catch(() => ({}))
-      setTree((data?.tree as TreeCategory[]) || [])
-    } catch (error) {
-      console.error('Error fetching reference data:', error)
-    }
-  }
-
-  const fetchSelections = async () => {
-    if (!params.id) return
-    try {
-      const [{ data: subSel, error: subSelError }, { data: svcSel, error: svcSelError }] = await Promise.all([
-        supabase
-          .from('profile_subcategories')
-          .select('subcategory:subcategories(id, name, slug, category:categories(id, name, slug))')
-          .eq('profile_id', params.id),
-        supabase
-          .from('profile_services')
-          .select('service:services(id, name, slug, subcategory_id)')
-          .eq('profile_id', params.id),
-      ])
-
-      if (subSelError) throw subSelError
-      if (svcSelError) throw svcSelError
-
-      const subs = ((subSel as any[]) || [])
-        .map((item) => item.subcategory && { ...item.subcategory, category: (item.subcategory as any).category })
-        .filter(Boolean) as typeof profileSubcategories
-      const svcs = ((svcSel as any[]) || [])
-        .map((item) => item.service as Service)
-        .filter(Boolean)
-
-      setProfileSubcategories(subs)
-      setProfileServices(svcs)
-      setSelectedSubcategoryIds(subs.map((s) => s.id))
-      setSelectedServiceIds(svcs.map((s) => s.id))
-    } catch (error) {
-      console.error('Error fetching selections:', error)
-    }
-  }
-
-  const toggleSubcategory = (id: string) => {
-    setSelectedSubcategoryIds((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-      setSelectedServiceIds((prevSvc) =>
-        prevSvc.filter((svcId) => {
-          const sub = tree.flatMap((c) => c.subcategories).find((s) => s.services.some((v) => v.id === svcId))
-          return !sub || next.includes(sub.id)
-        })
-      )
-      return next
-    })
-  }
-
-  const toggleService = (id: string) => {
-    const sub = tree.flatMap((c) => c.subcategories).find((s) => s.services.some((v) => v.id === id))
-    if (sub && !selectedSubcategoryIds.includes(sub.id)) {
-      setSelectedSubcategoryIds((prev) => [...prev, sub.id])
-    }
-    setSelectedServiceIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
-  }
-
-  const syncSelections = async (profileId: string) => {
-    try {
-      await supabase.from('profile_subcategories').delete().eq('profile_id', profileId)
-      if (selectedSubcategoryIds.length > 0) {
-        await supabase.from('profile_subcategories').insert(
-          selectedSubcategoryIds.map((subId) => ({ profile_id: profileId, subcategory_id: subId }))
-        )
-      }
-      await supabase.from('profile_services').delete().eq('profile_id', profileId)
-      if (selectedServiceIds.length > 0) {
-        await supabase.from('profile_services').insert(
-          selectedServiceIds.map((svcId) => ({ profile_id: profileId, service_id: svcId }))
-        )
-      }
-    } catch (error) {
-      console.error('Error syncing selections:', error)
     }
   }
 
@@ -988,263 +850,6 @@ export default function ProfilePage() {
     }
   }
 
-  // Удален дублирующий useEffect - данные загружаются внутри fetchProfile()
-
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!currentUser || !e.target.files || e.target.files.length === 0) return
-
-    const file = e.target.files[0]
-    if (!file.type.startsWith('image/')) {
-      alert('Пожалуйста, выберите изображение')
-      return
-    }
-
-    setUploadingAvatar(true)
-    try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${currentUser.id}/avatar-${Date.now()}.${fileExt}`
-
-      // Загружаем в product-images bucket (можно создать отдельный bucket для профилей)
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, file, { cacheControl: '3600', upsert: false })
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError)
-        alert(`Ошибка при загрузке: ${uploadError.message}`)
-        return
-      }
-
-      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName)
-      const avatarUrl = urlData.publicUrl
-
-      // Обновляем профиль
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: avatarUrl })
-        .eq('id', currentUser.id)
-
-      if (updateError) throw updateError
-
-      // Обновляем локальное состояние
-      setProfile({ ...profile, avatar_url: avatarUrl } as User)
-      alert('Аватарка успешно обновлена!')
-    } catch (error) {
-      console.error('Error uploading avatar:', error)
-      alert('Ошибка при загрузке аватарки')
-    } finally {
-      setUploadingAvatar(false)
-      e.target.value = '' // Сбрасываем input
-    }
-  }
-
-  const handleCoverPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!currentUser || !e.target.files || e.target.files.length === 0) return
-
-    const file = e.target.files[0]
-    if (!file.type.startsWith('image/')) {
-      alert('Пожалуйста, выберите изображение')
-      return
-    }
-
-    setUploadingCover(true)
-    try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${currentUser.id}/cover-${Date.now()}.${fileExt}`
-
-      // Загружаем в product-images bucket
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, file, { cacheControl: '3600', upsert: false })
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError)
-        alert(`Ошибка при загрузке: ${uploadError.message}`)
-        return
-      }
-
-      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(fileName)
-      const coverUrl = urlData.publicUrl
-
-      // Обновляем профиль
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ cover_photo_url: coverUrl })
-        .eq('id', currentUser.id)
-
-      if (updateError) throw updateError
-
-      // Обновляем локальное состояние
-      setProfile({ ...profile, cover_photo_url: coverUrl } as User)
-      alert('Фоновая картинка успешно обновлена!')
-    } catch (error) {
-      console.error('Error uploading cover photo:', error)
-      alert('Ошибка при загрузке фоновой картинки')
-    } finally {
-      setUploadingCover(false)
-      e.target.value = '' // Сбрасываем input
-    }
-  }
-
-  const handleDeleteAvatar = async () => {
-    if (!currentUser || !profile || !profile.avatar_url) return
-    if (!confirm('Вы уверены, что хотите удалить аватарку?')) return
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ avatar_url: null })
-        .eq('id', currentUser.id)
-
-      if (error) throw error
-
-      setProfile({ ...profile, avatar_url: undefined } as User)
-      alert('Аватарка успешно удалена!')
-    } catch (error) {
-      console.error('Error deleting avatar:', error)
-      alert('Ошибка при удалении аватарки')
-    }
-  }
-
-  const handleDeleteCoverPhoto = async () => {
-    if (!currentUser || !profile || !profile.cover_photo_url) return
-    if (!confirm('Вы уверены, что хотите удалить фоновую картинку?')) return
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ cover_photo_url: null })
-        .eq('id', currentUser.id)
-
-      if (error) throw error
-
-      setProfile({ ...profile, cover_photo_url: undefined } as User)
-      alert('Фоновая картинка успешно удалена!')
-    } catch (error) {
-      console.error('Error deleting cover photo:', error)
-      alert('Ошибка при удалении фоновой картинки')
-    }
-  }
-
-
-  const handleSaveSettings = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!currentUser || !profile) return
-
-    setSaving(true)
-    try {
-      const updateData: any = {
-        full_name: fullName,
-        phone: phone || null,
-        description: description || null,
-      }
-      // Город только для не-продавцов: у продавца локация задаётся адресом магазина
-      if (profile.role !== 'seller') {
-        updateData.city = city || null
-      }
-
-      // Add master-specific fields
-      if (profile.role === 'master') {
-        updateData.services = servicesText || null
-        updateData.service_location = serviceLocation || null
-        updateData.experience_years = experienceYears ? Number(experienceYears) : null
-        updateData.specialization = specialization || null
-        updateData.work_schedule = workSchedule || null
-      }
-
-      // Add seller-specific fields (город для продавца не из формы — только адрес магазина)
-      if (profile.role === 'seller') {
-        updateData.store_address = storeAddress || null
-        // city для продавца не обновляем из формы — локация задаётся адресом магазина
-        updateData.work_hours = workHours || null
-        updateData.delivery_available = deliveryAvailable
-        updateData.delivery_zones = deliveryZones || null
-        updateData.product_categories = productCategories || null
-      }
-
-      const { error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', currentUser.id)
-
-      if (error) throw error
-
-      await syncSelections(currentUser.id)
-      await fetchSelections()
-      // Refresh profile data
-      await fetchProfile()
-      setActiveTab('profile')
-    } catch (error) {
-      console.error('Error updating profile:', error)
-      alert('Ошибка при сохранении профиля')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!currentUser) return
-
-    setPasswordError('')
-    setPasswordSuccess('')
-
-    // Валидация
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError('Все поля обязательны для заполнения')
-      return
-    }
-
-    if (newPassword.length < 6) {
-      setPasswordError('Новый пароль должен содержать минимум 6 символов')
-      return
-    }
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Новые пароли не совпадают')
-      return
-    }
-
-    setChangingPassword(true)
-    try {
-      // Проверяем текущий пароль, пытаясь войти с ним
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: currentUser.email,
-        password: currentPassword,
-      })
-
-      if (signInError) {
-        setPasswordError('Текущий пароль неверен')
-        setChangingPassword(false)
-        return
-      }
-
-      // Обновляем пароль
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      })
-
-      if (updateError) {
-        throw updateError
-      }
-
-      setPasswordSuccess('Пароль успешно изменен!')
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-      
-      // Очищаем сообщение об успехе через 3 секунды
-      setTimeout(() => {
-        setPasswordSuccess('')
-      }, 3000)
-    } catch (error: any) {
-      console.error('Error changing password:', error)
-      setPasswordError(error.message || 'Ошибка при изменении пароля')
-    } finally {
-      setChangingPassword(false)
-    }
-  }
-
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1294,15 +899,14 @@ export default function ProfilePage() {
   const displayRole = adminRole || profile.role
 
   const isOwnProfile = currentUser?.id === profile.id
-  const filteredServices = tree.flatMap((c) => c.subcategories.flatMap((s) => s.services.map((v) => ({ ...v, subcategory_id: s.id })))).filter((svc: any) => selectedSubcategoryIds.includes(svc.subcategory_id))
 
   const returnTo = searchParams.get('returnTo')
 
   return (
-    <div className={`min-h-screen pb-20 ${activeTab === 'profile' ? 'bg-[#f2f2f7]' : 'bg-bg-primary'}`}>
+    <div className="min-h-screen pb-20 bg-[#f2f2f7]">
       <Navbar />
-      <div className={`w-full mx-auto py-4 sm:py-6 ${activeTab === 'profile' ? 'max-w-lg px-0' : 'max-w-7xl px-2 sm:px-4 md:px-6 lg:px-8'}`}>
-        <div className={`w-full mx-auto ${activeTab === 'profile' ? 'max-w-lg' : 'max-w-full sm:max-w-2xl md:max-w-4xl'}`}>
+      <div className="w-full mx-auto py-4 sm:py-6 max-w-lg px-0">
+        <div className="w-full mx-auto max-w-lg">
           {/* Back to Responses Button */}
           {returnTo && (
             <div className="mb-4">
@@ -1317,16 +921,9 @@ export default function ProfilePage() {
           )}
           {/* Tabs */}
           <div className="flex gap-1 sm:gap-2 mb-6 sm:mb-8 border-b border-border-color/40 overflow-x-auto scrollbar-hide">
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`px-3 sm:px-4 py-2 font-medium text-sm sm:text-base transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
-                activeTab === 'profile'
-                  ? 'border-brand-accent text-graphite-secondary'
-                  : 'border-transparent text-text-secondary hover:text-graphite-secondary'
-              }`}
-            >
+            <span className="px-3 sm:px-4 py-2 font-medium text-sm sm:text-base border-b-2 whitespace-nowrap flex-shrink-0 border-brand-accent text-graphite-secondary">
               Профиль
-            </button>
+            </span>
             {isOwnProfile && (
               <Link
                 href="/settings"
@@ -1346,8 +943,6 @@ export default function ProfilePage() {
           </div>
 
           {/* Profile Tab Content */}
-          {activeTab === 'profile' && (
-            <>
               <ProfileStrictHeader
                 profile={profile}
                 displayRoleLabel={roleLabels[displayRole as keyof typeof roleLabels] || roleLabels.client}
@@ -2128,8 +1723,6 @@ export default function ProfilePage() {
                 </div>
               )}
 
-            </>
-          )}
 
           {/* Portfolio Gallery Modal */}
           {selectedPortfolioIndex !== null && portfolioItems.length > 0 && (
@@ -2142,816 +1735,8 @@ export default function ProfilePage() {
             />
           )}
 
-          {/* Settings Tab Content */}
-          {activeTab === 'settings' && isOwnProfile && (
-            <div className="card w-full">
-              <h1 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-graphite-secondary tracking-tight">Настройки</h1>
-
-              {/* Settings Sub-tabs - Vertical List */}
-              <div className="flex flex-col gap-1 sm:gap-2 mb-4 sm:mb-6 w-full">
-                <button
-                  onClick={() => setSettingsTab('edit')}
-                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm transition-colors rounded-md text-left ${
-                    settingsTab === 'edit'
-                      ? 'bg-brand-accent text-white'
-                      : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <FiUser size={16} className="flex-shrink-0" />
-                    <span className="truncate">Редактировать профиль</span>
-                  </div>
-                </button>
-                {profile.role === 'master' && (
-                  <button
-                    onClick={() => setSettingsTab('specializations')}
-                    className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm transition-colors rounded-md text-left ${
-                      settingsTab === 'specializations'
-                        ? 'bg-brand-accent text-white'
-                        : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <FiBriefcase size={16} className="flex-shrink-0" />
-                      <span className="truncate">Специализации и услуги</span>
-                    </div>
-                  </button>
-                )}
-                <button
-                  onClick={() => setSettingsTab('security')}
-                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm transition-colors rounded-md text-left ${
-                    settingsTab === 'security'
-                      ? 'bg-brand-accent text-white'
-                      : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <FiShield size={16} className="flex-shrink-0" />
-                    <span className="truncate">Безопасность</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => setSettingsTab('account')}
-                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm transition-colors rounded-md text-left ${
-                    settingsTab === 'account'
-                      ? 'bg-brand-accent text-white'
-                      : 'text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <FiLock size={16} className="flex-shrink-0" />
-                    <span className="truncate">Аккаунт</span>
-                  </div>
-                </button>
-              </div>
-
-              {/* Edit Profile Tab */}
-              {settingsTab === 'edit' && (
-                <div className="space-y-4 sm:space-y-6 w-full">
-              {/* Image Upload Section */}
-              <div className="mb-6 sm:mb-8 pb-6 sm:pb-8 border-b border-border-color">
-                <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Изображения профиля</h2>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                  {/* Avatar Upload */}
-                <div>
-                    <label className="block text-sm font-medium mb-2 text-graphite-secondary">
-                      Аватарка
-                  </label>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-text-primary border-2 border-border-color flex items-center justify-center text-white text-lg sm:text-xl font-semibold rounded-full flex-shrink-0">
-                        {profile.avatar_url ? (
-                          <img
-                            src={profile.avatar_url}
-                            alt={profile.full_name}
-                            className="w-full h-full object-cover rounded-full"
-                  />
-                        ) : (
-                          profile.full_name[0]?.toUpperCase() || '?'
-                        )}
-                </div>
-                      <div className="flex-1 w-full sm:w-auto">
-                        <button
-                          type="button"
-                          onClick={() => setShowAvatarModal(true)}
-                          disabled={uploadingAvatar}
-                          className="btn btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2"
-                        >
-                          <FiCamera size={16} />
-                          <span>{uploadingAvatar ? 'Загрузка...' : 'Изменить'}</span>
-                        </button>
-                </div>
-                    </div>
-                </div>
-
-                  {/* Cover Photo Upload */}
-                      <div>
-                    <label className="block text-sm font-medium mb-2 text-graphite-secondary">
-                      Фоновая картинка
-                        </label>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                      <div className="w-full sm:w-20 h-12 bg-bg-secondary border border-border-color rounded overflow-hidden flex-shrink-0">
-                        {profile.cover_photo_url ? (
-                          <img
-                            src={profile.cover_photo_url}
-                            alt="Cover"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                            <FiCamera size={16} className="text-text-secondary" />
-                      </div>
-                        )}
-                      </div>
-                      <div className="flex-1 w-full sm:w-auto">
-                        <button
-                          type="button"
-                          onClick={() => setShowCoverModal(true)}
-                          disabled={uploadingCover}
-                          className="btn btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2"
-                        >
-                          <FiCamera size={16} />
-                          <span>{uploadingCover ? 'Загрузка...' : 'Изменить'}</span>
-                        </button>
-                      </div>
-                        </div>
-                      </div>
-                        </div>
-                      </div>
-
-              {/* Edit Profile Form */}
-              <form onSubmit={handleSaveSettings} className="space-y-4 w-full">
-                <div className="w-full">
-                  <label className="block text-sm font-medium mb-2">
-                    ФИО *
-                  </label>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    className="input w-full"
-                  />
-                </div>
-
-                <div className="w-full">
-                  <label className="block text-sm font-medium mb-2">
-                    Телефон
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="input w-full"
-                  />
-                </div>
-
-                {/* Город только для не-продавцов: у продавца адрес магазина задаётся в блоке «Адрес магазина» ниже */}
-                {profile.role !== 'seller' && (
-                  <div className="w-full">
-                    <label className="block text-sm font-medium mb-2">
-                      Город
-                    </label>
-                    <input
-                      type="text"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      className="input w-full"
-                    />
-                  </div>
-                )}
-
-                <div className="w-full">
-                  <label className="block text-sm font-medium mb-2">
-                    О себе
-                  </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="textarea w-full"
-                    rows={5}
-                  />
-                </div>
-
-                {/* Master-specific fields (only basic info, specializations moved to separate tab) */}
-                {profile.role === 'master' && (
-                  <>
-                    <div className="border-t border-gray-200 pt-4 sm:pt-6 mt-4 sm:mt-6 w-full">
-                      <h3 className="text-sm sm:text-base font-bold mb-3 sm:mb-4">Информация для мастера</h3>
-                      
-                      <div className="w-full">
-                        <label className="block text-sm font-medium mb-2">
-                          Описание услуг (необязательно)
-                        </label>
-                        <textarea
-                          value={servicesText}
-                          onChange={(e) => setServicesText(e.target.value)}
-                          placeholder="Кратко опишите ваши услуги или особенности работы"
-                          className="textarea w-full"
-                          rows={4}
-                        />
-                      </div>
-
-                      <div className="mt-4 w-full">
-                        <label className="block text-sm font-medium mb-2">
-                          Место обслуживания *
-                        </label>
-                        <select
-                          value={serviceLocation}
-                          onChange={(e) => setServiceLocation(e.target.value as 'home' | 'workshop' | 'both')}
-                          className="input w-full"
-                          required
-                        >
-                          <option value="home">Выезд на дом</option>
-                          <option value="workshop">В мастерской</option>
-                          <option value="both">Выезд и в мастерской</option>
-                        </select>
-                      </div>
-
-                      <div className="mt-4 w-full">
-                        <label className="block text-sm font-medium mb-2">
-                          Опыт работы (лет)
-                        </label>
-                        <input
-                          type="number"
-                          value={experienceYears}
-                          onChange={(e) => setExperienceYears(e.target.value ? Number(e.target.value) : '')}
-                          min="0"
-                          max="100"
-                          className="input w-full"
-                          placeholder="Например: 5"
-                        />
-                      </div>
-
-                      <div className="mt-4 w-full">
-                        <MasterRadiusPicker />
-                      </div>
-
-                      <div className="mt-4 w-full">
-                        <label className="block text-sm font-medium mb-2">
-                          График работы
-                        </label>
-                        <input
-                          type="text"
-                          value={workSchedule}
-                          onChange={(e) => setWorkSchedule(e.target.value)}
-                          placeholder="Например: Пн-Пт 9:00-18:00, Сб 10:00-16:00"
-                          className="input w-full"
-                        />
-                      </div>
-
-                    </div>
-                  </>
-                )}
-
-                {/* Seller-specific fields: точный адрес магазина вместо города — для карты и «Товары рядом» */}
-                {profile.role === 'seller' && (
-                  <>
-                    <div className="border-t border-gray-200 pt-6 mt-6">
-                      <h3 className="text-base font-bold mb-4">Информация для продавца</h3>
-                      <p className="text-sm text-text-secondary mb-4">
-                        Укажите точный адрес магазина или склада. По нему вас найдут на карте, а мастерам в радиусе будут показываться ваши товары в блоке «Товары рядом».
-                      </p>
-                      <SellerAddressPicker
-                        onSave={() => {
-                          fetchProfile()
-                        }}
-                      />
-
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium mb-2">
-                          Режим работы
-                        </label>
-                        <input
-                          type="text"
-                          value={workHours}
-                          onChange={(e) => setWorkHours(e.target.value)}
-                          placeholder="Например: Пн-Сб 10:00-20:00, Вс 11:00-18:00"
-                          className="input"
-                        />
-                      </div>
-
-                      <div className="mt-4">
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={deliveryAvailable}
-                            onChange={(e) => setDeliveryAvailable(e.target.checked)}
-                            className="w-4 h-4"
-                          />
-                          <span className="text-sm font-medium">Предоставляю доставку</span>
-                        </label>
-                      </div>
-
-                      {deliveryAvailable && (
-                        <div className="mt-4">
-                          <label className="block text-sm font-medium mb-2">
-                            Зоны доставки
-                          </label>
-                          <input
-                            type="text"
-                            value={deliveryZones}
-                            onChange={(e) => setDeliveryZones(e.target.value)}
-                            placeholder="Например: Вся Москва, МО до 50 км"
-                            className="input"
-                          />
-                        </div>
-                      )}
-
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium mb-2">
-                          Категории товаров
-                        </label>
-                        <input
-                          type="text"
-                          value={productCategories}
-                          onChange={(e) => setProductCategories(e.target.value)}
-                          placeholder="Например: Инструменты, Стройматериалы, Электроинструмент"
-                          className="input"
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="flex flex-col sm:flex-row gap-3 pt-4 sm:pt-6 border-t border-gray-200 mt-4 sm:mt-6 w-full">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm font-medium bg-black text-white border border-black hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {saving ? 'Сохранение...' : 'Сохранить'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFullName(profile.full_name || '')
-                      setPhone(profile.phone || '')
-                      setCity(profile.city || '')
-                      setDescription(profile.description || '')
-                      setSelectedSubcategoryIds(profileSubcategories.map((s) => s.id))
-                      setSelectedServiceIds(profileServices.map((s) => s.id))
-                      // Reset master fields
-                      if (profile.role === 'master') {
-                        setServicesText(profile.services || '')
-                        setServiceLocation(profile.service_location || 'both')
-                        setExperienceYears(profile.experience_years || '')
-                        setWorkSchedule(profile.work_schedule || '')
-                      }
-                      // Reset seller fields
-                      if (profile.role === 'seller') {
-                        setStoreAddress(profile.store_address || '')
-                        setWorkHours(profile.work_hours || '')
-                        setDeliveryAvailable(profile.delivery_available || false)
-                        setDeliveryZones(profile.delivery_zones || '')
-                        setProductCategories(profile.product_categories || '')
-                      }
-                    }}
-                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm font-medium bg-bg-card text-graphite-secondary border border-border-light hover:bg-bg-secondary transition-colors"
-                  >
-                    Отмена
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-              {/* Specializations and Services Tab (only for masters) */}
-              {settingsTab === 'specializations' && profile.role === 'master' && (
-                <div className="space-y-4 sm:space-y-6 w-full">
-                  <div className="w-full">
-                    <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Категории и подкатегории</h2>
-                    <div className="space-y-4 max-h-96 overflow-y-auto border border-border-color p-3 sm:p-4 rounded-md">
-                      {tree.map((cat) => (
-                        <div key={cat.id}>
-                          <div className="font-medium text-graphite-secondary mb-2">{cat.name}</div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-2">
-                            {cat.subcategories.map((sub) => (
-                              <label key={sub.id} className="flex items-center gap-2 text-sm text-text-primary">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedSubcategoryIds.includes(sub.id)}
-                                  onChange={() => toggleSubcategory(sub.id)}
-                                  className="w-4 h-4"
-                                />
-                                <span>{sub.name}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="w-full">
-                    <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Услуги</h2>
-                    <p className="text-sm text-text-secondary mb-3 sm:mb-4">
-                      Услуги по выбранным подкатегориям
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto border border-border-color p-3 sm:p-4 rounded-md">
-                      {filteredServices.length === 0 ? (
-                        <p className="text-sm text-text-secondary col-span-2">Сначала выберите подкатегории</p>
-                      ) : (
-                        filteredServices.map((svc: any) => (
-                          <label key={svc.id} className="flex items-center gap-2 text-sm text-text-primary">
-                            <input
-                              type="checkbox"
-                              checked={selectedServiceIds.includes(svc.id)}
-                              onChange={() => toggleService(svc.id)}
-                              className="w-4 h-4"
-                            />
-                            <span>{svc.name}</span>
-                          </label>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border-color w-full">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!currentUser) return
-                        await syncSelections(currentUser.id)
-                        await fetchSelections()
-                        alert('Категории и услуги сохранены!')
-                      }}
-                      className="btn btn-primary w-full sm:w-auto"
-                    >
-                      Сохранить
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedSubcategoryIds(profileSubcategories.map((s) => s.id))
-                        setSelectedServiceIds(profileServices.map((s) => s.id))
-                      }}
-                      className="btn btn-secondary w-full sm:w-auto"
-                    >
-                      Отмена
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Security Tab */}
-              {settingsTab === 'security' && (
-                <div className="w-full">
-                  <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Изменение пароля</h2>
-                  <p className="text-sm text-text-secondary mb-3 sm:mb-4">
-                    Пароль хранится в зашифрованном виде и не может быть просмотрен. Вы можете изменить его, указав текущий пароль.
-                  </p>
-
-                  <form onSubmit={handleChangePassword} className="space-y-4 w-full">
-                    <div className="w-full">
-                      <label className="block text-sm font-medium mb-2 text-graphite-secondary">
-                        Текущий пароль *
-                      </label>
-                      <input
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        className="input w-full"
-                        placeholder="Введите текущий пароль"
-                        disabled={changingPassword}
-                        required
-                      />
-                        </div>
-                    
-                    <div className="w-full">
-                      <label className="block text-sm font-medium mb-2 text-graphite-secondary">
-                        Новый пароль *
-                      </label>
-                      <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="input w-full"
-                        placeholder="Минимум 6 символов"
-                        disabled={changingPassword}
-                        required
-                        minLength={6}
-                      />
-                      </div>
-
-                    <div className="w-full">
-                      <label className="block text-sm font-medium mb-2 text-graphite-secondary">
-                        Подтвердите новый пароль *
-                      </label>
-                      <input
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="input w-full"
-                        placeholder="Повторите новый пароль"
-                        disabled={changingPassword}
-                        required
-                        minLength={6}
-                      />
-                </div>
-
-                    {passwordError && (
-                      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                        {passwordError}
-                      </div>
-                    )}
-
-                    {passwordSuccess && (
-                      <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-                        {passwordSuccess}
-                        </div>
-                      )}
-
-                    <button
-                      type="submit"
-                      disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
-                      className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
-                    >
-                      <FiLock size={16} />
-                      <span>{changingPassword ? 'Изменение...' : 'Изменить пароль'}</span>
-                    </button>
-                  </form>
-                      </div>
-                    )}
-
-              {/* Account Tab */}
-              {settingsTab === 'account' && (
-                <div className="space-y-4 sm:space-y-6 w-full">
-                  {/* Sign Out Section */}
-                  <div className="pb-4 sm:pb-6 border-b border-border-color w-full">
-                    <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-graphite-secondary tracking-tight">Выход из аккаунта</h2>
-                    <p className="text-sm text-text-secondary mb-3 sm:mb-4">
-                      Вы можете выйти из аккаунта в любой момент. Для повторного входа потребуется ввести email и пароль.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (confirm('Вы уверены, что хотите выйти из аккаунта?')) {
-                          await supabase.auth.signOut()
-                          router.push('/')
-                        }
-                      }}
-                      className="btn btn-secondary w-full sm:w-auto flex items-center justify-center gap-2"
-                    >
-                      <FiLogOut size={16} />
-                      <span>Выйти из аккаунта</span>
-                    </button>
-                        </div>
-
-                  {/* Delete Account Section */}
-                  <div className="w-full">
-                    <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-red-600">Удаление аккаунта</h2>
-                    <p className="text-sm text-text-secondary mb-3 sm:mb-4">
-                      Удаление аккаунта необратимо. Все ваши данные будут безвозвратно удалены.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDeleteEmail(currentUser?.email || '')
-                        setShowDeleteAccountModal(true)
-                      }}
-                      className="btn bg-red-500 hover:bg-red-600 text-white border-red-500 w-full sm:w-auto"
-                    >
-                      Удалить аккаунт
-                    </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
         </div>
       </div>
-
-      {/* Avatar Modal */}
-      {showAvatarModal && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 animate-fade-in"
-          onClick={() => setShowAvatarModal(false)}
-        >
-          <div
-            className="bg-bg-primary border border-border-color rounded-lg shadow-card p-6 w-full max-w-sm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold mb-4 text-graphite-secondary tracking-tight">Аватарка</h3>
-            <div className="flex flex-col gap-3">
-              <label className="btn btn-primary cursor-pointer inline-flex items-center justify-center gap-2">
-                <FiCamera size={16} />
-                <span>{uploadingAvatar ? 'Загрузка...' : 'Изменить'}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    handleAvatarUpload(e)
-                    setShowAvatarModal(false)
-                  }}
-                  disabled={uploadingAvatar}
-                  className="hidden"
-                />
-              </label>
-              {profile?.avatar_url && (
-                            <button
-                  type="button"
-                  onClick={() => {
-                    handleDeleteAvatar()
-                    setShowAvatarModal(false)
-                  }}
-                  disabled={uploadingAvatar}
-                  className="btn bg-red-500 hover:bg-red-600 text-white border-red-500 inline-flex items-center justify-center gap-2"
-                            >
-                  <FiX size={16} />
-                  <span>Удалить</span>
-                            </button>
-                          )}
-                          <button
-                type="button"
-                onClick={() => setShowAvatarModal(false)}
-                className="btn bg-bg-secondary hover:bg-bg-primary text-graphite-secondary border border-border-light"
-                          >
-                Отмена
-                          </button>
-                            </div>
-                              </div>
-                </div>
-              )}
-
-      {/* Cover Photo Modal */}
-      {showCoverModal && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 animate-fade-in"
-          onClick={() => setShowCoverModal(false)}
-        >
-          <div
-            className="bg-bg-primary border border-border-color rounded-lg shadow-card p-6 w-full max-w-sm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold mb-4 text-graphite-secondary tracking-tight">Фоновая картинка</h3>
-            <div className="flex flex-col gap-3">
-              <label className="btn btn-primary cursor-pointer inline-flex items-center justify-center gap-2">
-                <FiCamera size={16} />
-                <span>{uploadingCover ? 'Загрузка...' : 'Изменить'}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    handleCoverPhotoUpload(e)
-                    setShowCoverModal(false)
-                  }}
-                  disabled={uploadingCover}
-                  className="hidden"
-                />
-              </label>
-              {profile?.cover_photo_url && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleDeleteCoverPhoto()
-                    setShowCoverModal(false)
-                  }}
-                  disabled={uploadingCover}
-                  className="btn bg-red-500 hover:bg-red-600 text-white border-red-500 inline-flex items-center justify-center gap-2"
-                >
-                  <FiX size={16} />
-                  <span>Удалить</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowCoverModal(false)}
-                className="btn bg-bg-secondary hover:bg-bg-primary text-graphite-secondary border border-border-light"
-                            >
-                Отмена
-              </button>
-                    </div>
-                  </div>
-                </div>
-                )}
-
-      {/* Delete Account Modal */}
-      {showDeleteAccountModal && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 animate-fade-in"
-          onClick={() => setShowDeleteAccountModal(false)}
-                          >
-          <div
-            className="bg-bg-primary border border-red-200 rounded-lg shadow-card p-6 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold mb-4 text-red-600">Удаление аккаунта</h3>
-            <p className="text-sm text-text-secondary mb-4">
-              Для подтверждения удаления аккаунта введите ваш email и пароль. Это действие необратимо.
-            </p>
-            
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault()
-                if (!currentUser) return
-
-                if (!deleteEmail || !deletePassword) {
-                  setDeleteError('Заполните все поля')
-                  return
-                }
-
-                setDeletingAccount(true)
-                setDeleteError('')
-
-                try {
-                  const token = (await supabase.auth.getSession()).data.session?.access_token
-                  if (!token) {
-                    throw new Error('Не удалось получить токен авторизации')
-                  }
-
-                  const response = await fetch('/api/account/delete', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                      email: deleteEmail || currentUser.email,
-                      password: deletePassword,
-                    }),
-                  })
-
-                  const data = await response.json()
-
-                  if (!response.ok) {
-                    throw new Error(data.error || 'Ошибка при удалении аккаунта')
-                  }
-
-                  // Выходим из аккаунта и редиректим на главную
-                  await supabase.auth.signOut()
-                  router.push('/')
-                } catch (error: any) {
-                  console.error('Error deleting account:', error)
-                  setDeleteError(error.message || 'Ошибка при удалении аккаунта')
-                } finally {
-                  setDeletingAccount(false)
-                }
-              }}
-              className="space-y-4"
-            >
-                      <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
-                  Email *
-                        </label>
-                              <input
-                  type="email"
-                  value={deleteEmail}
-                  onChange={(e) => setDeleteEmail(e.target.value)}
-                  className="input w-full"
-                  placeholder={currentUser?.email || "Введите ваш email"}
-                  disabled={deletingAccount}
-                  required
-                />
-                      </div>
-                      
-                      <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
-                  Пароль *
-                        </label>
-                        <input
-                  type="password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  className="input w-full"
-                  placeholder="Введите ваш пароль"
-                  disabled={deletingAccount}
-                  required
-                        />
-                      </div>
-
-              {deleteError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                  {deleteError}
-                        </div>
-                      )}
-
-              <div className="flex gap-3">
-                  <button
-                    type="submit"
-                  disabled={deletingAccount || !deleteEmail || !deletePassword}
-                  className="btn bg-red-500 hover:bg-red-600 text-white border-red-500 flex-1"
-                  >
-                  {deletingAccount ? 'Удаление...' : 'Подтвердить удаление'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                    setShowDeleteAccountModal(false)
-                    setDeleteEmail(currentUser?.email || '')
-                    setDeletePassword('')
-                    setDeleteError('')
-                  }}
-                  disabled={deletingAccount}
-                  className="btn bg-bg-secondary hover:bg-bg-primary text-graphite-secondary border border-border-light"
-                  >
-                    Отмена
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
       {/* Модалка: список подписчиков или подписок */}
       {showFollowModal && (

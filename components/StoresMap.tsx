@@ -1,21 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import dynamic from 'next/dynamic'
+import { MapContainer, TileLayer, Marker, Popup, Circle } from '@/components/maps/leaflet'
 import Image from 'next/image'
 import Link from 'next/link'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import { supabase, User, Product } from '@/lib/supabase'
 import { FiMapPin, FiShoppingBag, FiX, FiNavigation, FiFilter } from 'react-icons/fi'
-import { configureLeafletIcons } from '@/lib/leaflet'
+import { configureLeafletIcons, leaflet as L } from '@/lib/leaflet'
 import 'leaflet/dist/leaflet.css'
-
-// dynamic() ломает типизацию пропсов компонентов react-leaflet — используем any
-const MapContainer: any = dynamic(() => import('react-leaflet').then((m) => m.MapContainer), { ssr: false })
-const TileLayer: any = dynamic(() => import('react-leaflet').then((m) => m.TileLayer), { ssr: false })
-const Marker: any = dynamic(() => import('react-leaflet').then((m) => m.Marker), { ssr: false })
-const Popup: any = dynamic(() => import('react-leaflet').then((m) => m.Popup), { ssr: false })
-const Circle: any = dynamic(() => import('react-leaflet').then((m) => m.Circle), { ssr: false })
 
 const DEFAULT_CENTER: [number, number] = [55.751244, 37.618423] // Москва
 const DEFAULT_ZOOM = 10
@@ -177,14 +170,10 @@ export default function StoresMap({ masterLocation, onSellerClick, className = '
 
   useEffect(() => {
     if (sellers.length > 0 && mapRef.current) {
-      void import('leaflet').then((L) => {
-        if (!mapRef.current) return
-
-        const bounds = L.latLngBounds(
-          sellers.map((p) => [p.lat, p.lng] as [number, number])
-        )
-        mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 })
-      })
+      const bounds = L.latLngBounds(
+        sellers.map((p) => [p.lat, p.lng] as [number, number])
+      )
+      mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 })
     }
   }, [sellers])
 

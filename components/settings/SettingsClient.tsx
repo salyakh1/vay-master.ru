@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { useAuth } from '@/app/providers'
@@ -15,7 +15,7 @@ import {
   type NotificationPrefs,
 } from '@/lib/notification-prefs'
 import {
-  SettingsArrow,
+  SettingsAccordionItem,
   SettingsBadge,
   SettingsHeader,
   SettingsProfilePreview,
@@ -23,7 +23,18 @@ import {
   SettingsRow,
   SettingsSection,
   SettingsToggle,
+  SettingsArrow,
 } from './SettingsUI'
+import {
+  useSettingsForms,
+  ProfileEditPanel,
+  SpecializationsPanel,
+  LocationPanel,
+  StoreAddressPanel,
+  PasswordPanel,
+  EmailPanel,
+  type SettingsPanelId,
+} from './SettingsFormPanels'
 
 const ROLE_LABELS: Record<string, string> = {
   master: 'Мастер',
@@ -35,10 +46,6 @@ const AVATAR_BG: Record<string, string> = {
   master: '#c0392b',
   seller: '#1d3557',
   client: '#22a85e',
-}
-
-function profileSection(userId: string, section: string) {
-  return `/profile/${userId}?tab=settings&section=${section}`
 }
 
 function getInitials(name: string) {
@@ -118,39 +125,15 @@ function DeleteAccountModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-base font-bold text-[#1c1c1e] mb-2">Удалить аккаунт</h2>
-        <p className="text-sm text-[#8e8e93] mb-4">
-          Действие необратимо. Введите email и пароль для подтверждения.
-        </p>
-        <input
-          type="email"
-          value={confirmEmail}
-          onChange={(e) => setConfirmEmail(e.target.value)}
-          className="input w-full mb-3 text-sm"
-          placeholder="Email"
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="input w-full mb-3 text-sm"
-          placeholder="Пароль"
-        />
+        <p className="text-sm text-[#8e8e93] mb-4">Действие необратимо. Введите email и пароль.</p>
+        <input type="email" value={confirmEmail} onChange={(e) => setConfirmEmail(e.target.value)} className="input w-full mb-3 text-sm" />
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input w-full mb-3 text-sm" />
         {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="btn btn-secondary flex-1">
-            Отмена
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={loading || !confirmEmail || !password}
-            className="btn bg-red-600 hover:bg-red-700 text-white border-red-600 flex-1"
-          >
+          <button type="button" onClick={onClose} className="btn btn-secondary flex-1">Отмена</button>
+          <button type="button" onClick={handleDelete} disabled={loading || !confirmEmail || !password} className="btn bg-red-600 hover:bg-red-700 text-white border-red-600 flex-1">
             {loading ? 'Удаление…' : 'Удалить'}
           </button>
         </div>
@@ -161,14 +144,14 @@ function DeleteAccountModal({
 
 export default function SettingsClient() {
   const router = useRouter()
-  const { user, loading: authLoading, signOut } = useAuth()
+  const searchParams = useSearchParams()
+  const { user, loading: authLoading, signOut, refreshUser } = useAuth()
   const [specCount, setSpecCount] = useState(0)
   const [portfolioCount, setPortfolioCount] = useState(0)
   const [productsCount, setProductsCount] = useState(0)
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>({})
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-
-  const access = useMemo(() => (user ? getMasterAccess(user) : null), [user])
+  const [openPanel, setOpenPanel] = useState<SettingsPanelId | null>(null)
 
   const loadStats = useCallback(async (userId: string, role: string) => {
     if (role === 'master') {
@@ -180,18 +163,22 @@ export default function SettingsClient() {
       setPortfolioCount(portRes.count ?? 0)
     }
     if (role === 'seller') {
-      const { count } = await supabase
-        .from('products')
-        .select('id', { count: 'exact', head: true })
-        .eq('seller_id', userId)
+      const { count } = await supabase.from('products').select('id', { count: 'exact', head: true }).eq('seller_id', userId)
       setProductsCount(count ?? 0)
     }
   }, [])
 
+  const onSaved = useCallback(() => {
+    refreshUser()
+    if (user) loadStats(user.id, user.role)
+  }, [refreshUser, loadStats, user])
+
+  const forms = useSettingsForms(onSaved)
+
+  const access = useMemo(() => (user ? getMasterAccess(user) : null), [user])
+
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/auth/login')
-    }
+    if (!authLoading && !user) router.replace('/auth/login')
   }, [user, authLoading, router])
 
   useEffect(() => {
@@ -200,10 +187,20 @@ export default function SettingsClient() {
     loadStats(user.id, user.role)
   }, [user, loadStats])
 
+  useEffect(() => {
+    const open = searchParams.get('open') as SettingsPanelId | null
+    if (open && ['profile', 'specializations', 'location', 'store', 'password', 'email'].includes(open)) {
+      setOpenPanel(open)
+    }
+  }, [searchParams])
+
+  const togglePanel = (id: SettingsPanelId) => {
+    setOpenPanel((prev) => (prev === id ? null : id))
+  }
+
   const toggleNotif = (key: NotificationPrefKey) => {
     if (!user) return
-    const next = setNotificationPref(user.id, user.role, key, !notifPrefs[key])
-    setNotifPrefs(next)
+    setNotifPrefs(setNotificationPref(user.id, user.role, key, !notifPrefs[key]))
   }
 
   const handleLogout = async () => {
@@ -221,27 +218,19 @@ export default function SettingsClient() {
   }
 
   const role = user.role
-  const section = (s: string) => profileSection(user.id, s)
   const radius = user.service_radius_km ?? 50
   const locationSub =
-    user.city && user.master_lat != null
-      ? `${user.city} · радиус ${radius} км`
-      : user.city || 'Не указано'
+    user.city && user.master_lat != null ? `${user.city} · радиус ${radius} км` : user.city || 'Не указано'
 
-  const proTitle = access?.isPro
-    ? 'PRO активен'
-    : access?.isTrial
-      ? 'Пробный PRO'
-      : 'Подключите PRO'
-
-  const proSubtitle = access?.isPro && user.pro_until
-    ? `Действует до ${format(new Date(user.pro_until), 'd MMMM yyyy', { locale: ru })}`
-    : access?.isTrial
-      ? 'Бесплатный период для новых мастеров и продавцов'
-      : role === 'seller'
-        ? 'Приоритет в каталоге и поиске'
-        : 'Больше заказов и видимость в поиске'
-
+  const proTitle = access?.isPro ? 'PRO активен' : access?.isTrial ? 'Пробный PRO' : 'Подключите PRO'
+  const proSubtitle =
+    access?.isPro && user.pro_until
+      ? `Действует до ${format(new Date(user.pro_until), 'd MMMM yyyy', { locale: ru })}`
+      : access?.isTrial
+        ? 'Бесплатный период'
+        : role === 'seller'
+          ? 'Приоритет в каталоге'
+          : 'Больше заказов в поиске'
   const proBtn = access?.isPro ? 'Продлить' : role === 'seller' ? 'Управление' : 'Подключить'
 
   return (
@@ -265,74 +254,50 @@ export default function SettingsClient() {
 
         <div className="flex-1 overflow-y-auto">
           {(role === 'master' || role === 'seller') && (
-            <SettingsProBanner
-              tag="Текущий план"
-              title={proTitle}
-              subtitle={proSubtitle}
-              buttonLabel={proBtn}
-              href="/pro"
-            />
+            <SettingsProBanner tag="Текущий план" title={proTitle} subtitle={proSubtitle} buttonLabel={proBtn} href="/pro" />
           )}
 
           {role === 'master' && (
             <>
               <SettingsSection title="Профиль мастера">
-                <SettingsRow
+                <SettingsAccordionItem
                   icon="✏️"
                   iconBg="#fff1f2"
                   title="Редактировать профиль"
                   subtitle="Имя, фото, описание, контакты"
-                  href={section('edit')}
-                  right={<SettingsArrow />}
-                />
-                <SettingsRow
+                  expanded={openPanel === 'profile'}
+                  onToggle={() => togglePanel('profile')}
+                >
+                  <ProfileEditPanel forms={forms} />
+                </SettingsAccordionItem>
+                <SettingsAccordionItem
                   icon="🔧"
                   iconBg="#fff1f2"
                   title="Специализации и услуги"
                   subtitle={specCountLabel(specCount)}
-                  href={section('specializations')}
-                  right={<SettingsArrow />}
-                />
-                <SettingsRow
+                  expanded={openPanel === 'specializations'}
+                  onToggle={() => togglePanel('specializations')}
+                >
+                  <SpecializationsPanel forms={forms} />
+                </SettingsAccordionItem>
+                <SettingsAccordionItem
                   icon="📍"
                   iconBg="#fff1f2"
                   title="Геолокация и радиус"
                   subtitle={locationSub}
-                  href={section('edit')}
-                  right={<SettingsArrow />}
-                />
-                <SettingsRow
-                  icon="🖼️"
-                  iconBg="#fff1f2"
-                  title="Портфолио"
-                  subtitle={portfolioLabel(portfolioCount)}
-                  href={`/profile/${user.id}`}
-                  right={<SettingsArrow />}
-                />
+                  expanded={openPanel === 'location'}
+                  onToggle={() => togglePanel('location')}
+                >
+                  <LocationPanel />
+                </SettingsAccordionItem>
+                <SettingsRow icon="🖼️" iconBg="#fff1f2" title="Портфолио" subtitle={portfolioLabel(portfolioCount)} href={`/profile/${user.id}`} right={<SettingsArrow />} />
               </SettingsSection>
 
               <SettingsSection title="Уведомления">
-                <SettingsRow
-                  icon="🔔"
-                  title="Новые заказы"
-                  subtitle="Push и в приложении"
-                  right={<SettingsToggle checked={!!notifPrefs.new_orders} onChange={() => toggleNotif('new_orders')} />}
-                />
-                <SettingsRow
-                  icon="💬"
-                  title="Сообщения в чатах"
-                  right={<SettingsToggle checked={!!notifPrefs.chat_messages} onChange={() => toggleNotif('chat_messages')} />}
-                />
-                <SettingsRow
-                  icon="⭐"
-                  title="Новые отзывы"
-                  right={<SettingsToggle checked={!!notifPrefs.new_reviews} onChange={() => toggleNotif('new_reviews')} />}
-                />
-                <SettingsRow
-                  icon="📢"
-                  title="Акции и новости"
-                  right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />}
-                />
+                <SettingsRow icon="🔔" title="Новые заказы" subtitle="Push и в приложении" right={<SettingsToggle checked={!!notifPrefs.new_orders} onChange={() => toggleNotif('new_orders')} />} />
+                <SettingsRow icon="💬" title="Сообщения в чатах" right={<SettingsToggle checked={!!notifPrefs.chat_messages} onChange={() => toggleNotif('chat_messages')} />} />
+                <SettingsRow icon="⭐" title="Новые отзывы" right={<SettingsToggle checked={!!notifPrefs.new_reviews} onChange={() => toggleNotif('new_reviews')} />} />
+                <SettingsRow icon="📢" title="Акции и новости" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
               </SettingsSection>
             </>
           )}
@@ -340,65 +305,41 @@ export default function SettingsClient() {
           {role === 'seller' && (
             <>
               <SettingsSection title="Мой магазин">
-                <SettingsRow
+                <SettingsAccordionItem
                   icon="🏪"
                   iconBg="#fff1f2"
                   title="Настройки магазина"
-                  subtitle="Название, логотип, описание"
-                  href={section('edit')}
-                  right={<SettingsArrow />}
-                />
+                  subtitle="Описание, режим работы, доставка"
+                  expanded={openPanel === 'profile'}
+                  onToggle={() => togglePanel('profile')}
+                >
+                  <ProfileEditPanel forms={forms} />
+                </SettingsAccordionItem>
                 <SettingsRow
                   icon="📦"
                   iconBg="#fff1f2"
                   title="Управление товарами"
-                  subtitle={
-                    productsCount > 0
-                      ? `${productsCount} ${productsCount === 1 ? 'товар' : productsCount < 5 ? 'товара' : 'товаров'} в каталоге`
-                      : 'Добавьте первый товар'
-                  }
+                  subtitle={productsCount > 0 ? `${productsCount} в каталоге` : 'Добавьте первый товар'}
                   href="/products"
                   right={<SettingsArrow />}
                 />
-                <SettingsRow
-                  icon="📊"
-                  iconBg="#fff1f2"
-                  title="Аналитика продаж"
-                  subtitle="Просмотры, клики, конверсия"
-                  href="/activity"
-                  right={
-                    <>
-                      <SettingsBadge variant="green">Новое</SettingsBadge>
-                      <SettingsArrow />
-                    </>
-                  }
-                />
-                <SettingsRow
+                <SettingsRow icon="📊" iconBg="#fff1f2" title="Аналитика продаж" subtitle="Просмотры и конверсия" href="/activity" right={<><SettingsBadge variant="green">Новое</SettingsBadge><SettingsArrow /></>} />
+                <SettingsAccordionItem
                   icon="📍"
                   iconBg="#fff1f2"
                   title="Адрес и зона доставки"
                   subtitle={user.delivery_zones || user.store_address || user.city || 'Не указано'}
-                  href={section('edit')}
-                  right={<SettingsArrow />}
-                />
+                  expanded={openPanel === 'store'}
+                  onToggle={() => togglePanel('store')}
+                >
+                  <StoreAddressPanel onSaved={onSaved} />
+                </SettingsAccordionItem>
               </SettingsSection>
 
               <SettingsSection title="Уведомления">
-                <SettingsRow
-                  icon="💬"
-                  title="Сообщения покупателей"
-                  right={<SettingsToggle checked={!!notifPrefs.buyer_messages} onChange={() => toggleNotif('buyer_messages')} />}
-                />
-                <SettingsRow
-                  icon="⭐"
-                  title="Новые отзывы на товары"
-                  right={<SettingsToggle checked={!!notifPrefs.product_reviews} onChange={() => toggleNotif('product_reviews')} />}
-                />
-                <SettingsRow
-                  icon="📢"
-                  title="Акции и маркетинг"
-                  right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />}
-                />
+                <SettingsRow icon="💬" title="Сообщения покупателей" right={<SettingsToggle checked={!!notifPrefs.buyer_messages} onChange={() => toggleNotif('buyer_messages')} />} />
+                <SettingsRow icon="⭐" title="Новые отзывы на товары" right={<SettingsToggle checked={!!notifPrefs.product_reviews} onChange={() => toggleNotif('product_reviews')} />} />
+                <SettingsRow icon="📢" title="Акции и маркетинг" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
               </SettingsSection>
             </>
           )}
@@ -406,183 +347,57 @@ export default function SettingsClient() {
           {role === 'client' && (
             <>
               <SettingsSection title="Личные данные">
-                <SettingsRow
+                <SettingsAccordionItem
                   icon="👤"
                   iconBg="#fff1f2"
                   title="Имя и фото профиля"
-                  href={section('edit')}
-                  right={<SettingsArrow />}
-                />
-                <SettingsRow
-                  icon="📧"
-                  iconBg="#fff1f2"
-                  title="Email"
-                  subtitle={user.email}
-                  href={section('account')}
-                  right={<SettingsArrow />}
-                />
-                <SettingsRow
-                  icon="📱"
-                  iconBg="#fff1f2"
-                  title="Телефон"
-                  subtitle={user.phone || 'Не указан'}
-                  href={section('edit')}
-                  right={<SettingsArrow />}
-                />
-                <SettingsRow
-                  icon="📍"
-                  iconBg="#fff1f2"
-                  title="Мой город"
-                  subtitle={user.city || 'Не указан'}
-                  href={section('edit')}
-                  right={<SettingsArrow />}
-                />
+                  expanded={openPanel === 'profile'}
+                  onToggle={() => togglePanel('profile')}
+                >
+                  <ProfileEditPanel forms={forms} />
+                </SettingsAccordionItem>
+                <SettingsAccordionItem icon="📧" iconBg="#fff1f2" title="Email" subtitle={user.email} expanded={openPanel === 'email'} onToggle={() => togglePanel('email')}>
+                  <EmailPanel email={user.email} />
+                </SettingsAccordionItem>
               </SettingsSection>
 
               <SettingsSection title="Уведомления">
-                <SettingsRow
-                  icon="📋"
-                  title="Отклики на мои заказы"
-                  right={<SettingsToggle checked={!!notifPrefs.order_responses} onChange={() => toggleNotif('order_responses')} />}
-                />
-                <SettingsRow
-                  icon="💬"
-                  title="Новые сообщения"
-                  right={<SettingsToggle checked={!!notifPrefs.chat_messages} onChange={() => toggleNotif('chat_messages')} />}
-                />
-                <SettingsRow
-                  icon="📢"
-                  title="Акции и предложения"
-                  right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />}
-                />
+                <SettingsRow icon="📋" title="Отклики на мои заказы" right={<SettingsToggle checked={!!notifPrefs.order_responses} onChange={() => toggleNotif('order_responses')} />} />
+                <SettingsRow icon="💬" title="Новые сообщения" right={<SettingsToggle checked={!!notifPrefs.chat_messages} onChange={() => toggleNotif('chat_messages')} />} />
+                <SettingsRow icon="📢" title="Акции и предложения" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
               </SettingsSection>
 
               <SettingsSection title="Возможности">
-                <SettingsRow
-                  icon="🔨"
-                  iconBg="#fff1f2"
-                  title="Стать мастером"
-                  subtitle="Начните получать заказы"
-                  href="/onboarding/specializations"
-                  right={
-                    <>
-                      <SettingsBadge>Новое</SettingsBadge>
-                      <SettingsArrow />
-                    </>
-                  }
-                />
-                <SettingsRow
-                  icon="🛒"
-                  iconBg="#fff1f2"
-                  title="Открыть магазин"
-                  subtitle="Продавайте товары на платформе"
-                  href="/onboarding/seller"
-                  right={<SettingsArrow />}
-                />
+                <SettingsRow icon="🔨" iconBg="#fff1f2" title="Стать мастером" subtitle="Начните получать заказы" href="/onboarding/specializations" right={<><SettingsBadge>Новое</SettingsBadge><SettingsArrow /></>} />
+                <SettingsRow icon="🛒" iconBg="#fff1f2" title="Открыть магазин" subtitle="Продавайте на платформе" href="/onboarding/seller" right={<SettingsArrow />} />
               </SettingsSection>
             </>
           )}
 
-          {role === 'master' && (
-            <SettingsSection title="Аккаунт">
-              <SettingsRow icon="📧" title="Email" subtitle={user.email} href={section('account')} right={<SettingsArrow />} />
-              <SettingsRow
-                icon="🔒"
-                title="Пароль"
-                subtitle="Изменить пароль"
-                href={section('security')}
-                right={<SettingsArrow />}
-              />
-              <SettingsRow
-                icon="📱"
-                title="Телефон"
-                subtitle={user.phone || 'Не указан'}
-                href={section('edit')}
-                right={<SettingsArrow />}
-              />
-            </SettingsSection>
-          )}
+          <SettingsSection title="Аккаунт и безопасность">
+            {(role === 'master' || role === 'seller' || role === 'client') && (
+              <SettingsAccordionItem icon="📧" title="Email" subtitle={user.email} expanded={openPanel === 'email'} onToggle={() => togglePanel('email')}>
+                <EmailPanel email={user.email} />
+              </SettingsAccordionItem>
+            )}
+            <SettingsAccordionItem icon="🔒" title="Сменить пароль" subtitle="Обновить пароль входа" expanded={openPanel === 'password'} onToggle={() => togglePanel('password')}>
+              <PasswordPanel forms={forms} />
+            </SettingsAccordionItem>
+            <SettingsRow icon="🛡" title="Двухфакторная аутентификация" right={<><SettingsBadge variant="gray">Выкл</SettingsBadge></>} />
+          </SettingsSection>
 
-          {role === 'seller' && (
-            <SettingsSection title="Аккаунт">
-              <SettingsRow icon="📧" title="Email" subtitle={user.email} href={section('account')} right={<SettingsArrow />} />
-              <SettingsRow icon="🔒" title="Пароль" href={section('security')} right={<SettingsArrow />} />
-              <SettingsRow
-                icon="🛡"
-                title="Двухфакторная аутентификация"
-                href={section('security')}
-                right={
-                  <>
-                    <SettingsBadge variant="gray">Выкл</SettingsBadge>
-                    <SettingsArrow />
-                  </>
-                }
-              />
-            </SettingsSection>
-          )}
-
-          {(role === 'master' || role === 'client') && (
-            <SettingsSection title="Безопасность">
-              <SettingsRow
-                icon="🛡"
-                title="Двухфакторная аутентификация"
-                href={section('security')}
-                right={
-                  <>
-                    <SettingsBadge variant="gray">Выкл</SettingsBadge>
-                    <SettingsArrow />
-                  </>
-                }
-              />
-              {role === 'master' && (
-                <SettingsRow
-                  icon="📋"
-                  title="Активные сессии"
-                  subtitle="Текущее устройство"
-                  href={section('security')}
-                  right={<SettingsArrow />}
-                />
-              )}
-              {role === 'client' && (
-                <SettingsRow icon="🔒" title="Сменить пароль" href={section('security')} right={<SettingsArrow />} />
-              )}
-            </SettingsSection>
-          )}
-
-          <SettingsSection title={role === 'client' ? undefined : role === 'seller' ? undefined : 'Прочее'}>
+          <SettingsSection title={role === 'seller' ? undefined : 'Прочее'}>
             {role === 'master' && (
               <>
-                <SettingsRow
-                  icon="🌐"
-                  title="Язык"
-                  right={
-                    <>
-                      <span className="text-xs text-[#8e8e93]">Русский</span>
-                      <SettingsArrow />
-                    </>
-                  }
-                />
+                <SettingsRow icon="🌐" title="Язык" right={<span className="text-xs text-[#8e8e93]">Русский</span>} />
                 <SettingsRow icon="❓" title="Поддержка" href="mailto:support@vay-master.ru" right={<SettingsArrow />} />
-                <SettingsRow icon="📄" title="Пользовательское соглашение" href="/feed" right={<SettingsArrow />} />
+                <SettingsRow icon="📄" title="Пользовательское соглашение" href="/rules" right={<SettingsArrow />} />
               </>
             )}
-            {role === 'client' && (
-              <SettingsRow icon="❓" title="Поддержка" href="mailto:support@vay-master.ru" right={<SettingsArrow />} />
-            )}
-            {role === 'seller' ? (
-              <SettingsRow icon="🚪" iconBg="#fff0f0" title="Выйти из аккаунта" onClick={handleLogout} danger />
-            ) : (
-              <SettingsRow icon="🚪" iconBg="#fff0f0" title={role === 'client' ? 'Выйти' : 'Выйти из аккаунта'} onClick={handleLogout} danger />
-            )}
+            {role === 'client' && <SettingsRow icon="❓" title="Поддержка" href="mailto:support@vay-master.ru" right={<SettingsArrow />} />}
+            <SettingsRow icon="🚪" iconBg="#fff0f0" title="Выйти из аккаунта" onClick={handleLogout} danger />
             {(role === 'master' || role === 'client') && (
-              <SettingsRow
-                icon="🗑"
-                iconBg="#fff0f0"
-                title="Удалить аккаунт"
-                subtitle="Действие необратимо"
-                onClick={() => setShowDeleteModal(true)}
-                danger
-              />
+              <SettingsRow icon="🗑" iconBg="#fff0f0" title="Удалить аккаунт" subtitle="Необратимо" onClick={() => setShowDeleteModal(true)} danger />
             )}
           </SettingsSection>
 
@@ -591,11 +406,7 @@ export default function SettingsClient() {
       </div>
 
       {showDeleteModal && (
-        <DeleteAccountModal
-          email={user.email}
-          onClose={() => setShowDeleteModal(false)}
-          onDeleted={() => router.push('/')}
-        />
+        <DeleteAccountModal email={user.email} onClose={() => setShowDeleteModal(false)} onDeleted={() => router.push('/')} />
       )}
     </div>
   )

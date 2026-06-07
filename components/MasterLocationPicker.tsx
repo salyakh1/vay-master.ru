@@ -1,16 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import dynamic from 'next/dynamic'
+import { MapContainer, TileLayer, Marker, Circle } from '@/components/maps/leaflet'
 import { FiX, FiNavigation } from 'react-icons/fi'
 import { configureLeafletIcons } from '@/lib/leaflet'
 import 'leaflet/dist/leaflet.css'
-
-// dynamic() ломает типизацию пропсов компонентов react-leaflet — используем any
-const MapContainer: any = dynamic(() => import('react-leaflet').then((m) => m.MapContainer), { ssr: false })
-const TileLayer: any = dynamic(() => import('react-leaflet').then((m) => m.TileLayer), { ssr: false })
-const Marker: any = dynamic(() => import('react-leaflet').then((m) => m.Marker), { ssr: false })
-const Circle: any = dynamic(() => import('react-leaflet').then((m) => m.Circle), { ssr: false })
 
 const DEFAULT_CENTER: [number, number] = [55.751244, 37.618423] // Москва
 const DEFAULT_ZOOM = 10

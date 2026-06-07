@@ -217,3 +217,60 @@ export function SettingsBadge({
     <span className={`${cls} text-white text-[8px] font-bold px-1.5 py-0.5 rounded-lg`}>{children}</span>
   )
 }
+
+type SettingsAccordionItemProps = {
+  icon: ReactNode
+  iconBg?: string
+  title: string
+  subtitle?: string
+  expanded: boolean
+  onToggle: () => void
+  children?: ReactNode
+  right?: ReactNode
+  danger?: boolean
+}
+
+export function SettingsAccordionItem({
+  icon,
+  iconBg = '#f0f0f5',
+  title,
+  subtitle,
+  expanded,
+  onToggle,
+  children,
+  right,
+  danger,
+}: SettingsAccordionItemProps) {
+  return (
+    <div className="border-b border-[#f2f2f7] last:border-b-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center gap-3 px-3.5 py-3 w-full text-left transition-colors active:bg-[#fafafa]"
+      >
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-[15px] flex-shrink-0"
+          style={{ backgroundColor: iconBg }}
+        >
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-[13px] font-medium ${danger ? 'text-brand-accent' : 'text-[#1c1c1e]'}`}>{title}</p>
+          {subtitle && <p className="text-[10px] text-[#8e8e93] mt-0.5">{subtitle}</p>}
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {right}
+          <span
+            className={`text-[#c7c7cc] text-sm transition-transform ${expanded ? 'rotate-90' : ''}`}
+            aria-hidden
+          >
+            ›
+          </span>
+        </div>
+      </button>
+      {expanded && children && (
+        <div className="px-3.5 pb-3.5 pt-0 border-t border-[#f2f2f7] bg-[#fafafa]/80">{children}</div>
+      )}
+    </div>
+  )
+}

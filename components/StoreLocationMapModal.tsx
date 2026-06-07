@@ -1,16 +1,11 @@
 'use client'
 
 import { useEffect } from 'react'
-import dynamic from 'next/dynamic'
+import { MapContainer, TileLayer, Marker, Popup } from '@/components/maps/leaflet'
 import { FiX } from 'react-icons/fi'
 import { configureLeafletIcons } from '@/lib/leaflet'
+import ChangeMapView from '@/components/ChangeMapView'
 import 'leaflet/dist/leaflet.css'
-
-const MapContainer: any = dynamic(() => import('react-leaflet').then((m) => m.MapContainer), { ssr: false })
-const TileLayer: any = dynamic(() => import('react-leaflet').then((m) => m.TileLayer), { ssr: false })
-const Marker: any = dynamic(() => import('react-leaflet').then((m) => m.Marker), { ssr: false })
-const Popup: any = dynamic(() => import('react-leaflet').then((m) => m.Popup), { ssr: false })
-const ChangeMapView = dynamic(() => import('@/components/ChangeMapView'), { ssr: false })
 
 const ZOOM = 16
 

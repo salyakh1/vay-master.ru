@@ -12,7 +12,7 @@ const STEPS: Record<UserRole, Array<{ title: string; desc: string; action: strin
       title: 'Добавьте фото профиля',
       desc: 'Мастера с фото получают в 3 раза больше откликов',
       action: 'Загрузить фото',
-      href: '/profile/edit',
+      href: '/settings?open=profile',
     },
     {
       title: 'Выберите специализации',
@@ -24,7 +24,7 @@ const STEPS: Record<UserRole, Array<{ title: string; desc: string; action: strin
       title: 'Добавьте примеры работ',
       desc: 'Портфолио с фото повышает доверие клиентов',
       action: 'Открыть профиль',
-      href: '/profile/edit',
+      href: '/portfolio/new',
     },
   ],
   seller: [
