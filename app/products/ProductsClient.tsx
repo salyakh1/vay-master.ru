@@ -520,7 +520,7 @@ function ProductsContent() {
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full pb-24">
-      {user && <Navbar />}
+      <Navbar />
 
       {/* Шапка каталога */}
       <div className="bg-white px-3.5 pt-2.5 pb-2.5 border-b border-[#f0f0f0]">

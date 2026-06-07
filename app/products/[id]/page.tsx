@@ -258,7 +258,7 @@ export default function ProductPage() {
 
   return (
     <div className="min-h-screen bg-white pb-20">
-      {user && <Navbar />}
+      <Navbar />
       <div className="container mx-auto px-4 py-4">
         <div className="max-w-6xl mx-auto">
           {/* Back Button */}

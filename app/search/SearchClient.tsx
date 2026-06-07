@@ -7,7 +7,7 @@ import SearchLoading from './loading'
 import { supabase, User } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import CompactPageBanner from '@/components/CompactPageBanner'
-import MasterListCard from '@/components/MasterListCard'
+import MasterGridCard from '@/components/MasterGridCard'
 import { FiSearch, FiSliders, FiBriefcase, FiArrowLeft } from 'react-icons/fi'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import { Story } from '@/lib/supabase'
@@ -531,7 +531,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full pb-24">
-      {user && <Navbar />}
+      <Navbar />
 
       {/* Шапка поиска */}
       <div className="bg-white px-3.5 pt-2.5 pb-2.5 border-b border-[#f0f0f0]">
@@ -642,24 +642,34 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
       {/* Список мастеров */}
       {loading ? (
-        <div className="text-center py-12 text-[#888] text-sm">Поиск...</div>
+        <div className="grid grid-cols-2 gap-3 px-3.5 py-2.5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-[#f0f0f0] overflow-hidden animate-pulse">
+              <div className="aspect-square bg-[#f2f2f7]" />
+              <div className="p-2.5 space-y-2">
+                <div className="h-3 bg-[#f2f2f7] rounded w-3/4" />
+                <div className="h-2 bg-[#f2f2f7] rounded w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : displayMasters.length === 0 ? (
         <div className="text-center py-12 text-[#888] text-sm px-4">
           {hasFilters ? 'Мастера не найдены' : 'Введите запрос или выберите категорию'}
         </div>
       ) : (
-        <div className="flex flex-col gap-2 px-3.5 py-2.5">
+        <div className="grid grid-cols-2 gap-3 px-3.5 py-2.5">
           {displayMasters.map((master) => (
-            <GuestAwareProfileLink key={master.id} profileId={master.id} className="block">
-              <MasterListCard master={master} />
+            <GuestAwareProfileLink key={master.id} profileId={master.id} className="block min-w-0">
+              <MasterGridCard master={master} />
             </GuestAwareProfileLink>
           ))}
           {(hasFilters ? loadingMoreMasters : loadingMoreRandom) && (
-            <div className="text-center text-xs text-[#888] py-2">Загрузка…</div>
+            <div className="col-span-2 text-center text-xs text-[#888] py-2">Загрузка…</div>
           )}
           <div
             ref={hasFilters ? loadMoreMastersSentinelRef : loadMoreRandomSentinelRef}
-            className="h-2"
+            className="col-span-2 h-2"
             aria-hidden
           />
         </div>

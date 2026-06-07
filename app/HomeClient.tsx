@@ -313,29 +313,8 @@ export default function HomeClient({
   }, [stories])
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full shadow-sm">
-      {/* Верхняя навигация — как в мокапе */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#f0f0f0] flex items-center justify-between px-4 py-2.5">
-        <Link href="/" className="text-base font-extrabold text-[#111] tracking-wide">
-          VAY<span className="text-brand-accent">-</span>MASTER
-        </Link>
-        {!user && !authLoading && (
-          <div className="flex gap-2">
-            <Link
-              href="/auth/login"
-              className="text-xs font-semibold px-3.5 py-1.5 rounded-full border border-[#e0e0e0] text-[#333]"
-            >
-              Войти
-            </Link>
-            <Link
-              href="/auth/register"
-              className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-brand-accent text-white"
-            >
-              Начать
-            </Link>
-          </div>
-        )}
-      </header>
+    <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full shadow-sm pb-24">
+      <Navbar />
 
       {/* Hero */}
       <section className="bg-white px-4 pt-5 pb-4">
@@ -555,8 +534,6 @@ export default function HomeClient({
 
       <div className={user ? 'h-24 bg-[#f5f5f7]' : 'h-3 bg-[#f5f5f7]'} />
 
-      {/* Нижнее меню — существующие иконки Navbar */}
-      {user && <Navbar bottomOnly />}
     </div>
   )
 }

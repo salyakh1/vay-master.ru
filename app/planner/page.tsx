@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import PlannerSinglePage from '@/components/planner/PlannerSinglePage'
+import Navbar from '@/components/Navbar'
 import { buildCalcLines, type BrickSize } from '@/components/planner/planner-calculations'
 import {
   MATS_BY_SURFACE,
@@ -788,6 +789,7 @@ export default function PlannerPage() {
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full pb-28">
+        <Navbar />
         <div className="bg-white border-b border-[#e5e5ea]/80 px-4 py-3 flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[#f2f2f7] animate-pulse" />
           <div className="h-4 flex-1 bg-[#f2f2f7] rounded animate-pulse" />
@@ -799,7 +801,9 @@ export default function PlannerPage() {
   }
 
   return (
-    <PlannerSinglePage
+    <>
+      <Navbar />
+      <PlannerSinglePage
       objectType={objectType}
       onObjectType={handleObjectType}
       onBack={() => router.back()}
@@ -1076,5 +1080,6 @@ export default function PlannerPage() {
                     </svg>
       </div>
     </PlannerSinglePage>
+    </>
   )
 }

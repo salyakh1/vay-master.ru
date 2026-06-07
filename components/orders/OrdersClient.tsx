@@ -316,7 +316,7 @@ export default function OrdersClient() {
     <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full pb-24">
       <Navbar />
 
-      <div className="sticky top-0 z-40 bg-white border-b border-[#f0f0f0]">
+      <div className="bg-white border-b border-[#f0f0f0]">
         <div className="flex items-center justify-between px-4 pt-3 pb-3">
           <h1 className="text-[17px] font-extrabold text-[#111]">
             {isClient ? (

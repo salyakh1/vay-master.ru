@@ -102,7 +102,7 @@ export default function PlannerSinglePage({
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full pb-36">
-      <div className="sticky top-0 z-50 bg-white border-b border-[#e5e5ea]/80 px-4 py-3 flex items-center gap-2.5">
+      <div className="bg-white border-b border-[#e5e5ea]/80 px-4 py-3 flex items-center gap-2.5 max-w-lg mx-auto w-full">
         <button
           type="button"
           onClick={onBack}

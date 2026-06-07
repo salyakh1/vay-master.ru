@@ -237,6 +237,21 @@ export default function ProfilePage() {
     if (idx >= 0) setSelectedPortfolioIndex(idx)
   }, [searchParams, portfolioItems])
 
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    const section = searchParams.get('section')
+    if (tab === 'settings') setActiveTab('settings')
+    if (
+      section === 'edit' ||
+      section === 'specializations' ||
+      section === 'security' ||
+      section === 'account'
+    ) {
+      setSettingsTab(section)
+      setActiveTab('settings')
+    }
+  }, [searchParams])
+
   // Бесконечный скролл: портфолио
   useEffect(() => {
     const el = portfolioLoadMoreSentinelRef.current
@@ -1285,7 +1300,7 @@ export default function ProfilePage() {
 
   return (
     <div className={`min-h-screen pb-20 ${activeTab === 'profile' ? 'bg-[#f2f2f7]' : 'bg-bg-primary'}`}>
-      {currentUser && <Navbar />}
+      <Navbar />
       <div className={`w-full mx-auto py-4 sm:py-6 ${activeTab === 'profile' ? 'max-w-lg px-0' : 'max-w-7xl px-2 sm:px-4 md:px-6 lg:px-8'}`}>
         <div className={`w-full mx-auto ${activeTab === 'profile' ? 'max-w-lg' : 'max-w-full sm:max-w-2xl md:max-w-4xl'}`}>
           {/* Back to Responses Button */}
@@ -1313,16 +1328,12 @@ export default function ProfilePage() {
               Профиль
             </button>
             {isOwnProfile && (
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`px-3 sm:px-4 py-2 font-medium text-sm sm:text-base transition-colors border-b-2 whitespace-nowrap flex-shrink-0 ${
-                  activeTab === 'settings'
-                    ? 'border-brand-accent text-text-primary'
-                    : 'border-transparent text-text-secondary hover:text-text-primary'
-                }`}
+              <Link
+                href="/settings"
+                className="px-3 sm:px-4 py-2 font-medium text-sm sm:text-base transition-colors border-b-2 whitespace-nowrap flex-shrink-0 border-transparent text-text-secondary hover:text-text-primary"
               >
                 Настройки
-              </button>
+              </Link>
             )}
             {isOwnProfile && (currentUser?.role === 'master' || currentUser?.role === 'seller') && (
               <button
@@ -1351,7 +1362,7 @@ export default function ProfilePage() {
                 onFollow={toggleFollow}
                 onMessage={handleStartChat}
                 onFollowersClick={() => setShowFollowModal('followers')}
-                onEdit={() => setActiveTab('settings')}
+                onEdit={() => router.push('/settings')}
                 backHref={returnTo || null}
               />
 
