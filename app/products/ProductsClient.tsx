@@ -17,6 +17,9 @@ import dynamic from 'next/dynamic'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs } from '@/lib/specialization-product-mapping'
 
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
+const NearbyProductsCarousel = dynamic(() => import('@/components/NearbyProductsCarousel'), { ssr: false })
+const RecommendationsCarousel = dynamic(() => import('@/components/RecommendationsCarousel'), { ssr: false })
+const MastersNearbyScroller = dynamic(() => import('@/components/scrollers/MastersNearbyScroller'), { ssr: false })
 
 function ProductsContent() {
   const { user } = useAuth()
@@ -519,7 +522,7 @@ function ProductsContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full pb-24">
+    <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full pb-24">
       <Navbar />
 
       {/* Шапка каталога */}
@@ -619,31 +622,80 @@ function ProductsContent() {
 
       <CompactPageBanner page="products" buttonLabel="Разместить" />
 
-      <div className="flex items-center justify-between px-3.5 pt-2 pb-0.5">
-        <span className="text-[11px] text-[#888]">
-          Товаров: <strong className="text-[#111]">{totalCount || products.length}</strong>
-        </span>
+      <div className="flex items-center gap-2 px-3.5 py-2">
+        {nearbyCenter && (
+          <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
+            <span aria-hidden>📍</span>
+            <strong className="text-[#1c1c1e] font-bold">{nearbyCenter.radiusKm} км</strong>
+          </div>
+        )}
+        <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
+          Найдено: <strong className="text-[#1c1c1e] font-bold">{totalCount || products.length}</strong>
+        </div>
         <button
           type="button"
           onClick={() => setSortPriceAsc((v) => !v)}
-          className="text-[10px] text-brand-accent font-semibold"
+          className="ml-auto text-[10px] text-brand-accent font-bold"
         >
           По цене {sortPriceAsc ? '↑' : '↓'}
         </button>
       </div>
 
+      {nearbyCenter ? (
+        <NearbyProductsCarousel
+          masterLat={nearbyCenter.lat}
+          masterLng={nearbyCenter.lng}
+          radiusKm={nearbyCenter.radiusKm}
+          city={user?.city || cityFilter || undefined}
+        />
+      ) : isMasterWithCategories ? (
+        <RecommendationsCarousel
+          title="Товары под ваши услуги"
+          tag="Рекомендуем"
+          categorySlugs={masterProductCategories.categorySlugs}
+          subcategorySlugs={masterProductCategories.subcategorySlugs}
+          role={user?.role}
+        />
+      ) : null}
+
       {products.length === 0 ? (
         <div className="text-center py-12 text-[#888] text-sm px-4">Товары не найдены</div>
       ) : (
         <>
+          <div className="text-[11px] font-bold text-[#1c1c1e] px-3.5 pt-2.5 pb-1.5 bg-white">
+            Все товары · {totalCount || products.length}
+          </div>
           <div className="grid grid-cols-2 gap-2 px-3.5 py-2.5">
             {products.map((product) => (
               <ProductGridCardCompact key={product.id} product={product} />
             ))}
           </div>
+          {hasMore && (
+            <div className="px-3.5 pb-3">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="w-full border-[1.5px] border-brand-accent rounded-xl py-2.5 text-center text-[13px] font-bold text-brand-accent disabled:opacity-50"
+              >
+                {loadingMore
+                  ? 'Загрузка…'
+                  : `Показать ещё товары (${Math.max(0, (totalCount || products.length) - products.length)} осталось)`}
+              </button>
+            </div>
+          )}
           {loadingMore && <div className="text-center text-xs text-[#888] py-2">Загрузка…</div>}
           <div ref={productsLoadMoreRef} className="h-2" aria-hidden />
         </>
+      )}
+
+      {nearbyCenter && (
+        <MastersNearbyScroller
+          lat={nearbyCenter.lat}
+          lng={nearbyCenter.lng}
+          radiusKm={nearbyCenter.radiusKm}
+          city={user?.city || cityFilter || undefined}
+        />
       )}
 
       {/* Модалка фильтров */}

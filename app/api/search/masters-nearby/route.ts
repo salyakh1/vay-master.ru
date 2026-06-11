@@ -92,10 +92,13 @@ export async function GET(request: NextRequest) {
 
     const from = (page - 1) * ITEMS_PER_PAGE
     const pageSlice = inRadius.slice(from, from + ITEMS_PER_PAGE)
-    const masters = pageSlice.map(({ _distance_km, ...rest }) => rest)
+    const masters = pageSlice.map(({ _distance_km, ...rest }) => ({
+      ...rest,
+      distance_km: Math.round(_distance_km * 10) / 10,
+    }))
     const hasMore = inRadius.length > from + ITEMS_PER_PAGE
 
-    return NextResponse.json({ masters, hasMore })
+    return NextResponse.json({ masters, hasMore, total: inRadius.length })
   } catch (e) {
     console.error('masters-nearby error:', e)
     return NextResponse.json(
