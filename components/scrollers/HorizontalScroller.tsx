@@ -21,7 +21,7 @@ export function ScrollerSectionHeader({
   linkLabel,
 }: {
   tag: string
-  tagVariant?: 'blue' | 'green'
+  tagVariant?: 'blue' | 'green' | 'red'
   title: string
   meta?: string
   linkHref?: string
@@ -30,7 +30,9 @@ export function ScrollerSectionHeader({
   const tagCls =
     tagVariant === 'green'
       ? 'bg-[#edfff5] text-[#22a85e]'
-      : 'bg-[#eaf1fb] text-[#1d5fa6]'
+      : tagVariant === 'red'
+        ? 'bg-[#fdf0f0] text-brand-accent'
+        : 'bg-[#eaf1fb] text-[#1d5fa6]'
 
   return (
     <div className="flex items-end justify-between px-3.5 pt-3 pb-1.5">

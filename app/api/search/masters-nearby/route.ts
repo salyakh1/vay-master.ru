@@ -42,6 +42,10 @@ export async function GET(request: NextRequest) {
       Math.max(1, Number(searchParams.get('radius_km')) || DEFAULT_RADIUS_KM)
     )
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(searchParams.get('limit') || String(ITEMS_PER_PAGE), 10))
+    )
 
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       return NextResponse.json(
@@ -90,13 +94,13 @@ export async function GET(request: NextRequest) {
     const inRadius = withDistance.filter((m) => m._distance_km <= radiusKm)
     inRadius.sort((a, b) => a._distance_km - b._distance_km)
 
-    const from = (page - 1) * ITEMS_PER_PAGE
-    const pageSlice = inRadius.slice(from, from + ITEMS_PER_PAGE)
+    const from = (page - 1) * limit
+    const pageSlice = inRadius.slice(from, from + limit)
     const masters = pageSlice.map(({ _distance_km, ...rest }) => ({
       ...rest,
       distance_km: Math.round(_distance_km * 10) / 10,
     }))
-    const hasMore = inRadius.length > from + ITEMS_PER_PAGE
+    const hasMore = inRadius.length > from + limit
 
     return NextResponse.json({ masters, hasMore, total: inRadius.length })
   } catch (e) {

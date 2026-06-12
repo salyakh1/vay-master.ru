@@ -15,11 +15,12 @@ import { sanitizeProductsForGuest } from '@/lib/guest-access'
 import { Story } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs } from '@/lib/specialization-product-mapping'
+import { ProductsScrollerSection } from '@/components/scrollers/ProductsScrollerSection'
+import { MastersScrollerSection } from '@/components/scrollers/MastersScrollerSection'
+import { useUserLocation } from '@/hooks/useUserLocation'
+import { LIST_PAGE_SIZE } from '@/lib/scrollerApi'
 
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
-const NearbyProductsCarousel = dynamic(() => import('@/components/NearbyProductsCarousel'), { ssr: false })
-const RecommendationsCarousel = dynamic(() => import('@/components/RecommendationsCarousel'), { ssr: false })
-const MastersNearbyScroller = dynamic(() => import('@/components/scrollers/MastersNearbyScroller'), { ssr: false })
 
 function ProductsContent() {
   const { user } = useAuth()
@@ -100,11 +101,8 @@ function ProductsContent() {
     )
   }
   
-  // Порция «по экрану»: ~1–1.5 экрана (2 колонки × 4–6 рядов)
-  const ITEMS_PER_PAGE = 12
-  const GRID_COLUMN_COUNT = 2
-  const ROW_BASE_HEIGHT = 320
-  const productsLoadMoreRef = useRef<HTMLDivElement>(null)
+  const ITEMS_PER_PAGE = LIST_PAGE_SIZE
+  const { lat: userLat, lng: userLng, radiusKm: userRadiusKm } = useUserLocation()
 
   // Загружаем подкатегории мастера для рекомендаций «под ваши услуги»
   const [masterSubcategorySlugs, setMasterSubcategorySlugs] = useState<string[]>([])
@@ -238,76 +236,6 @@ function ProductsContent() {
       else clearTimeout(id as ReturnType<typeof setTimeout>)
     }
   }, [])
-
-  // Создаем массив строк (каждая строка = 2 товара или товар+заказ)
-  const gridRows = useMemo(() => {
-    const rows: Array<{ 
-      items: Product[], 
-      hasAd: boolean, 
-      adProductIndex?: number,
-      orderAfter?: Order | null,
-      orderWithNextProduct?: boolean, // Флаг: заказ вставляется вместе со следующим товаром
-      skipFirstItem?: boolean // Пропустить первый товар (уже использован с заказом)
-    }> = []
-    
-    let orderIndex = 0 // Индекс текущего заказа из cityOrders
-    let skipNextProduct = false // Пропустить следующий товар (он уже использован с заказом)
-    
-    for (let i = 0; i < products.length; i += GRID_COLUMN_COUNT) {
-      // Пропускаем товары, которые уже использованы с заказом
-      if (skipNextProduct) {
-        skipNextProduct = false
-        continue
-      }
-      
-      const rowItems = products.slice(i, i + GRID_COLUMN_COUNT)
-      const productIndex = i + GRID_COLUMN_COUNT - 1 // индекс последнего товара в строке
-      // Показываем рекламу каждые 6 товаров (после 5, 11, 17 и т.д.)
-      const hasAd = productIndex > 0 && (productIndex + 1) % 6 === 0
-      
-      // Вставляем заказ каждые 7 товаров (после 6-го товара, на 7-й позиции)
-      // productIndex + 1 = количество товаров до этого момента (включая текущую строку)
-      // Строка 0: товары 0-1 (productIndex = 1, totalProducts = 2)
-      // Строка 1: товары 2-3 (productIndex = 3, totalProducts = 4)
-      // Строка 2: товары 4-5 (productIndex = 5, totalProducts = 6) <- после этой строки вставляем заказ
-      // Строка 3: товары 6-7 (productIndex = 7, totalProducts = 8)
-      const totalProducts = productIndex + 1
-      // Вставляем заказ после строк где totalProducts = 6, 13, 20... (т.е. totalProducts % 7 === 6)
-      const shouldInsertOrder = user?.role === 'master' && 
-        cityOrders.length > 0 && 
-        totalProducts % 7 === 6 && 
-        orderIndex < cityOrders.length
-      
-      const orderToInsert = shouldInsertOrder ? cityOrders[orderIndex] : null
-      if (shouldInsertOrder && orderToInsert) {
-        console.log('[GridRows] Inserting order at position', totalProducts, 'orderId:', orderToInsert.id)
-        orderIndex++
-      }
-      
-      rows.push({ 
-        items: rowItems, 
-        hasAd, 
-        adProductIndex: hasAd ? productIndex : undefined,
-        orderAfter: orderToInsert || undefined
-      })
-    }
-    
-    return rows
-  }, [products, user, cityOrders])
-
-  // Подгрузка при прокрутке до конца списка
-  useEffect(() => {
-    const el = productsLoadMoreRef.current
-    if (!el || !hasMore || loadingMore) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) loadMore()
-      },
-      { rootMargin: '200px' }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [hasMore, loadingMore, products.length])
 
   // Город применяется только при закрытии модалки — во время ввода запросы не уходят
   const applyCityAndCloseFilters = () => {
@@ -641,22 +569,25 @@ function ProductsContent() {
         </button>
       </div>
 
-      {nearbyCenter ? (
-        <NearbyProductsCarousel
-          masterLat={nearbyCenter.lat}
-          masterLng={nearbyCenter.lng}
-          radiusKm={nearbyCenter.radiusKm}
-          city={user?.city || cityFilter || undefined}
-        />
-      ) : isMasterWithCategories ? (
-        <RecommendationsCarousel
-          title="Товары под ваши услуги"
-          tag="Рекомендуем"
-          categorySlugs={masterProductCategories.categorySlugs}
-          subcategorySlugs={masterProductCategories.subcategorySlugs}
-          role={user?.role}
-        />
-      ) : null}
+      <ProductsScrollerSection
+        title="Топ товары рядом"
+        label="Рекомендуем"
+        labelVariant="blue"
+        lat={nearbyCenter?.lat ?? userLat}
+        lng={nearbyCenter?.lng ?? userLng}
+        radiusKm={nearbyCenter?.radiusKm ?? userRadiusKm}
+        q={searchQuery || undefined}
+        categorySlugs={
+          !nearbyCenter && isMasterWithCategories
+            ? masterProductCategories.categorySlugs
+            : undefined
+        }
+        subcategorySlugs={
+          !nearbyCenter && isMasterWithCategories
+            ? masterProductCategories.subcategorySlugs
+            : undefined
+        }
+      />
 
       {products.length === 0 ? (
         <div className="text-center py-12 text-[#888] text-sm px-4">Товары не найдены</div>
@@ -685,18 +616,23 @@ function ProductsContent() {
             </div>
           )}
           {loadingMore && <div className="text-center text-xs text-[#888] py-2">Загрузка…</div>}
-          <div ref={productsLoadMoreRef} className="h-2" aria-hidden />
         </>
       )}
 
-      {nearbyCenter && (
-        <MastersNearbyScroller
-          lat={nearbyCenter.lat}
-          lng={nearbyCenter.lng}
-          radiusKm={nearbyCenter.radiusKm}
-          city={user?.city || cityFilter || undefined}
-        />
-      )}
+      <div className="h-2 bg-[#f2f2f7]" aria-hidden />
+
+      <MastersScrollerSection
+        title="Мастера по этим материалам"
+        label="Работают с этим"
+        labelVariant="green"
+        href="/search"
+        lat={nearbyCenter?.lat ?? userLat}
+        lng={nearbyCenter?.lng ?? userLng}
+        radiusKm={nearbyCenter?.radiusKm ?? userRadiusKm}
+        city={user?.city || cityFilter || undefined}
+      />
+
+      <div className="h-2 bg-[#f2f2f7]" aria-hidden />
 
       {/* Модалка фильтров */}
         {showFilters && (

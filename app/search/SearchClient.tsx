@@ -1,15 +1,18 @@
 'use client'
 
-import { useEffect, useState, Suspense, useRef, useMemo } from 'react'
+import { useEffect, useState, Suspense, useRef, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import SearchLoading from './loading'
-import { supabase, User } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import CompactPageBanner from '@/components/CompactPageBanner'
-import MasterGridCard from '@/components/MasterGridCard'
 import { FiSearch, FiSliders, FiBriefcase, FiArrowLeft } from 'react-icons/fi'
-import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
+import { MastersScrollerSection } from '@/components/scrollers/MastersScrollerSection'
+import { ProductsScrollerSection } from '@/components/scrollers/ProductsScrollerSection'
+import { MasterListCard, MasterListCardSkeleton } from '@/components/search/MasterListCard'
+import { fetchMastersPage, LIST_PAGE_SIZE, type MasterScrollerItem } from '@/lib/scrollerApi'
+import { useUserLocation } from '@/hooks/useUserLocation'
 import { Story } from '@/lib/supabase'
 import type { AdBanner } from '@/lib/supabase'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs, getProductCategoriesForCategorySlugs } from '@/lib/specialization-product-mapping'
@@ -24,17 +27,19 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const searchParams = useSearchParams()
   const { user } = useAuth()
   const [query, setQuery] = useState(searchParams.get('q') || '')
-  const [loading, setLoading] = useState(false)
   const [searchSuggestions, setSearchSuggestions] = useState<Array<{ id: string; name: string; type: string; category_name?: string | null }>>([])
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const searchInputWrapperRef = useRef<HTMLDivElement>(null)
   const autocompleteAbortRef = useRef<AbortController | null>(null)
 
-  const [masters, setMasters] = useState<User[]>([])
-  const [randomProfiles, setRandomProfiles] = useState<User[]>([])
+  const { lat, lng, radiusKm, city: userLocCity } = useUserLocation()
+  const [listMasters, setListMasters] = useState<MasterScrollerItem[]>([])
+  const [listPage, setListPage] = useState(1)
+  const [listTotal, setListTotal] = useState(0)
+  const [listLoading, setListLoading] = useState(true)
+  const [listLoadingMore, setListLoadingMore] = useState(false)
   const [cityFilter, setCityFilter] = useState<string>('')
-  const [userCity, setUserCity] = useState<string>('')
   const [tree, setTree] = useState<Array<{ id: string; name: string; slug: string; image_url?: string | null; sort_order: number; subcategories: Array<{ id: string; category_id: string; name: string; slug: string; image_url?: string | null; sort_order: number; services: Array<{ id: string; name: string; slug: string; sort_order: number }> }> }>>([])
   const [selectedCategory, setSelectedCategory] = useState<string>(() => searchParams.get('category') || '')
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>(() => searchParams.get('subcategory') || '')
@@ -48,16 +53,6 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const [filterImageFailed, setFilterImageFailed] = useState<Set<string>>(new Set())
   const [stories, setStories] = useState<Story[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
-  const [mastersPage, setMastersPage] = useState(1)
-  const [randomPage, setRandomPage] = useState(1)
-  const [loadingMoreMasters, setLoadingMoreMasters] = useState(false)
-  const [loadingMoreRandom, setLoadingMoreRandom] = useState(false)
-  const [hasMoreMasters, setHasMoreMasters] = useState(true)
-  const [hasMoreRandom, setHasMoreRandom] = useState(true)
-  const loadMoreRandomSentinelRef = useRef<HTMLDivElement>(null)
-  const loadMoreMastersSentinelRef = useRef<HTMLDivElement>(null)
-
-  const ITEMS_PER_PAGE = 12
 
   // Синхронизация фильтров с URL (только если параметры реально изменились)
   useEffect(() => {
@@ -209,130 +204,67 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     fetchReference()
   }, [showFiltersModal])
 
-  // Поиск мастеров только когда модалка фильтра закрыта (выбор категории/подкатегории/услуги без обновления страницы)
+  useEffect(() => {
+    fetch('/api/master-categories/with-counts')
+      .then((r) => r.json())
+      .then((data) => setCategoriesForFilter(data?.categories || []))
+      .catch(() => {})
+  }, [])
+
+  const loadList = useCallback(
+    async (pageNum: number, reset: boolean) => {
+      if (reset) setListLoading(true)
+      else setListLoadingMore(true)
+      try {
+        const result = await fetchMastersPage({
+          page: pageNum,
+          limit: LIST_PAGE_SIZE,
+          q: query,
+          city: cityFilter || userLocCity || undefined,
+          category: selectedCategory || undefined,
+          subcategory: selectedSubcategory || undefined,
+          service: selectedServiceIds.length > 0 ? selectedServiceIds.join(',') : undefined,
+          lat,
+          lng,
+          radiusKm,
+        })
+        if (reset) setListMasters(result.items)
+        else setListMasters((prev) => [...prev, ...result.items])
+        setListTotal(result.total)
+        setListPage(pageNum)
+      } catch (error) {
+        console.error('Error loading masters list:', error)
+        if (reset) {
+          setListMasters([])
+          setListTotal(0)
+        }
+      } finally {
+        setListLoading(false)
+        setListLoadingMore(false)
+      }
+    },
+    [
+      query,
+      cityFilter,
+      userLocCity,
+      selectedCategory,
+      selectedSubcategory,
+      selectedServiceIds,
+      lat,
+      lng,
+      radiusKm,
+    ]
+  )
+
   useEffect(() => {
     if (showFiltersModal) return
-    setMastersPage(1)
-    setMasters([])
-    setHasMoreMasters(true)
-    performSearch()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, cityFilter, selectedCategory, selectedSubcategory, selectedServiceIds, showFiltersModal])
+    void loadList(1, true)
+  }, [showFiltersModal, loadList])
 
-  // Сначала загружаем список мастеров «вашего города»; истории — с задержкой
   useEffect(() => {
-    fetchRandomProfiles(1, true)
     const t = setTimeout(() => fetchStories(), 800)
     return () => clearTimeout(t)
   }, [])
-
-  const performSearch = async () => {
-    const hasFilters =
-      query.trim().length > 0 ||
-      !!selectedCategory ||
-      !!selectedSubcategory ||
-      selectedServiceIds.length > 0 ||
-      !!cityFilter
-
-    // Если нет фильтров — показываем подборку по городу
-    if (!hasFilters) {
-      await fetchRandomProfiles(1, true)
-      setMasters([])
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      await searchMastersViaApi(1, true)
-    } catch (error) {
-      console.error('Search error:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchRandomProfiles = async (pageNum: number = 1, reset: boolean = false) => {
-    try {
-      if (reset) {
-        setRandomProfiles([])
-        setRandomPage(1)
-        setHasMoreRandom(true)
-      } else {
-        setLoadingMoreRandom(true)
-      }
-
-      const from = (pageNum - 1) * ITEMS_PER_PAGE
-      const to = from + ITEMS_PER_PAGE - 1
-
-      let query = supabase
-        .from('profiles')
-        .select(`
-          *,
-          profile_subcategories (
-            subcategory:subcategories (id, name, slug, category:categories (id, name, slug))
-          ),
-          profile_services (
-            service:services (id, name, slug, subcategory:subcategories (id, name, slug, category:categories (id, name, slug)))
-          ),
-          master_rating,
-          master_reviews_count
-        `, { count: 'exact' })
-        .eq('role', 'master')
-        .range(from, to)
-
-      const { data, error, count } = await query
-
-      if (error) throw error
-      const list = (data as any[]) || []
-      
-      // Перемешиваем только первую страницу для случайного порядка
-      if (reset && pageNum === 1) {
-        for (let i = list.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1))
-          ;[list[i], list[j]] = [list[j], list[i]]
-        }
-      }
-
-      if (reset) {
-        setRandomProfiles(list)
-      } else {
-        setRandomProfiles(prev => [...prev, ...list])
-      }
-
-      setHasMoreRandom(list.length === ITEMS_PER_PAGE && (count || 0) > pageNum * ITEMS_PER_PAGE)
-    } catch (error) {
-      console.error('Error fetching random profiles:', error)
-      if (reset) {
-        setRandomProfiles([])
-      }
-    } finally {
-      setLoadingMoreRandom(false)
-    }
-  }
-
-  const loadMoreRandom = () => {
-    if (!loadingMoreRandom && hasMoreRandom) {
-      const nextPage = randomPage + 1
-      setRandomPage(nextPage)
-      fetchRandomProfiles(nextPage, false)
-    }
-  }
-
-  const fetchUserCity = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('city')
-        .eq('id', user!.id)
-        .maybeSingle()
-      if (error) throw error
-      setUserCity((data as any)?.city || '')
-    } catch (error) {
-      console.error('Error fetching user city:', error)
-      setUserCity('')
-    }
-  }
 
   const fetchStories = async () => {
     try {
@@ -361,119 +293,10 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     }
   }
 
-  // Единый API поиска мастеров (геокод + зона обслуживания + спец/услуги на сервере)
-  const searchMastersViaApi = async (pageNum: number = 1, reset: boolean = false) => {
-    try {
-      if (reset) {
-        setMasters([])
-        setMastersPage(1)
-        setHasMoreMasters(true)
-      } else {
-        setLoadingMoreMasters(true)
-      }
-
-      const params = new URLSearchParams()
-      if (query.trim()) params.set('q', query.trim())
-      if (cityFilter.trim()) params.set('city', cityFilter.trim())
-      if (selectedCategory) params.set('category', selectedCategory)
-      if (selectedSubcategory) params.set('subcategory', selectedSubcategory)
-      if (selectedServiceIds.length > 0) params.set('service', selectedServiceIds.join(','))
-      params.set('page', String(pageNum))
-
-      const res = await fetch(`/api/search/masters?${params.toString()}`)
-      if (!res.ok) throw new Error('Ошибка поиска')
-      const { masters: newMasters, hasMore } = await res.json()
-
-      if (reset) {
-        setMasters(newMasters || [])
-      } else {
-        setMasters((prev) => [...prev, ...(newMasters || [])])
-        setMastersPage(pageNum)
-      }
-      setHasMoreMasters(!!hasMore)
-    } catch (error) {
-      console.error('Error searching masters:', error)
-      if (reset) setMasters([])
-    } finally {
-      setLoadingMoreMasters(false)
-    }
-  }
-
-  const loadMoreMasters = () => {
-    if (!loadingMoreMasters && hasMoreMasters) {
-      const nextPage = mastersPage + 1
-      setMastersPage(nextPage)
-      searchMastersViaApi(nextPage, false)
-    }
-  }
-
-  // Бесконечный скролл: рандомные мастера
-  useEffect(() => {
-    const el = loadMoreRandomSentinelRef.current
-    if (!el || !hasMoreRandom || loadingMoreRandom) return
-    const observer = new IntersectionObserver(
-      (entries) => { if (entries[0]?.isIntersecting) loadMoreRandom() },
-      { rootMargin: '300px', threshold: 0 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [hasMoreRandom, loadingMoreRandom, randomPage, randomProfiles.length])
-
-  // Бесконечный скролл: мастера по поиску
-  useEffect(() => {
-    const el = loadMoreMastersSentinelRef.current
-    if (!el || !hasMoreMasters || loadingMoreMasters) return
-    const observer = new IntersectionObserver(
-      (entries) => { if (entries[0]?.isIntersecting) loadMoreMasters() },
-      { rootMargin: '300px', threshold: 0 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [hasMoreMasters, loadingMoreMasters, mastersPage, masters.length])
-
-  const fetchProfileIdsByFilters = async (): Promise<string[] | null> => {
-    try {
-      if (selectedServiceIds.length > 0) {
-        const allIds: string[] = []
-        for (const sid of selectedServiceIds) {
-          const { data, error } = await supabase
-            .from('profile_services')
-            .select('profile_id')
-            .eq('service_id', sid)
-          if (error) throw error
-          allIds.push(...(data || []).map((row) => row.profile_id as string))
-        }
-        return Array.from(new Set(allIds))
-      }
-      if (selectedSubcategory) {
-        const { data, error } = await supabase
-          .from('profile_subcategories')
-          .select('profile_id')
-          .eq('subcategory_id', selectedSubcategory)
-        if (error) throw error
-        return (data || []).map((row) => row.profile_id as string)
-      }
-      if (selectedCategory) {
-        const subIds = tree.find((c) => c.id === selectedCategory)?.subcategories?.map((s) => s.id) || []
-        if (subIds.length === 0) return null
-        const { data, error } = await supabase
-          .from('profile_subcategories')
-          .select('profile_id')
-          .in('subcategory_id', subIds)
-        if (error) throw error
-        return Array.from(new Set((data || []).map((row) => row.profile_id as string)))
-      }
-      return null
-    } catch (error) {
-      console.error('Error filtering masters by category/subcategory/service:', error)
-      return null
-    }
-  }
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setShowSearchSuggestions(false)
-    performSearch()
+    void loadList(1, true)
   }
 
   const applySuggestion = (name: string) => {
@@ -484,18 +307,6 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   }
 
   // Убираем проверку авторизации - неавторизованные могут видеть карточки мастеров
-
-  const roleLabels = {
-    master: 'Мастер',
-    seller: 'Продавец',
-    client: 'Клиент',
-  }
-
-  const roleEmoji = {
-    master: '🔨',
-    seller: '🛒',
-    client: '👤',
-  }
 
   const selectedCategoryNode = tree.find((c) => c.id === selectedCategory)
   const subcategoriesForFilter = selectedCategoryNode?.subcategories || []
@@ -515,19 +326,26 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     return null
   }, [selectedCategoryNode?.slug, selectedSubcategoryNode?.slug])
 
-  const hasFilters =
-    query.trim().length > 0 ||
-    !!selectedCategory ||
-    !!selectedSubcategory ||
-    selectedServiceIds.length > 0 ||
-    !!cityFilter
+  const listRemaining = Math.max(0, listTotal - listMasters.length)
 
-  const displayMasters = useMemo(() => {
-    const list = hasFilters ? masters : randomProfiles
-    return [...list].sort((a, b) => (b.master_rating ?? 0) - (a.master_rating ?? 0))
-  }, [hasFilters, masters, randomProfiles])
+  const productScrollerSlugs = useMemo(() => {
+    if (filterProductCategories?.categorySlugs?.length) return filterProductCategories
+    if (isMasterWithCategories) return masterProductCategories
+    return undefined
+  }, [filterProductCategories, isMasterWithCategories, masterProductCategories])
 
   const chipCategories = categoriesForFilter.slice(0, 6)
+
+  const scrollerFilters = {
+    q: query || undefined,
+    city: cityFilter || userLocCity || undefined,
+    category: selectedCategory || undefined,
+    subcategory: selectedSubcategory || undefined,
+    service: selectedServiceIds.length > 0 ? selectedServiceIds.join(',') : undefined,
+    lat,
+    lng,
+    radiusKm,
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full pb-24">
@@ -628,52 +446,82 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
       <CompactPageBanner page="search" initialBanners={initialBanners} />
 
-      {/* Счётчик результатов */}
-      <div className="flex items-center justify-between px-3.5 pt-2 pb-0.5">
-        <span className="text-[11px] text-[#888]">
-          Найдено:{' '}
-          <strong className="text-[#111]">
-            {displayMasters.length}{' '}
-            {displayMasters.length === 1 ? 'мастер' : displayMasters.length < 5 ? 'мастера' : 'мастеров'}
-          </strong>
-        </span>
-        <span className="text-[10px] text-brand-accent font-semibold">По рейтингу ↓</span>
+      {/* Stat bar */}
+      <div className="flex items-center gap-2 px-3.5 py-2">
+        <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
+          <span aria-hidden>📍</span>
+          <strong className="text-[#1c1c1e] font-bold">{radiusKm} км</strong>
+        </div>
+        <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
+          Найдено: <strong className="text-[#1c1c1e] font-bold">{listTotal}</strong>
+        </div>
+        <span className="ml-auto text-[10px] text-brand-accent font-bold">По рейтингу ↓</span>
       </div>
 
-      {/* Список мастеров */}
-      {loading ? (
-        <div className="grid grid-cols-2 gap-3 px-3.5 py-2.5">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-[#f0f0f0] overflow-hidden animate-pulse">
-              <div className="aspect-square bg-[#f2f2f7]" />
-              <div className="p-2.5 space-y-2">
-                <div className="h-3 bg-[#f2f2f7] rounded w-3/4" />
-                <div className="h-2 bg-[#f2f2f7] rounded w-full" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : displayMasters.length === 0 ? (
-        <div className="text-center py-12 text-[#888] text-sm px-4">
-          {hasFilters ? 'Мастера не найдены' : 'Введите запрос или выберите категорию'}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 px-3.5 py-2.5">
-          {displayMasters.map((master) => (
-            <GuestAwareProfileLink key={master.id} profileId={master.id} className="block min-w-0">
-              <MasterGridCard master={master} />
-            </GuestAwareProfileLink>
-          ))}
-          {(hasFilters ? loadingMoreMasters : loadingMoreRandom) && (
-            <div className="col-span-2 text-center text-xs text-[#888] py-2">Загрузка…</div>
-          )}
-          <div
-            ref={hasFilters ? loadMoreMastersSentinelRef : loadMoreRandomSentinelRef}
-            className="col-span-2 h-2"
-            aria-hidden
-          />
-        </div>
-      )}
+      {/* Скроллер: топ мастера рядом */}
+      <MastersScrollerSection
+        title="Топ мастера рядом"
+        label="Рекомендуем"
+        labelVariant="red"
+        {...scrollerFilters}
+      />
+
+      {/* Блок «Все мастера» — 6 карточек списком */}
+      <div className="bg-white">
+        <p className="text-[11px] font-bold text-[#1c1c1e] px-3.5 pt-3 pb-1.5">
+          Все мастера · {listTotal}
+        </p>
+
+        {listLoading && listMasters.length === 0 ? (
+          <div className="flex flex-col gap-2 px-3.5 pb-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <MasterListCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : listMasters.length === 0 ? (
+          <div className="text-center py-12 text-[#888] text-sm px-4">Мастера не найдены</div>
+        ) : (
+          <div className="flex flex-col gap-2 px-3.5 pb-2">
+            {listMasters.map((master, i) => (
+              <MasterListCard key={master.id} master={master} colorIndex={i} />
+            ))}
+          </div>
+        )}
+
+        {listRemaining > 0 && (
+          <div className="px-3.5 pb-4">
+            <button
+              type="button"
+              onClick={() => void loadList(listPage + 1, false)}
+              disabled={listLoading || listLoadingMore}
+              className="w-full border-[1.5px] border-brand-accent rounded-xl py-3 text-[13px] font-bold text-brand-accent active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              {listLoadingMore
+                ? 'Загрузка…'
+                : `Показать ещё мастеров (${listRemaining} осталось)`}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="h-2 bg-[#f2f2f7]" aria-hidden />
+
+      {/* Скроллер: товары для задачи */}
+      <ProductsScrollerSection
+        title="Товары для вашей задачи"
+        label="Вам понадобится"
+        labelVariant="blue"
+        href="/products"
+        linkLabel="Каталог →"
+        categorySlugs={productScrollerSlugs?.categorySlugs}
+        subcategorySlugs={productScrollerSlugs?.subcategorySlugs}
+        lat={lat}
+        lng={lng}
+        radiusKm={radiusKm}
+        showRadius={false}
+      />
+
+      <div className="h-2 bg-[#f2f2f7]" aria-hidden />
 
       {/* Модалка фильтров */}
           {showFiltersModal && (

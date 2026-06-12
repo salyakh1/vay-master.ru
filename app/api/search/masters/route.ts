@@ -29,9 +29,13 @@ export async function GET(request: NextRequest) {
     const serviceParam = searchParams.get('service') || ''
     const serviceIds = serviceParam ? serviceParam.split(',').map((s) => s.trim()).filter(Boolean) : []
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(searchParams.get('limit') || String(ITEMS_PER_PAGE), 10))
+    )
 
-    const from = (page - 1) * ITEMS_PER_PAGE
-    const to = from + ITEMS_PER_PAGE - 1
+    const from = (page - 1) * limit
+    const to = from + limit - 1
 
     let profileIds: string[] | null = null
 
@@ -160,7 +164,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (finalProfileIds && finalProfileIds.length === 0) {
-      return NextResponse.json({ masters: [], hasMore: false })
+      return NextResponse.json({ masters: [], hasMore: false, total: 0 })
     }
 
     let queryBuilder = supabaseAdmin
@@ -196,9 +200,9 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     const list = (masters || []) as any[]
-    const hasMore = list.length === ITEMS_PER_PAGE && (count || 0) > page * ITEMS_PER_PAGE
+    const hasMore = list.length === limit && (count || 0) > page * limit
 
-    return NextResponse.json({ masters: list, hasMore })
+    return NextResponse.json({ masters: list, hasMore, total: count || 0 })
   } catch (e) {
     console.error('search/masters error:', e)
     return NextResponse.json(
