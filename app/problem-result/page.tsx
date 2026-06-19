@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '../providers'
 import { supabase, User, Service, Product } from '@/lib/supabase'
@@ -21,7 +21,7 @@ interface ProblemResult {
   }
 }
 
-export default function ProblemResultPage() {
+function ProblemResultContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -479,3 +479,16 @@ export default function ProblemResultPage() {
   )
 }
 
+export default function ProblemResultPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-bg-primary">
+          <div className="text-base text-text-secondary">Загрузка...</div>
+        </div>
+      }
+    >
+      <ProblemResultContent />
+    </Suspense>
+  )
+}

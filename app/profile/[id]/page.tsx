@@ -959,6 +959,11 @@ export default function ProfilePage() {
                 onFollowersClick={() => setShowFollowModal('followers')}
                 onEdit={() => router.push('/settings')}
                 backHref={returnTo || null}
+                orderHref={
+                  !isOwnProfile && profile.role === 'master'
+                    ? `/orders/new?master=${profile.id}&title=${encodeURIComponent(`Заказ для ${profile.full_name}`)}`
+                    : null
+                }
               />
 
               {(profile.role === 'master' || profile.role === 'seller') && (

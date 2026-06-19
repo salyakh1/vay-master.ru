@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { filterProductionBanners } from '@/lib/banner-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,7 +62,9 @@ export async function GET(request: NextRequest) {
       return true
     }).slice(0, limit) // Ограничиваем до нужного количества
 
-    const res = NextResponse.json({ banners: filteredBanners })
+    const banners = filterProductionBanners(filteredBanners as any[])
+
+    const res = NextResponse.json({ banners })
     res.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
     return res
   } catch (error) {

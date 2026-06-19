@@ -39,6 +39,7 @@ export default function MasterScrollerCard({ master }: MasterScrollerCardProps) 
       .toUpperCase() || '?'
 
   const rating = master.master_rating ?? 0
+  const reviews = master.master_reviews_count ?? 0
   const isPro = master.is_pro || (master.pro_until && new Date(master.pro_until) > new Date())
 
   return (
@@ -66,9 +67,10 @@ export default function MasterScrollerCard({ master }: MasterScrollerCardProps) 
       <p className="text-xs font-bold text-[#1c1c1e] mb-0.5 truncate">{master.full_name}</p>
       <p className="text-[10px] text-[#8e8e93] leading-snug line-clamp-2 min-h-[26px] mb-1">{getSpecs(master)}</p>
       <div className="flex items-center justify-between gap-1">
-        <div className="text-[10px] text-[#f4a228] flex items-center gap-0.5">
-          ★
+        <div className="inline-flex items-center gap-0.5 bg-[#fff8e6] px-1 py-0.5 rounded-md text-[10px]">
+          <span className="text-[#f4a228] leading-none">★</span>
           <span className="text-[#1c1c1e] font-bold">{rating > 0 ? rating.toFixed(1) : '—'}</span>
+          {reviews > 0 && <span className="text-[#8e8e93] font-medium">({reviews})</span>}
         </div>
         {master.distance_km != null ? (
           <span className="text-[9px] text-[#c7c7cc]">{master.distance_km} км</span>

@@ -77,19 +77,19 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#1c1c1e] py-12 px-4">
       <div className="max-w-md w-full">
-        {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-accent rounded-full mb-4">
-            <FiShield size={32} className="text-white" />
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-brand-accent rounded-[10px] mb-4">
+            <FiShield size={28} className="text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-text-primary mb-2">VayMaster</h1>
-          <h2 className="text-xl font-semibold text-text-secondary">Админ-панель</h2>
+          <h1 className="text-2xl font-black text-white mb-1 tracking-tight">
+            VAY<span className="text-brand-accent">–</span>MASTER
+          </h1>
+          <p className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest">Admin Panel</p>
         </div>
 
-        {/* Login Form */}
-        <div className="card">
+        <div className="bg-white rounded-2xl border border-[#e5e5ea] p-6">
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
               <label className="block text-sm font-medium mb-2 text-text-primary">
@@ -152,20 +152,14 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-border-color">
-            <Link
-              href="/"
-              className="block text-center text-sm text-text-secondary hover:text-text-primary transition-colors"
-            >
+          <div className="mt-6 pt-6 border-t border-[#e5e5ea]">
+            <Link href="/" className="block text-center text-sm text-[#8e8e93] hover:text-[#1c1c1e] transition-colors">
               Вернуться на сайт
             </Link>
           </div>
         </div>
 
-        {/* Security Notice */}
-        <p className="mt-6 text-center text-xs text-text-secondary">
-          Доступ только для администраторов
-        </p>
+        <p className="mt-6 text-center text-xs text-[#6d6d72]">Доступ только для администраторов</p>
       </div>
     </div>
   )

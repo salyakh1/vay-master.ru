@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { AdBanner } from './supabase'
+import { filterProductionBanners } from './banner-utils'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -44,7 +45,7 @@ export async function getBannersForPage(
     return true
   }).slice(0, limit) as AdBanner[]
 
-  return filtered
+  return filterProductionBanners(filtered)
 }
 
 export interface MasterCategoryWithCount {

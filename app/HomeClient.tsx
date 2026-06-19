@@ -12,6 +12,7 @@ import { sanitizeProductsForGuest, profileLoginUrl } from '@/lib/guest-access'
 import type { AdBanner } from '@/lib/supabase'
 import type { MasterCategoryWithCount } from '@/lib/server-data'
 import { FiSearch, FiStar, FiArrowRight } from 'react-icons/fi'
+import { getCategoryEmoji } from '@/lib/categoryEmoji'
 
 interface HomeClientProps {
   initialBanners?: AdBanner[] | null
@@ -50,15 +51,6 @@ const ROLES = [
   { icon: '👤', title: 'Клиентам', desc: 'Проверенные мастера с отзывами', href: '/auth/register?role=client' },
   { icon: '🆓', title: 'Бесплатно', desc: 'Регистрация без скрытых платежей', href: '/auth/register' },
 ]
-
-function catEmoji(slug: string, name: string): string {
-  const s = `${slug} ${name}`.toLowerCase()
-  if (s.includes('электр')) return '⚡'
-  if (s.includes('сантех') || s.includes('вод')) return '🚿'
-  if (s.includes('строй') || s.includes('фундам')) return '🏗️'
-  if (s.includes('отдел') || s.includes('плит')) return '🎨'
-  return '🔧'
-}
 
 function SectionHeader({ title, linkLabel, href }: { title: string; linkLabel?: string; href?: string }) {
   return (
@@ -105,10 +97,10 @@ function MasterCard({ master }: { master: User }) {
         </div>
         <p className="text-[13px] font-bold text-[#111] truncate">{master.full_name}</p>
         <p className="text-[11px] text-[#888] truncate mb-1.5">{specs}</p>
-        <div className="flex items-center gap-1 text-[11px]">
-          <FiStar className="text-amber-400 fill-amber-400" size={10} />
-          <span className="font-semibold text-[#111]">{rating > 0 ? rating.toFixed(1) : '—'}</span>
-          <span className="text-[#aaa]">({reviews})</span>
+        <div className="inline-flex items-center gap-1 bg-[#fff8e6] px-1.5 py-0.5 rounded-md text-[11px]">
+          <FiStar className="text-[#f4a228] fill-[#f4a228]" size={11} />
+          <span className="font-bold text-[#1c1c1e]">{rating > 0 ? rating.toFixed(1) : '—'}</span>
+          {reviews > 0 && <span className="text-[#8e8e93] font-medium">({reviews})</span>}
         </div>
       </div>
     </GuestAwareProfileLink>
@@ -266,7 +258,7 @@ export default function HomeClient({
   const heroCats = useMemo((): HeroCat[] => {
     const fromDb = (initialCategories ?? []).slice(0, 4).map((c) => ({
       label: c.name,
-      emoji: catEmoji(c.slug, c.name),
+      emoji: getCategoryEmoji(c.slug, c.name),
       slug: c.slug,
       id: c.id,
     }))
@@ -434,28 +426,46 @@ export default function HomeClient({
 
       {/* Masters */}
       <SectionHeader title="Мастера рядом" linkLabel="Все →" href="/search" />
-      <div className="flex gap-2.5 overflow-x-auto px-4 pb-3.5 scrollbar-hide">
-        {masters.map((m) => (
-          <MasterCard key={m.id} master={m} />
-        ))}
-        <Link
-          href="/search"
-          className="w-[100px] flex-shrink-0 rounded-[18px] border border-dashed border-[#e0e0e0] bg-[#f5f5f7] flex flex-col items-center justify-center gap-1.5 p-3"
-        >
-          <FiArrowRight className="text-brand-accent" size={20} />
-          <span className="text-[11px] text-[#888] text-center">Все мастера</span>
-        </Link>
-      </div>
+      {masters.length === 0 ? (
+        <div className="mx-4 mb-3.5 rounded-[18px] border border-dashed border-[#e0e0e0] bg-white px-4 py-6 text-center">
+          <p className="text-sm text-[#888] mb-2">Пока нет мастеров в выдаче — попробуйте поиск по категории</p>
+          <Link href="/search" className="text-brand-accent text-sm font-bold">
+            Открыть поиск →
+          </Link>
+        </div>
+      ) : (
+        <div className="flex gap-2.5 overflow-x-auto px-4 pb-3.5 scrollbar-hide">
+          {masters.map((m) => (
+            <MasterCard key={m.id} master={m} />
+          ))}
+          <Link
+            href="/search"
+            className="w-[100px] flex-shrink-0 rounded-[18px] border border-dashed border-[#e0e0e0] bg-[#f5f5f7] flex flex-col items-center justify-center gap-1.5 p-3"
+          >
+            <FiArrowRight className="text-brand-accent" size={20} />
+            <span className="text-[11px] text-[#888] text-center">Все мастера</span>
+          </Link>
+        </div>
+      )}
 
       {DIVIDER}
 
       {/* Products */}
       <SectionHeader title="Материалы и инструменты" linkLabel="Каталог →" href="/products" />
-      <div className="flex gap-2.5 overflow-x-auto px-4 pb-3.5 scrollbar-hide">
-        {products.map((p) => (
-          <ProductCardHome key={p.id} product={p} />
-        ))}
-      </div>
+      {products.length === 0 ? (
+        <div className="mx-4 mb-3.5 rounded-[18px] border border-dashed border-[#e0e0e0] bg-white px-4 py-6 text-center">
+          <p className="text-sm text-[#888] mb-2">Каталог материалов обновляется — загляните позже</p>
+          <Link href="/products" className="text-brand-accent text-sm font-bold">
+            Открыть каталог →
+          </Link>
+        </div>
+      ) : (
+        <div className="flex gap-2.5 overflow-x-auto px-4 pb-3.5 scrollbar-hide">
+          {products.map((p) => (
+            <ProductCardHome key={p.id} product={p} />
+          ))}
+        </div>
+      )}
 
       {DIVIDER}
 

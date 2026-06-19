@@ -1,11 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
-import { createLogger } from '@/lib/logger'
+import Link from 'next/link'
 
-const logger = createLogger('error-boundary')
-
-export default function Error({
+export default function GlobalError({
   error,
   reset,
 }: {
@@ -13,23 +11,43 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    logger.error('Unhandled route error', error)
+    console.error(error)
   }, [error])
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center">
-      <p className="text-6xl mb-4">⚙️</p>
-      <h1 className="text-2xl font-semibold mb-2">Что-то пошло не так</h1>
-      <p className="text-gray-500 mb-6">
-        Произошла непредвиденная ошибка. Мы уже работаем над её устранением.
-      </p>
-      <button
-        type="button"
-        onClick={reset}
-        className="bg-red-500 text-white px-6 py-3 rounded-xl font-medium"
-      >
-        Попробовать снова
-      </button>
-    </div>
+    <html lang="ru">
+      <body className="min-h-screen bg-[#f2f2f7] flex items-center justify-center px-4">
+        <div className="max-w-sm w-full text-center">
+          <div className="text-6xl mb-4" aria-hidden>
+            ⚠️
+          </div>
+          <h1 className="text-2xl font-extrabold text-[#1c1c1e] mb-2">Что-то пошло не так</h1>
+          <p className="text-sm text-[#8e8e93] mb-6 leading-relaxed">
+            Произошла ошибка при загрузке страницы. Попробуйте обновить или вернитесь на главную.
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={reset}
+              className="block w-full bg-brand-accent text-white text-sm font-bold py-3 rounded-xl"
+            >
+              Попробовать снова
+            </button>
+            <Link
+              href="/"
+              className="block w-full bg-white text-brand-accent text-sm font-bold py-3 rounded-xl border border-[#e5e5ea]"
+            >
+              На главную
+            </Link>
+            <Link
+              href="/search"
+              className="block w-full text-[#8e8e93] text-sm font-medium py-2"
+            >
+              Найти мастера
+            </Link>
+          </div>
+        </div>
+      </body>
+    </html>
   )
 }

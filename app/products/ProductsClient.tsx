@@ -19,6 +19,7 @@ import { ProductsScrollerSection } from '@/components/scrollers/ProductsScroller
 import { MastersScrollerSection } from '@/components/scrollers/MastersScrollerSection'
 import { useUserLocation } from '@/hooks/useUserLocation'
 import { LIST_PAGE_SIZE } from '@/lib/scrollerApi'
+import { getProductCategoryEmoji } from '@/lib/categoryEmoji'
 
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
 
@@ -445,9 +446,7 @@ function ProductsContent() {
 
   const chipCategories = productCategories.slice(0, 8)
 
-  if (loading) {
-    return <ProductsLoading />
-  }
+  const gridSkeleton = loading && products.length === 0
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full pb-24">
@@ -542,7 +541,7 @@ function ProductsContent() {
                   : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
               }`}
             >
-              {cat.name}
+              {getProductCategoryEmoji(cat.slug, cat.name)} {cat.name}
             </button>
           ))}
         </div>
@@ -589,7 +588,22 @@ function ProductsContent() {
         }
       />
 
-      {products.length === 0 ? (
+      {gridSkeleton ? (
+        <div className="px-3.5 py-2">
+          <div className="h-3.5 w-24 bg-[#f2f2f7] rounded animate-pulse mb-3" />
+          <div className="grid grid-cols-2 gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-[14px] border border-[#e5e5ea] overflow-hidden animate-pulse">
+                <div className="h-[88px] bg-[#f2f2f7]" />
+                <div className="p-2 space-y-2">
+                  <div className="h-3 bg-[#f2f2f7] rounded w-full" />
+                  <div className="h-4 bg-[#f2f2f7] rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : products.length === 0 ? (
         <div className="text-center py-12 text-[#888] text-sm px-4">Товары не найдены</div>
       ) : (
         <>
@@ -846,12 +860,6 @@ function ProductsContent() {
 }
 
 export default function ProductsClient() {
-  const { loading: authLoading } = useAuth()
-
-  if (authLoading) {
-    return <ProductsLoading />
-  }
-
   return (
     <Suspense fallback={<ProductsLoading />}>
       <ProductsContent />

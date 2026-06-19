@@ -1,25 +1,8 @@
 import type { Order, OrderStatus } from '@/lib/supabase'
-
-export const CATEGORY_ICONS: Record<string, string> = {
-  электрика: '⚡',
-  сантехника: '🚿',
-  ремонт: '🔧',
-  строительство: '🏗️',
-  стройка: '🏗️',
-  окна: '🪟',
-  отделка: '🎨',
-  кровля: '🏠',
-  ландшафт: '🌿',
-  default: '📋',
-}
+import { getCategoryEmoji } from '@/lib/categoryEmoji'
 
 export function getCategoryIcon(category?: string | null): string {
-  if (!category) return CATEGORY_ICONS.default
-  const key = category.toLowerCase()
-  for (const [k, icon] of Object.entries(CATEGORY_ICONS)) {
-    if (k !== 'default' && key.includes(k)) return icon
-  }
-  return CATEGORY_ICONS.default
+  return getCategoryEmoji(null, category)
 }
 
 export const STATUS_CONFIG: Record<

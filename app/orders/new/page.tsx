@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
@@ -10,16 +10,36 @@ import Link from 'next/link'
 import OrderPaymentModal from '@/components/OrderPaymentModal'
 import OrderLocationPicker from '@/components/OrderLocationPicker'
 
+const MIN_DESCRIPTION_LENGTH = 30
+
+const TITLE_EXAMPLES = [
+  'Ремонт кухни под ключ',
+  'Замена смесителя в ванной',
+  'Установка розеток в комнате',
+  'Поклейка обоев в спальне',
+]
+
+const DESCRIPTION_HINTS = [
+  'Что нужно сделать и в каком объёме',
+  'Адрес или район (если ещё не указали на карте)',
+  'Желаемые сроки и примерный бюджет',
+  'Есть ли материалы или нужна закупка',
+]
+
 type OrderPaymentSettings = {
   paymentOrderPublicationEnabled: boolean
   orderPublicationPriceRub: number
   tinkoffReady: boolean
 }
 
-export default function NewOrderPage() {
+function NewOrderForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
-  const [title, setTitle] = useState('')
+  const masterId = searchParams.get('master')
+  const prefilledTitle = searchParams.get('title') ?? ''
+
+  const [title, setTitle] = useState(prefilledTitle)
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
   const [location, setLocation] = useState<{ city: string; address: string } | null>(null)
@@ -35,14 +55,6 @@ export default function NewOrderPage() {
     orderPublicationPriceRub: 199,
     tinkoffReady: false,
   })
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-bg-primary">
-        <div className="text-base text-text-secondary">Загрузка...</div>
-      </div>
-    )
-  }
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -86,14 +98,30 @@ export default function NewOrderPage() {
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/auth/login')
+    }
+  }, [authLoading, user, router])
+
+  const descriptionOk = description.trim().length >= MIN_DESCRIPTION_LENGTH
+  const descriptionCharsLeft = MIN_DESCRIPTION_LENGTH - description.trim().length
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-bg-primary">
+        <div className="text-base text-text-secondary">Загрузка...</div>
+      </div>
+    )
+  }
+
   if (!user) {
-    router.push('/auth/login')
     return null
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const newFiles = Array.from(e.target.files).slice(0, 10) // Максимум 10 изображений
+      const newFiles = Array.from(e.target.files).slice(0, 10)
       setFiles((prev) => [...prev, ...newFiles].slice(0, 10))
     }
   }
@@ -131,6 +159,14 @@ export default function NewOrderPage() {
     return null
   }
 
+  const buildDescription = (): string => {
+    let text = description.trim()
+    if (masterId) {
+      text += `\n\n[Мастер из профиля: /profile/${masterId}]`
+    }
+    return text
+  }
+
   const createOrder = async () => {
     if (!user) return
 
@@ -140,16 +176,15 @@ export default function NewOrderPage() {
       if (files.length > 0) {
         try {
           imageUrls = await uploadOrderImages()
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.warn('Image upload process failed:', err)
         }
       }
 
-      // Создаем заказ
-      const orderData: any = {
+      const orderData: Record<string, unknown> = {
         client_id: user.id,
         title: title.trim(),
-        description: description.trim(),
+        description: buildDescription(),
         category,
         location: location?.address?.trim() || '',
         status: 'open',
@@ -171,11 +206,11 @@ export default function NewOrderPage() {
 
       if (orderError) throw orderError
 
-      // Перенаправляем на страницу созданного заказа
       router.push(`/orders/${newOrder.id}`)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating order:', error)
-      alert(error?.message || 'Ошибка при создании заказа')
+      const message = error instanceof Error ? error.message : 'Ошибка при создании заказа'
+      alert(message)
     } finally {
       setSaving(false)
     }
@@ -187,6 +222,11 @@ export default function NewOrderPage() {
 
     if (!title.trim() || !description.trim() || !category) {
       alert('Заполните все обязательные поля')
+      return
+    }
+
+    if (description.trim().length < MIN_DESCRIPTION_LENGTH) {
+      alert(`Описание слишком короткое. Минимум ${MIN_DESCRIPTION_LENGTH} символов — опишите задачу подробнее.`)
       return
     }
 
@@ -224,7 +264,7 @@ export default function NewOrderPage() {
           },
           body: JSON.stringify({
             title: title.trim(),
-            description: description.trim(),
+            description: buildDescription(),
             category,
             location: { city: location!.city.trim(), address: location!.address.trim() },
             budget: budgetNum,
@@ -248,8 +288,9 @@ export default function NewOrderPage() {
         }
         setShowPaymentModal(false)
         window.location.href = initData.paymentUrl
-      } catch (e: any) {
-        alert(e?.message || 'Ошибка оплаты')
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : 'Ошибка оплаты'
+        alert(message)
       } finally {
         setSaving(false)
       }
@@ -265,7 +306,6 @@ export default function NewOrderPage() {
       <Navbar />
       <div className="container mx-auto px-4 py-6">
         <div className="max-w-2xl mx-auto">
-          {/* Header */}
           <div className="flex items-center gap-4 mb-6">
             <Link
               href="/orders"
@@ -278,8 +318,13 @@ export default function NewOrderPage() {
             </h1>
           </div>
 
+          {masterId && (
+            <div className="mb-4 rounded-xl bg-[#fff1f2] border border-[#fecdd3] px-4 py-3 text-sm text-[#1c1c1e]">
+              Заказ для мастера из профиля. Опишите задачу — мастера категории получат уведомление.
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="card space-y-6">
-            {/* Название заказа */}
             <div>
               <label className="block text-sm font-semibold text-graphite-secondary mb-2">
                 Название заказа *
@@ -289,12 +334,24 @@ export default function NewOrderPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
+                minLength={5}
                 className="input"
                 placeholder="Например: Ремонт кухни"
               />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {TITLE_EXAMPLES.map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => setTitle(example)}
+                    className="text-[11px] px-2.5 py-1 rounded-full bg-[#f2f2f7] text-[#555] border border-[#e5e5ea] hover:border-brand-accent hover:text-brand-accent transition-colors"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Описание */}
             <div>
               <label className="block text-sm font-semibold text-graphite-secondary mb-2">
                 Описание *
@@ -303,13 +360,31 @@ export default function NewOrderPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 required
+                minLength={MIN_DESCRIPTION_LENGTH}
                 className="textarea"
                 rows={6}
-                placeholder="Подробно опишите задачу, что нужно сделать, какие материалы использовать и т.д."
+                placeholder="Опишите задачу: что сделать, объём работ, материалы, сроки. Чем подробнее — тем точнее отклики мастеров."
               />
+              <div className="flex items-center justify-between mt-1.5">
+                <p className={`text-xs ${descriptionOk ? 'text-[#22a85e]' : 'text-text-muted'}`}>
+                  {descriptionOk
+                    ? 'Описание достаточно подробное'
+                    : `Ещё ${descriptionCharsLeft} симв. — добавьте детали`}
+                </p>
+                <span className="text-xs text-text-muted">
+                  {description.trim().length}/{MIN_DESCRIPTION_LENGTH}+
+                </span>
+              </div>
+              <ul className="mt-2 space-y-1">
+                {DESCRIPTION_HINTS.map((hint) => (
+                  <li key={hint} className="text-xs text-text-muted flex items-start gap-1.5">
+                    <span className="text-brand-accent mt-0.5">•</span>
+                    {hint}
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            {/* Категория заказа */}
             <div>
               <label className="block text-sm font-semibold text-graphite-secondary mb-2">
                 Категория заказа *
@@ -336,10 +411,8 @@ export default function NewOrderPage() {
               </p>
             </div>
 
-            {/* Место на карте */}
             <OrderLocationPicker value={location} onChange={setLocation} />
 
-            {/* Бюджет */}
             <div>
               <label className="block text-sm font-semibold text-graphite-secondary mb-2">
                 Бюджет (₽)
@@ -352,14 +425,13 @@ export default function NewOrderPage() {
                   setBudget(value)
                 }}
                 className="input"
-                placeholder="Например: 50000"
+                placeholder="Например: 50 000"
               />
               <p className="text-xs text-text-muted mt-1">
-                Укажите примерный бюджет или оставьте пустым для обсуждения
+                Укажите примерный бюджет или оставьте пустым для обсуждения с мастером
               </p>
             </div>
 
-            {/* Изображения */}
             <div>
               <label className="block text-sm font-semibold text-graphite-secondary mb-2">
                 Фотографии (до 10 шт.)
@@ -404,19 +476,11 @@ export default function NewOrderPage() {
               </div>
             </div>
 
-            {/* Кнопки */}
             <div className="flex gap-4 pt-4">
-              <Link
-                href="/orders"
-                className="btn btn-outline flex-1"
-              >
+              <Link href="/orders" className="btn btn-outline flex-1">
                 Отмена
               </Link>
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn btn-primary flex-1"
-              >
+              <button type="submit" disabled={saving || !descriptionOk} className="btn btn-primary flex-1">
                 {saving ? 'Создание...' : 'Создать заказ'}
               </button>
             </div>
@@ -439,3 +503,16 @@ export default function NewOrderPage() {
   )
 }
 
+export default function NewOrderPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-bg-primary">
+          <div className="text-base text-text-secondary">Загрузка...</div>
+        </div>
+      }
+    >
+      <NewOrderForm />
+    </Suspense>
+  )
+}

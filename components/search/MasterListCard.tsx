@@ -44,6 +44,7 @@ export function MasterListCard({
     : master.specialization || master.description?.slice(0, 40) || 'Мастер'
 
   const rating = master.master_rating ?? 0
+  const reviews = master.master_reviews_count ?? 0
   const isPro = master.is_pro || (master.pro_until && new Date(master.pro_until) > new Date())
 
   return (
@@ -81,11 +82,14 @@ export function MasterListCard({
         </div>
         <p className="text-[11px] text-[#8e8e93] mb-1 truncate">{specs}</p>
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-0.5">
-            <span className="text-yellow-400 text-[10px]">★</span>
-            <span className="text-[10px] font-bold text-[#1c1c1e]">
+          <div className="inline-flex items-center gap-0.5 bg-[#fff8e6] px-1.5 py-0.5 rounded-md">
+            <span className="text-[#f4a228] text-[11px] leading-none">★</span>
+            <span className="text-[11px] font-bold text-[#1c1c1e]">
               {rating > 0 ? rating.toFixed(1) : '—'}
             </span>
+            {reviews > 0 && (
+              <span className="text-[10px] text-[#8e8e93] font-medium">({reviews})</span>
+            )}
           </div>
           {master.city && (
             <span className="bg-[#f2f2f7] text-[#666] text-[9px] font-medium px-2 py-0.5 rounded-md truncate max-w-[90px]">

@@ -16,6 +16,7 @@ import { useUserLocation } from '@/hooks/useUserLocation'
 import { Story } from '@/lib/supabase'
 import type { AdBanner } from '@/lib/supabase'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs, getProductCategoriesForCategorySlugs } from '@/lib/specialization-product-mapping'
+import { getCategoryEmoji } from '@/lib/categoryEmoji'
 
 export interface SearchContentProps {
   /** Баннеры с сервера для быстрого LCP (SSR). */
@@ -438,7 +439,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                   : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
               }`}
             >
-              {cat.name}
+              {getCategoryEmoji(cat.slug, cat.name)} {cat.name}
             </button>
           ))}
         </div>
@@ -745,12 +746,6 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 }
 
 export default function SearchClient() {
-  const { loading: authLoading } = useAuth()
-
-  if (authLoading) {
-    return <SearchLoading />
-  }
-
   return (
     <Suspense fallback={<SearchLoading />}>
       <SearchContent />

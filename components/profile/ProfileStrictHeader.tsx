@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { FiMessageCircle, FiShare2 } from 'react-icons/fi'
+import { FiMessageCircle, FiShare2, FiClipboard } from 'react-icons/fi'
 import type { User } from '@/lib/supabase'
 import { getInitials, yearsOnSite } from './profile-utils'
 
@@ -24,6 +24,7 @@ type ProfileStrictHeaderProps = {
   onFollowersClick: () => void
   onEdit?: () => void
   backHref?: string | null
+  orderHref?: string | null
 }
 
 export default function ProfileStrictHeader({
@@ -42,6 +43,7 @@ export default function ProfileStrictHeader({
   onFollowersClick,
   onEdit,
   backHref,
+  orderHref,
 }: ProfileStrictHeaderProps) {
   const isMaster = profile.role === 'master'
   const isSeller = profile.role === 'seller'
@@ -186,35 +188,46 @@ export default function ProfileStrictHeader({
         </div>
 
         {!isOwnProfile && profile.role !== 'client' && (
-          <div className="flex gap-2 items-center">
-            <button
-              type="button"
-              onClick={onMessage}
-              className="flex-1 bg-[#c0392b] text-white text-[12px] font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5"
-            >
-              <FiMessageCircle size={14} />
-              Написать
-            </button>
-            <button
-              type="button"
-              onClick={onFollow}
-              disabled={followLoading}
-              className={`flex-1 text-[12px] font-semibold py-2.5 rounded-lg border ${
-                isFollowing
-                  ? 'bg-[#f2f2f7] text-[#1c1c1e] border-[#e5e5ea]'
-                  : 'bg-[#f2f2f7] text-[#1c1c1e] border-[#e5e5ea]'
-              }`}
-            >
-              {followLoading ? '…' : isFollowing ? 'Отписаться' : 'Подписка'}
-            </button>
-            <button
-              type="button"
-              onClick={handleShare}
-              className="w-[38px] h-[38px] bg-[#f2f2f7] border border-[#e5e5ea] rounded-lg flex items-center justify-center flex-shrink-0 text-[#3c3c43]"
-              aria-label="Поделиться"
-            >
-              <FiShare2 size={16} />
-            </button>
+          <div className="flex flex-col gap-2">
+            {isMaster && orderHref && (
+              <Link
+                href={orderHref}
+                className="w-full bg-[#c0392b] text-white text-[12px] font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5"
+              >
+                <FiClipboard size={14} />
+                Заказать
+              </Link>
+            )}
+            <div className="flex gap-2 items-center">
+              <button
+                type="button"
+                onClick={onMessage}
+                className="flex-1 bg-white text-[#c0392b] text-[12px] font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 border border-[#c0392b]"
+              >
+                <FiMessageCircle size={14} />
+                Написать
+              </button>
+              <button
+                type="button"
+                onClick={onFollow}
+                disabled={followLoading}
+                className={`flex-1 text-[12px] font-semibold py-2.5 rounded-lg border ${
+                  isFollowing
+                    ? 'bg-[#f2f2f7] text-[#1c1c1e] border-[#e5e5ea]'
+                    : 'bg-[#f2f2f7] text-[#1c1c1e] border-[#e5e5ea]'
+                }`}
+              >
+                {followLoading ? '…' : isFollowing ? 'Отписаться' : 'Подписка'}
+              </button>
+              <button
+                type="button"
+                onClick={handleShare}
+                className="w-[38px] h-[38px] bg-[#f2f2f7] border border-[#e5e5ea] rounded-lg flex items-center justify-center flex-shrink-0 text-[#3c3c43]"
+                aria-label="Поделиться"
+              >
+                <FiShare2 size={16} />
+              </button>
+            </div>
           </div>
         )}
 
