@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams
     const query = searchParams.get('q')?.trim() || ''
 
-    if (!query || query.length < 3) {
+    if (!query || query.length < 2) {
       return NextResponse.json({ results: [] })
     }
 

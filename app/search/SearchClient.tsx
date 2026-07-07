@@ -7,7 +7,7 @@ import SearchLoading from './loading'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import CompactPageBanner from '@/components/CompactPageBanner'
-import { FiSearch, FiSliders, FiBriefcase, FiArrowLeft } from 'react-icons/fi'
+import { FiSearch, FiSliders, FiBriefcase, FiArrowLeft, FiMapPin } from 'react-icons/fi'
 import { MastersScrollerSection } from '@/components/scrollers/MastersScrollerSection'
 import { ProductsScrollerSection } from '@/components/scrollers/ProductsScrollerSection'
 import { MasterListCard, MasterListCardSkeleton } from '@/components/search/MasterListCard'
@@ -17,6 +17,26 @@ import { Story } from '@/lib/supabase'
 import type { AdBanner } from '@/lib/supabase'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs, getProductCategoriesForCategorySlugs } from '@/lib/specialization-product-mapping'
 import { getCategoryEmoji } from '@/lib/categoryEmoji'
+
+type CitySuggestion = {
+  display_name: string
+  lat: number
+  lng: number
+  address?: Record<string, string>
+}
+
+function pickCityLabel(result: CitySuggestion): string {
+  const a = result.address || {}
+  return (
+    a.city ||
+    a.town ||
+    a.village ||
+    a.municipality ||
+    a.county ||
+    result.display_name.split(',')[0]?.trim() ||
+    result.display_name
+  )
+}
 
 export interface SearchContentProps {
   /** Баннеры с сервера для быстрого LCP (SSR). */
@@ -32,7 +52,9 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const searchInputWrapperRef = useRef<HTMLDivElement>(null)
+  const cityInputWrapperRef = useRef<HTMLDivElement>(null)
   const autocompleteAbortRef = useRef<AbortController | null>(null)
+  const cityAutocompleteAbortRef = useRef<AbortController | null>(null)
 
   const { lat, lng, radiusKm, city: userLocCity, locationReady } = useUserLocation()
   const [listMasters, setListMasters] = useState<MasterScrollerItem[]>([])
@@ -43,6 +65,9 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const [listError, setListError] = useState<string | null>(null)
   const [readyToSearch, setReadyToSearch] = useState(false)
   const [cityFilter, setCityFilter] = useState<string>('')
+  const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false)
+  const [loadingCitySuggestions, setLoadingCitySuggestions] = useState(false)
   const [tree, setTree] = useState<Array<{ id: string; name: string; slug: string; image_url?: string | null; sort_order: number; subcategories: Array<{ id: string; category_id: string; name: string; slug: string; image_url?: string | null; sort_order: number; services: Array<{ id: string; name: string; slug: string; sort_order: number }> }> }>>([])
   const [selectedCategory, setSelectedCategory] = useState<string>(() => searchParams.get('category') || '')
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>(() => searchParams.get('subcategory') || '')
@@ -59,6 +84,9 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
   const searchParamsKey = searchParams.toString()
   const hasCoords = lat != null && lng != null
+  const activeCity = cityFilter.trim()
+  const hasActiveFilters =
+    !!activeCity || !!selectedCategory || !!selectedSubcategory || selectedServiceIds.length > 0
 
   // Восстановление фильтров из URL (кнопка «назад» / прямой переход)
   useEffect(() => {
@@ -127,10 +155,48 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     }
   }, [query])
 
+  // Подсказки городов при вводе в фильтре
+  useEffect(() => {
+    const q = cityFilter.trim()
+    if (q.length < 2) {
+      setCitySuggestions([])
+      setShowCitySuggestions(false)
+      return
+    }
+    if (cityAutocompleteAbortRef.current) cityAutocompleteAbortRef.current.abort()
+    const ctrl = new AbortController()
+    cityAutocompleteAbortRef.current = ctrl
+    setLoadingCitySuggestions(true)
+    const t = setTimeout(() => {
+      fetch(`/api/geocode/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
+        .then((r) => (r.ok ? r.json() : { results: [] }))
+        .then((data) => {
+          if (ctrl.signal.aborted) return
+          const results = (data.results || []) as CitySuggestion[]
+          setCitySuggestions(results)
+          setShowCitySuggestions(results.length > 0)
+        })
+        .catch(() => {
+          if (!ctrl.signal.aborted) setCitySuggestions([])
+        })
+        .finally(() => {
+          if (!ctrl.signal.aborted) setLoadingCitySuggestions(false)
+        })
+    }, 350)
+    return () => {
+      clearTimeout(t)
+      ctrl.abort()
+    }
+  }, [cityFilter])
+
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (searchInputWrapperRef.current && !searchInputWrapperRef.current.contains(e.target as Node)) {
+      const t = e.target as Node
+      if (searchInputWrapperRef.current && !searchInputWrapperRef.current.contains(t)) {
         setShowSearchSuggestions(false)
+      }
+      if (cityInputWrapperRef.current && !cityInputWrapperRef.current.contains(t)) {
+        setShowCitySuggestions(false)
       }
     }
     document.addEventListener('mousedown', onDown)
@@ -247,7 +313,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
           page: pageNum,
           limit: LIST_PAGE_SIZE,
           q: query,
-          city: cityFilter || userLocCity || undefined,
+          city: cityFilter.trim() || undefined,
           category: selectedCategory || undefined,
           subcategory: selectedSubcategory || undefined,
           service: selectedServiceIds.length > 0 ? selectedServiceIds.join(',') : undefined,
@@ -274,7 +340,6 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     [
       query,
       cityFilter,
-      userLocCity,
       selectedCategory,
       selectedSubcategory,
       selectedServiceIds,
@@ -367,7 +432,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
   const scrollerFilters = {
     q: query || undefined,
-    city: cityFilter || userLocCity || undefined,
+    city: cityFilter.trim() || undefined,
     category: selectedCategory || undefined,
     subcategory: selectedSubcategory || undefined,
     service: selectedServiceIds.length > 0 ? selectedServiceIds.join(',') : undefined,
@@ -429,10 +494,14 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
           <button
             type="button"
             onClick={() => setShowFiltersModal(true)}
-            className="flex-shrink-0 bg-[#f5f5f7] border border-[#ececec] rounded-[10px] px-2.5 py-2 text-[11px] text-[#555] font-semibold"
+            className={`flex-shrink-0 rounded-[10px] px-2.5 py-2 text-[11px] font-semibold border ${
+              hasActiveFilters
+                ? 'bg-[#fff1f2] border-brand-accent text-brand-accent'
+                : 'bg-[#f5f5f7] border-[#ececec] text-[#555]'
+            }`}
           >
             <FiSliders size={14} className="inline mr-0.5" />
-            Фильтр
+            Фильтр{hasActiveFilters ? ' •' : ''}
           </button>
         </form>
 
@@ -443,15 +512,26 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
               setSelectedCategory('')
               setSelectedSubcategory('')
               setSelectedServiceIds([])
+              setCityFilter('')
             }}
             className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border ${
-              !selectedCategory
+              !selectedCategory && !activeCity
                 ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
                 : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
             }`}
           >
             Все
           </button>
+          {activeCity && (
+            <button
+              type="button"
+              onClick={() => setShowFiltersModal(true)}
+              className="flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap bg-[#fff1f2] border-brand-accent text-brand-accent font-bold"
+            >
+              <FiMapPin size={10} className="inline mr-0.5" />
+              {activeCity}
+            </button>
+          )}
           {chipCategories.map((cat) => (
             <button
               key={cat.id}
@@ -477,10 +557,17 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
       {/* Stat bar */}
       <div className="flex items-center gap-2 px-3.5 py-2">
-        <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
-          <span aria-hidden>📍</span>
-          <strong className="text-[#1c1c1e] font-bold">{radiusKm} км</strong>
-        </div>
+        {activeCity ? (
+          <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium max-w-[45%]">
+            <FiMapPin size={10} className="shrink-0 text-brand-accent" />
+            <strong className="text-[#1c1c1e] font-bold truncate">{activeCity}</strong>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
+            <span aria-hidden>📍</span>
+            <strong className="text-[#1c1c1e] font-bold">{radiusKm} км</strong>
+          </div>
+        )}
         <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
           Найдено: <strong className="text-[#1c1c1e] font-bold">{showListSkeleton ? '…' : listTotal}</strong>
         </div>
@@ -585,9 +672,9 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                     ×
                   </button>
                   <div className="text-base font-semibold text-graphite-secondary">
-                    {filterStepMasters === 'category' && 'Выберите категорию'}
-                    {filterStepMasters === 'subcategory' && 'Выберите подкатегорию'}
-                    {filterStepMasters === 'service' && 'Выберите услугу'}
+                    {filterStepMasters === 'category' && 'Фильтры'}
+                    {filterStepMasters === 'subcategory' && 'Подкатегория'}
+                    {filterStepMasters === 'service' && 'Услуга'}
                   </div>
                   <button
                     onClick={() => {
@@ -604,19 +691,69 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-4 py-4">
-                  {/* Город показываем только после выбора категории, подкатегории или услуги */}
-                  {(selectedCategory || selectedSubcategory || selectedServiceIds.length > 0) && (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-graphite-secondary mb-2">Город</label>
+                  <div className="mb-5" ref={cityInputWrapperRef}>
+                    <label className="block text-sm font-semibold text-graphite-secondary mb-2">
+                      <FiMapPin className="inline mr-1 text-brand-accent" size={14} />
+                      Город
+                    </label>
+                    <p className="text-xs text-text-secondary mb-2">
+                      Можно искать только по городу — категория не обязательна
+                    </p>
+                    <div className="relative">
                       <input
                         type="text"
                         value={cityFilter}
                         onChange={(e) => setCityFilter(e.target.value)}
-                        placeholder="Введите город"
-                        className="input w-full h-10 text-sm"
+                        onFocus={() => citySuggestions.length > 0 && setShowCitySuggestions(true)}
+                        placeholder="Москва, Грозный, Санкт-Петербург…"
+                        className="input w-full h-11 text-sm pr-9"
+                        autoComplete="off"
                       />
+                      {cityFilter.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCityFilter('')
+                            setCitySuggestions([])
+                            setShowCitySuggestions(false)
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-graphite-secondary w-7 h-7 flex items-center justify-center"
+                          aria-label="Очистить город"
+                        >
+                          ×
+                        </button>
+                      )}
+                      {showCitySuggestions && citySuggestions.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-xl border border-border-light shadow-lg overflow-hidden max-h-[220px] overflow-y-auto">
+                          {loadingCitySuggestions ? (
+                            <div className="px-3 py-2 text-xs text-text-secondary">Загрузка…</div>
+                          ) : (
+                            <ul className="py-1">
+                              {citySuggestions.map((item, i) => (
+                                <li key={`${item.lat}-${item.lng}-${i}`}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCityFilter(pickCityLabel(item))
+                                      setShowCitySuggestions(false)
+                                      setCitySuggestions([])
+                                    }}
+                                    className="w-full text-left px-3 py-2.5 hover:bg-bg-secondary text-sm text-graphite-secondary"
+                                  >
+                                    {pickCityLabel(item)}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+
+                  <div className="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">
+                    Категория мастера
+                  </div>
 
                   {filterStepMasters === 'category' && (
                     <div className="grid grid-cols-3 gap-1">
@@ -749,16 +886,15 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                   )}
                 </div>
 
-                {/* Кнопка «Найти» только после выбора категории (не показываем на шаге «Выберите категорию» без выбора) */}
-                {selectedCategory && (
+                {(activeCity || selectedCategory || selectedSubcategory || selectedServiceIds.length > 0) && (
                   <div className="p-4 border-t border-border-light bg-white">
-                    {filterStepMasters === 'category' ? (
+                    {filterStepMasters === 'category' && selectedCategory ? (
                       <button
                         type="button"
                         onClick={() => { setSelectedSubcategory(''); setSelectedServiceIds([]); setShowFiltersModal(false) }}
                         className="btn btn-primary w-full h-12 text-base font-semibold"
                       >
-                        Применить по категории
+                        {activeCity ? `Найти в ${activeCity}` : 'Применить по категории'}
                       </button>
                     ) : filterStepMasters === 'subcategory' && selectedSubcategory ? (
                       <button
@@ -766,7 +902,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                         onClick={() => { setSelectedServiceIds([]); setShowFiltersModal(false) }}
                         className="btn btn-primary w-full h-12 text-base font-semibold"
                       >
-                        Применить по подкатегории
+                        {activeCity ? `Найти в ${activeCity}` : 'Применить по подкатегории'}
                       </button>
                     ) : (
                       <button
@@ -774,7 +910,9 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
                         onClick={() => setShowFiltersModal(false)}
                         className="btn btn-primary w-full h-12 text-base font-semibold"
                       >
-                        Найти
+                        {activeCity && !selectedCategory
+                          ? `Найти в ${activeCity}`
+                          : 'Применить фильтры'}
                       </button>
                     )}
                   </div>
