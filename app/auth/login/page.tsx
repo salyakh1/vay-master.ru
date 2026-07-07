@@ -4,13 +4,7 @@ import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { FiShield, FiStar, FiMessageCircle } from 'react-icons/fi'
-
-const BENEFITS = [
-  { icon: FiStar, text: 'Реальные отзывы после заказов' },
-  { icon: FiMessageCircle, text: 'Чат с мастером напрямую' },
-  { icon: FiShield, text: 'Модерация профилей' },
-]
+import AuthBrandHero from '@/components/auth/AuthBrandHero'
 
 function LoginForm() {
   const router = useRouter()
@@ -62,27 +56,21 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f2f2f7] flex flex-col">
-      <div className="bg-brand-accent px-4 pt-10 pb-8 text-center">
-        <div className="inline-flex items-center justify-center w-14 h-14 bg-white/15 rounded-2xl mb-3">
-          <span className="text-2xl" aria-hidden>
-            🔧
-          </span>
-        </div>
-        <h1 className="text-2xl font-black text-white tracking-tight mb-1">
-          VAY<span className="opacity-80">–</span>MASTER
-        </h1>
-        <p className="text-white/80 text-sm">Мастера, материалы и заказы в одном месте</p>
-      </div>
+    <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full flex flex-col">
+      <AuthBrandHero subtitle="Войдите, чтобы писать мастерам, оформлять заказы и сохранять избранное." />
 
-      <div className="flex-1 px-4 -mt-4 pb-8">
-        <div className="bg-white rounded-2xl border border-[#e5e5ea] p-5 shadow-sm max-w-md mx-auto">
-          <h2 className="text-lg font-bold text-[#1c1c1e] mb-4 text-center">Вход в аккаунт</h2>
+      <div className="flex-1 px-4 -mt-6 relative z-10 pb-10">
+        <div className="bg-white rounded-2xl border border-[#e5e5ea] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
+          <h2 className="text-lg font-bold text-[#1c1c1e] mb-1 text-center">Вход в аккаунт</h2>
+          <p className="text-center text-xs text-[#8e8e93] mb-5">Добро пожаловать обратно в VAY-MASTER</p>
 
-          <form onSubmit={handleLogin} className="space-y-3">
+          <form onSubmit={handleLogin} className="space-y-3.5">
             <div>
-              <label className="block text-xs font-semibold text-[#8e8e93] mb-1.5">Email</label>
+              <label htmlFor="login-email" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
+                Email
+              </label>
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -94,8 +82,11 @@ function LoginForm() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#8e8e93] mb-1.5">Пароль</label>
+              <label htmlFor="login-password" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
+                Пароль
+              </label>
               <input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -107,38 +98,30 @@ function LoginForm() {
             </div>
 
             {error && (
-              <div className="bg-[#fdf0f0] border border-[#f5c6cb] text-brand-accent px-3 py-2.5 rounded-xl text-sm">
+              <div
+                className="bg-[#fdf0f0] border border-[#f5c6cb] text-brand-accent px-3 py-2.5 rounded-xl text-sm"
+                role="alert"
+              >
                 {error}
               </div>
             )}
 
-            <button type="submit" disabled={loading} className="w-full btn btn-primary py-3 font-bold">
+            <button type="submit" disabled={loading} className="w-full btn btn-primary py-3.5 font-bold text-[15px]">
               {loading ? 'Вход…' : 'Войти'}
             </button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-[#8e8e93]">
+          <p className="mt-5 text-center text-sm text-[#8e8e93]">
             Нет аккаунта?{' '}
-            <Link href="/auth/register" className="text-brand-accent font-semibold">
-              Зарегистрироваться
+            <Link href="/auth/register" className="text-brand-accent font-semibold hover:underline">
+              Зарегистрироваться бесплатно
             </Link>
           </p>
         </div>
 
-        <ul className="max-w-md mx-auto mt-5 space-y-2.5 px-1">
-          {BENEFITS.map(({ icon: Icon, text }) => (
-            <li key={text} className="flex items-center gap-2.5 text-sm text-[#555]">
-              <span className="w-8 h-8 rounded-lg bg-white border border-[#e5e5ea] flex items-center justify-center text-brand-accent shrink-0">
-                <Icon size={15} />
-              </span>
-              {text}
-            </li>
-          ))}
-        </ul>
-
         <p className="text-center mt-6">
-          <Link href="/" className="text-sm text-[#8e8e93] hover:text-[#1c1c1e]">
-            ← На главную без входа
+          <Link href="/" className="text-sm text-[#8e8e93] hover:text-[#1c1c1e] transition-colors">
+            ← Продолжить без входа
           </Link>
         </p>
       </div>
@@ -146,15 +129,20 @@ function LoginForm() {
   )
 }
 
+function LoginPageFallback() {
+  return (
+    <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full">
+      <div className="h-72 bg-gradient-to-br from-[#1c1c1e] to-[#8b2e28] animate-pulse" />
+      <div className="px-4 -mt-6">
+        <div className="bg-white rounded-2xl border border-[#e5e5ea] p-5 h-80 animate-pulse" />
+      </div>
+    </div>
+  )
+}
+
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#f2f2f7] flex items-center justify-center">
-          <div className="text-[#8e8e93]">Загрузка…</div>
-        </div>
-      }
-    >
+    <Suspense fallback={<LoginPageFallback />}>
       <LoginForm />
     </Suspense>
   )

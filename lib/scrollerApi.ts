@@ -41,28 +41,17 @@ export async function fetchMastersPage(
   const { page, limit = SCROLLER_PAGE_SIZE, lat, lng, radiusKm = 50, q, city, category, subcategory, service } =
     params
 
-  if (lat != null && lng != null) {
-    const sp = new URLSearchParams({
-      lat: String(lat),
-      lng: String(lng),
-      radius_km: String(radiusKm),
-      page: String(page),
-      limit: String(limit),
-    })
-    const res = await fetch(`/api/search/masters-nearby?${sp}`)
-    if (!res.ok) return { items: [], total: 0, hasMore: false }
-    const data = await res.json()
-    const items = (data.masters || []) as MasterScrollerItem[]
-    const total = data.total ?? items.length
-    return { items, total, hasMore: !!data.hasMore }
-  }
-
   const sp = new URLSearchParams({ page: String(page), limit: String(limit) })
   if (q?.trim()) sp.set('q', q.trim())
   if (city?.trim()) sp.set('city', city.trim())
   if (category) sp.set('category', category)
   if (subcategory) sp.set('subcategory', subcategory)
   if (service) sp.set('service', service)
+  if (lat != null && lng != null) {
+    sp.set('lat', String(lat))
+    sp.set('lng', String(lng))
+    sp.set('radius_km', String(radiusKm))
+  }
 
   const res = await fetch(`/api/search/masters?${sp}`)
   if (!res.ok) return { items: [], total: 0, hasMore: false }

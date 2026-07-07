@@ -34,12 +34,14 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const searchInputWrapperRef = useRef<HTMLDivElement>(null)
   const autocompleteAbortRef = useRef<AbortController | null>(null)
 
-  const { lat, lng, radiusKm, city: userLocCity } = useUserLocation()
+  const { lat, lng, radiusKm, city: userLocCity, locationReady } = useUserLocation()
   const [listMasters, setListMasters] = useState<MasterScrollerItem[]>([])
   const [listPage, setListPage] = useState(1)
   const [listTotal, setListTotal] = useState(0)
   const [listLoading, setListLoading] = useState(true)
   const [listLoadingMore, setListLoadingMore] = useState(false)
+  const [listError, setListError] = useState<string | null>(null)
+  const [readyToSearch, setReadyToSearch] = useState(false)
   const [cityFilter, setCityFilter] = useState<string>('')
   const [tree, setTree] = useState<Array<{ id: string; name: string; slug: string; image_url?: string | null; sort_order: number; subcategories: Array<{ id: string; category_id: string; name: string; slug: string; image_url?: string | null; sort_order: number; services: Array<{ id: string; name: string; slug: string; sort_order: number }> }> }>>([])
   const [selectedCategory, setSelectedCategory] = useState<string>(() => searchParams.get('category') || '')
@@ -55,7 +57,29 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const [stories, setStories] = useState<Story[]>([])
   const [storiesLoading, setStoriesLoading] = useState(false)
 
-  // Синхронизация фильтров с URL (только если параметры реально изменились)
+  const searchParamsKey = searchParams.toString()
+  const hasCoords = lat != null && lng != null
+
+  // Восстановление фильтров из URL (кнопка «назад» / прямой переход)
+  useEffect(() => {
+    setQuery(searchParams.get('q') || '')
+    setSelectedCategory(searchParams.get('category') || '')
+    setSelectedSubcategory(searchParams.get('subcategory') || '')
+    const svc = searchParams.get('service') || ''
+    setSelectedServiceIds(svc ? svc.split(',').map((id) => id.trim()).filter(Boolean) : [])
+    setCityFilter(searchParams.get('city') || '')
+  }, [searchParamsKey, searchParams])
+
+  // Коротко ждём геолокацию, чтобы сразу отсортировать по расстоянию (без двойной загрузки)
+  useEffect(() => {
+    if (locationReady) {
+      setReadyToSearch(true)
+      return
+    }
+    const t = setTimeout(() => setReadyToSearch(true), 800)
+    return () => clearTimeout(t)
+  }, [locationReady])
+  // Синхронизация фильтров в URL
   useEffect(() => {
     const params = new URLSearchParams()
     if (query.trim()) params.set('q', query.trim())
@@ -214,8 +238,10 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
   const loadList = useCallback(
     async (pageNum: number, reset: boolean) => {
-      if (reset) setListLoading(true)
-      else setListLoadingMore(true)
+      if (reset) {
+        setListLoading(true)
+        setListError(null)
+      } else setListLoadingMore(true)
       try {
         const result = await fetchMastersPage({
           page: pageNum,
@@ -238,6 +264,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
         if (reset) {
           setListMasters([])
           setListTotal(0)
+          setListError('Не удалось загрузить мастеров. Проверьте соединение и попробуйте снова.')
         }
       } finally {
         setListLoading(false)
@@ -258,9 +285,9 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   )
 
   useEffect(() => {
-    if (showFiltersModal) return
+    if (showFiltersModal || !readyToSearch) return
     void loadList(1, true)
-  }, [showFiltersModal, loadList])
+  }, [showFiltersModal, readyToSearch, loadList])
 
   useEffect(() => {
     const t = setTimeout(() => fetchStories(), 800)
@@ -328,6 +355,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   }, [selectedCategoryNode?.slug, selectedSubcategoryNode?.slug])
 
   const listRemaining = Math.max(0, listTotal - listMasters.length)
+  const showListSkeleton = listLoading || (!readyToSearch && listMasters.length === 0)
 
   const productScrollerSlugs = useMemo(() => {
     if (filterProductCategories?.categorySlugs?.length) return filterProductCategories
@@ -454,9 +482,11 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
           <strong className="text-[#1c1c1e] font-bold">{radiusKm} км</strong>
         </div>
         <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
-          Найдено: <strong className="text-[#1c1c1e] font-bold">{listTotal}</strong>
+          Найдено: <strong className="text-[#1c1c1e] font-bold">{showListSkeleton ? '…' : listTotal}</strong>
         </div>
-        <span className="ml-auto text-[10px] text-brand-accent font-bold">По рейтингу ↓</span>
+        <span className="ml-auto text-[10px] text-brand-accent font-bold">
+          {hasCoords ? 'По расстоянию ↑' : 'По рейтингу ↓'}
+        </span>
       </div>
 
       {/* Скроллер: топ мастера рядом */}
@@ -473,14 +503,26 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
           Все мастера · {listTotal}
         </p>
 
-        {listLoading && listMasters.length === 0 ? (
+        {!readyToSearch && (
+          <p className="text-[11px] text-[#8e8e93] px-3.5 pb-2">Определяем местоположение для сортировки…</p>
+        )}
+
+        {listError && (
+          <div className="mx-3.5 mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {listError}
+          </div>
+        )}
+
+        {showListSkeleton ? (
           <div className="flex flex-col gap-2 px-3.5 pb-2">
             {Array.from({ length: 6 }).map((_, i) => (
               <MasterListCardSkeleton key={i} />
             ))}
           </div>
         ) : listMasters.length === 0 ? (
-          <div className="text-center py-12 text-[#888] text-sm px-4">Мастера не найдены</div>
+          <div className="text-center py-12 text-[#888] text-sm px-4">
+            {query.trim() ? `По запросу «${query.trim()}» ничего не найдено` : 'Мастера не найдены'}
+          </div>
         ) : (
           <div className="flex flex-col gap-2 px-3.5 pb-2">
             {listMasters.map((master, i) => (

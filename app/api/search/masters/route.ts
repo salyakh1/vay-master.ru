@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { haversineKm } from '@/lib/geo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,10 +12,23 @@ const supabaseAdmin = createClient(
 export const dynamic = 'force-dynamic'
 
 const ITEMS_PER_PAGE = 20
+const MAX_LOCATION_FETCH = 2000
+
+const PROFILE_SELECT = `
+  *,
+  profile_subcategories (
+    subcategory:subcategories (id, name, slug, category:categories (id, name, slug))
+  ),
+  profile_services (
+    service:services (id, name, slug, subcategory:subcategories (id, name, slug, category:categories (id, name, slug)))
+  ),
+  master_rating,
+  master_reviews_count
+`
 
 /**
- * GET /api/search/masters?q=&city=&category=&subcategory=&service=&page=1
- * Поиск мастеров: текст, город, категория, подкатегория, услуга.
+ * GET /api/search/masters?q=&city=&category=&subcategory=&service=&lat=&lng=&radius_km=&page=1
+ * Поиск мастеров: текст, фильтры, опционально сортировка по расстоянию.
  */
 export async function GET(request: NextRequest) {
   const { success } = rateLimit(getClientIp(request), 60, 60_000)
@@ -33,9 +47,13 @@ export async function GET(request: NextRequest) {
       50,
       Math.max(1, parseInt(searchParams.get('limit') || String(ITEMS_PER_PAGE), 10))
     )
+    const lat = Number(searchParams.get('lat'))
+    const lng = Number(searchParams.get('lng'))
+    const hasLocation = Number.isFinite(lat) && Number.isFinite(lng)
+    const radiusKm = Math.min(200, Math.max(1, Number(searchParams.get('radius_km')) || 50))
+    const hasTextOrFilters = !!(q || city || category || subcategory || serviceIds.length > 0)
 
     const from = (page - 1) * limit
-    const to = from + limit - 1
 
     let profileIds: string[] | null = null
 
@@ -169,22 +187,8 @@ export async function GET(request: NextRequest) {
 
     let queryBuilder = supabaseAdmin
       .from('profiles')
-      .select(
-        `
-        *,
-        profile_subcategories (
-          subcategory:subcategories (id, name, slug, category:categories (id, name, slug))
-        ),
-        profile_services (
-          service:services (id, name, slug, subcategory:subcategories (id, name, slug, category:categories (id, name, slug)))
-        ),
-        master_rating,
-        master_reviews_count
-      `,
-        { count: 'exact' }
-      )
+      .select(PROFILE_SELECT, hasLocation ? undefined : { count: 'exact' })
       .eq('role', 'master')
-      .range(from, to)
 
     if (q && !profileIds) {
       queryBuilder = queryBuilder.or(
@@ -195,11 +199,45 @@ export async function GET(request: NextRequest) {
       queryBuilder = queryBuilder.in('id', finalProfileIds)
     }
 
+    if (hasLocation) {
+      const { data: masters, error } = await queryBuilder.limit(MAX_LOCATION_FETCH)
+      if (error) throw error
+
+      let list = (masters || []).map((m: any) => {
+        const mLat = m.master_lat != null ? Number(m.master_lat) : NaN
+        const mLng = m.master_lng != null ? Number(m.master_lng) : NaN
+        const distance_km =
+          Number.isFinite(mLat) && Number.isFinite(mLng)
+            ? Math.round(haversineKm(lat, lng, mLat, mLng) * 10) / 10
+            : null
+        return { ...m, distance_km }
+      })
+
+      if (!hasTextOrFilters) {
+        list = list.filter((m) => m.distance_km == null || m.distance_km <= radiusKm)
+      }
+
+      list.sort((a, b) => {
+        const da = a.distance_km ?? Number.POSITIVE_INFINITY
+        const db = b.distance_km ?? Number.POSITIVE_INFINITY
+        if (da !== db) return da - db
+        return (b.master_rating ?? 0) - (a.master_rating ?? 0)
+      })
+
+      const total = list.length
+      const pageSlice = list.slice(from, from + limit)
+      const hasMore = from + limit < total
+      return NextResponse.json({ masters: pageSlice, hasMore, total })
+    }
+
+    queryBuilder = queryBuilder.range(from, from + limit - 1)
+
     const { data: masters, error, count } = await queryBuilder
 
     if (error) throw error
 
     const list = (masters || []) as any[]
+    list.sort((a, b) => (b.master_rating ?? 0) - (a.master_rating ?? 0))
     const hasMore = list.length === limit && (count || 0) > page * limit
 
     return NextResponse.json({ masters: list, hasMore, total: count || 0 })

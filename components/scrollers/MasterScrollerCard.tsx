@@ -73,7 +73,7 @@ export default function MasterScrollerCard({ master }: MasterScrollerCardProps) 
           {reviews > 0 && <span className="text-[#8e8e93] font-medium">({reviews})</span>}
         </div>
         {master.distance_km != null ? (
-          <span className="text-[9px] text-[#c7c7cc]">{master.distance_km} км</span>
+          <span className="text-[9px] font-semibold text-brand-accent whitespace-nowrap">{master.distance_km} км</span>
         ) : master.city ? (
           <span className="text-[9px] text-[#c7c7cc] truncate max-w-[52px]">{master.city}</span>
         ) : null}

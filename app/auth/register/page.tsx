@@ -1,12 +1,20 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase, UserRole } from '@/lib/supabase'
 import Link from 'next/link'
+import AuthBrandHero from '@/components/auth/AuthBrandHero'
 
-export default function RegisterPage() {
+const VALID_ROLES: UserRole[] = ['master', 'seller', 'client']
+
+function isUserRole(v: string | null): v is UserRole {
+  return v != null && VALID_ROLES.includes(v as UserRole)
+}
+
+function RegisterForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
@@ -16,6 +24,14 @@ export default function RegisterPage() {
   const [city, setCity] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const r = searchParams.get('role')
+    if (isUserRole(r)) {
+      setRole(r)
+      setRoleTouched(true)
+    }
+  }, [searchParams])
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,7 +46,6 @@ export default function RegisterPage() {
     }
 
     try {
-      // Sign up with Supabase Auth and pass metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -47,96 +62,63 @@ export default function RegisterPage() {
       if (authError) throw authError
 
       if (authData.user) {
-        // Если сессия не создана автоматически, ждем немного и проверяем
         if (!authData.session) {
-          // Ждем, пока сессия установится (может потребоваться время для подтверждения email)
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          // Проверяем сессию еще раз
-          const { data: { session } } = await supabase.auth.getSession()
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
           if (!session) {
             console.warn('Session not created after registration, user may need to login')
           }
         }
-        
-        // Profile will be created automatically by trigger
-        // Wait a bit for trigger to execute, then verify profile exists
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // Verify profile was created (optional check)
+
+        await new Promise((resolve) => setTimeout(resolve, 500))
+
         const { data: profileData, error: profileCheckError } = await supabase
           .from('profiles')
           .select('id')
           .eq('id', authData.user.id)
           .single()
 
-        // If profile doesn't exist, try to create it manually as fallback
         if (!profileData && !profileCheckError) {
           try {
-            const { error: profileError } = await supabase
-              .from('profiles')
-              .insert({
-                id: authData.user.id,
-                email,
-                full_name: fullName,
-                role,
-                phone: phone || null,
-                city: city || null,
-              })
+            const { error: profileError } = await supabase.from('profiles').insert({
+              id: authData.user.id,
+              email,
+              full_name: fullName,
+              role,
+              phone: phone || null,
+              city: city || null,
+            })
 
             if (profileError) {
               console.error('Profile creation error:', profileError)
-              // Don't throw - user is registered, profile can be created later
             }
-          } catch (err: any) {
+          } catch (err: unknown) {
             console.error('Profile creation exception:', err)
-            // Don't throw - user is registered, profile can be created later
           }
         }
 
-        // Email confirmation is handled by SQL trigger (auto_confirm_on_user_created)
-        // If user is not confirmed yet, wait a bit more for trigger
         if (!authData.user.email_confirmed_at) {
-          await new Promise(resolve => setTimeout(resolve, 300))
+          await new Promise((resolve) => setTimeout(resolve, 300))
         }
 
-        // Отправляем приветственное сообщение от администрации
-        // Добавляем небольшую задержку, чтобы профиль точно был создан
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+
         try {
-          console.log('[register] Sending welcome message for user:', authData.user.id, 'role:', role)
           const welcomeResponse = await fetch('/api/welcome-message', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: authData.user.id,
-              role: role,
-            }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: authData.user.id, role: role }),
           })
-
           const welcomeData = await welcomeResponse.json()
-          
           if (!welcomeResponse.ok) {
-            console.error('[register] Failed to send welcome message:', {
-              status: welcomeResponse.status,
-              statusText: welcomeResponse.statusText,
-              data: welcomeData
-            })
-            // Не прерываем регистрацию, если не удалось отправить приветственное сообщение
-          } else {
-            console.log('[register] Welcome message sent successfully:', welcomeData)
+            console.error('[register] Failed to send welcome message:', welcomeData)
           }
-        } catch (welcomeError: any) {
-          console.error('[register] Error sending welcome message:', {
-            error: welcomeError.message,
-            stack: welcomeError.stack
-          })
-          // Не прерываем регистрацию, если не удалось отправить приветственное сообщение
+        } catch (welcomeError: unknown) {
+          console.error('[register] Error sending welcome message:', welcomeError)
         }
 
-        // После регистрации перенаправляем в зависимости от роли
         if (role === 'master') {
           router.push('/onboarding/specializations')
         } else if (role === 'seller') {
@@ -145,180 +127,191 @@ export default function RegisterPage() {
           router.push('/onboarding')
         }
       }
-    } catch (error: any) {
-      setError(error.message || 'Ошибка при регистрации')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ошибка при регистрации')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white py-12 px-4">
-      <div className="max-w-md w-full card">
-        <h2 className="text-xl font-bold text-center mb-8 text-black">Регистрация</h2>
+    <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full flex flex-col">
+      <AuthBrandHero subtitle="Создайте аккаунт за минуту — бесплатно. Мастера, продавцы и клиенты в одной экосистеме." />
 
-        <form onSubmit={handleRegister} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              ФИО *
-            </label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-              className="input"
-              placeholder="Иван Иванов"
-            />
-          </div>
+      <div className="flex-1 px-4 -mt-6 relative z-10 pb-10">
+        <div className="bg-white rounded-2xl border border-[#e5e5ea] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
+          <h2 className="text-lg font-bold text-[#1c1c1e] mb-1 text-center">Регистрация</h2>
+          <p className="text-center text-xs text-[#8e8e93] mb-5">Выберите роль и заполните данные</p>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Email *
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="input"
-              placeholder="example@mail.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Пароль *
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className="input"
-              placeholder="Минимум 6 символов"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Телефон
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="input"
-              placeholder="+7 (999) 123-45-67"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Город
-            </label>
-            <input
-              type="text"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="input"
-              placeholder="Москва"
-            />
-          </div>
-
-          <div className="pt-1">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <label className="block text-sm font-medium">
-                Выберите роль *
+          <form onSubmit={handleRegister} className="space-y-3.5">
+            <div>
+              <label htmlFor="reg-name" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
+                ФИО *
               </label>
-              {!role && (
-                <span className="text-xs font-semibold text-red-600">
-                  Роль не выбрана
-                </span>
-              )}
+              <input
+                id="reg-name"
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                className="input w-full"
+                placeholder="Иван Иванов"
+                autoComplete="name"
+              />
             </div>
-            <div
-              role="radiogroup"
-              aria-label="Роль пользователя"
-              aria-invalid={roleTouched && !role ? 'true' : 'false'}
-              className={[
-                'grid grid-cols-3 gap-2',
-                roleTouched && !role ? 'rounded-2xl p-1 bg-red-50 border border-red-200' : '',
-              ].join(' ')}
-            >
-              {(
-                [
-                  { id: 'role-master', value: 'master', label: 'Мастер', icon: '🔨' },
-                  { id: 'role-seller', value: 'seller', label: 'Продавец', icon: '🛒' },
-                  { id: 'role-client', value: 'client', label: 'Клиент', icon: '👤' },
-                ] as const
-              ).map((item) => {
-                const selected = role === item.value
-                return (
-                  <label
-                    key={item.id}
-                    htmlFor={item.id}
-                    className={[
-                      'cursor-pointer select-none rounded-2xl border px-3 py-3',
-                      'flex flex-col items-center justify-center gap-1',
-                      'transition-colors duration-150',
-                      selected
-                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-                        : 'bg-white border-gray-200 text-gray-800 hover:bg-gray-50 hover:border-gray-300',
-                    ].join(' ')}
-                  >
-                    <input
-                      id={item.id}
-                      type="radio"
-                      name="role"
-                      value={item.value}
-                      checked={selected}
-                      onChange={() => {
-                        setRoleTouched(true)
-                        setRole(item.value)
-                      }}
-                      className="sr-only"
-                    />
-                    <div className="relative">
-                      <span className="text-2xl leading-none" aria-hidden="true">
+
+            <div>
+              <label htmlFor="reg-email" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
+                Email *
+              </label>
+              <input
+                id="reg-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="input w-full"
+                placeholder="example@mail.com"
+                autoComplete="email"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="reg-password" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
+                Пароль *
+              </label>
+              <input
+                id="reg-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="input w-full"
+                placeholder="Минимум 6 символов"
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="reg-phone" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
+                  Телефон
+                </label>
+                <input
+                  id="reg-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="input w-full"
+                  placeholder="+7 999 123-45-67"
+                  autoComplete="tel"
+                />
+              </div>
+              <div>
+                <label htmlFor="reg-city" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
+                  Город
+                </label>
+                <input
+                  id="reg-city"
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="input w-full"
+                  placeholder="Москва"
+                  autoComplete="address-level2"
+                />
+              </div>
+            </div>
+
+            <div className="pt-1">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <label className="block text-xs font-semibold text-[#8e8e93]">Выберите роль *</label>
+                {roleTouched && !role && (
+                  <span className="text-[11px] font-semibold text-brand-accent">Роль не выбрана</span>
+                )}
+              </div>
+              <div
+                role="radiogroup"
+                aria-label="Роль пользователя"
+                aria-invalid={roleTouched && !role ? 'true' : 'false'}
+                className={[
+                  'grid grid-cols-3 gap-2',
+                  roleTouched && !role ? 'rounded-xl p-1 bg-[#fdf0f0] border border-[#f5c6cb]' : '',
+                ].join(' ')}
+              >
+                {(
+                  [
+                    { id: 'role-master', value: 'master' as const, label: 'Мастер', icon: '🔨' },
+                    { id: 'role-seller', value: 'seller' as const, label: 'Продавец', icon: '🛒' },
+                    { id: 'role-client', value: 'client' as const, label: 'Клиент', icon: '👤' },
+                  ] as const
+                ).map((item) => {
+                  const selected = role === item.value
+                  return (
+                    <label
+                      key={item.id}
+                      htmlFor={item.id}
+                      className={[
+                        'cursor-pointer select-none rounded-xl border px-2 py-2.5',
+                        'flex flex-col items-center justify-center gap-1',
+                        'transition-all duration-150 active:scale-[0.98]',
+                        selected
+                          ? 'bg-brand-accent border-brand-accent text-white shadow-sm'
+                          : 'bg-[#f5f5f7] border-[#e5e5ea] text-[#1c1c1e] hover:border-brand-accent/40',
+                      ].join(' ')}
+                    >
+                      <input
+                        id={item.id}
+                        type="radio"
+                        name="role"
+                        value={item.value}
+                        checked={selected}
+                        onChange={() => {
+                          setRoleTouched(true)
+                          setRole(item.value)
+                        }}
+                        className="sr-only"
+                      />
+                      <span className="text-xl leading-none" aria-hidden="true">
                         {item.icon}
                       </span>
-                      {selected && (
-                        <span
-                          aria-hidden="true"
-                          className="absolute -right-2 -top-2 w-5 h-5 rounded-full bg-white/25 flex items-center justify-center"
-                        >
-                          <span className="text-[12px] leading-none">✓</span>
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-sm font-semibold">{item.label}</span>
-                  </label>
-                )
-              })}
+                      <span className="text-[11px] font-bold">{item.label}</span>
+                    </label>
+                  )
+                })}
+              </div>
             </div>
-          </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
+            {error && (
+              <div
+                className="bg-[#fdf0f0] border border-[#f5c6cb] text-brand-accent px-3 py-2.5 rounded-xl text-sm"
+                role="alert"
+              >
+                {error}
+              </div>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full btn btn-primary"
-          >
-            {loading ? 'Регистрация...' : 'Зарегистрироваться'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full btn btn-primary py-3.5 font-bold text-[15px]"
+            >
+              {loading ? 'Регистрация…' : 'Создать аккаунт'}
+            </button>
+          </form>
 
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Уже есть аккаунт?{' '}
-          <Link href="/auth/login" className="text-blue-600 hover:underline">
-            Войти
+          <p className="mt-5 text-center text-sm text-[#8e8e93]">
+            Уже есть аккаунт?{' '}
+            <Link href="/auth/login" className="text-brand-accent font-semibold hover:underline">
+              Войти
+            </Link>
+          </p>
+        </div>
+
+        <p className="text-center mt-6">
+          <Link href="/" className="text-sm text-[#8e8e93] hover:text-[#1c1c1e] transition-colors">
+            ← На главную
           </Link>
         </p>
       </div>
@@ -326,3 +319,21 @@ export default function RegisterPage() {
   )
 }
 
+function RegisterPageFallback() {
+  return (
+    <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full">
+      <div className="h-72 bg-gradient-to-br from-[#1c1c1e] to-[#8b2e28] animate-pulse" />
+      <div className="px-4 -mt-6">
+        <div className="bg-white rounded-2xl border border-[#e5e5ea] p-5 h-[520px] animate-pulse" />
+      </div>
+    </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<RegisterPageFallback />}>
+      <RegisterForm />
+    </Suspense>
+  )
+}
