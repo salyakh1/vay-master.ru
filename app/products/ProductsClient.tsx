@@ -38,8 +38,11 @@ function ProductsContent() {
   const [loadingProductSuggestions, setLoadingProductSuggestions] = useState(false)
   const productSearchWrapperRef = useRef<HTMLDivElement>(null)
   const productAutocompleteAbortRef = useRef<AbortController | null>(null)
-  const [categoryId, setCategoryId] = useState('')
-  const [subcategoryIds, setSubcategoryIds] = useState<string[]>([])
+  const [categoryId, setCategoryId] = useState(() => searchParams.get('category') || '')
+  const [subcategoryIds, setSubcategoryIds] = useState<string[]>(() => {
+    const sub = searchParams.get('subcategory')
+    return sub ? [sub] : []
+  })
   const [cityFilter, setCityFilter] = useState('')
   const [cityFilterInput, setCityFilterInput] = useState('')
   const [productCategories, setProductCategories] = useState<ProductCategory[]>([])

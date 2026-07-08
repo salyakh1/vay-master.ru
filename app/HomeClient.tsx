@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -11,8 +11,41 @@ import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import { sanitizeProductsForGuest, profileLoginUrl } from '@/lib/guest-access'
 import type { AdBanner } from '@/lib/supabase'
 import type { MasterCategoryWithCount } from '@/lib/server-data'
-import { FiSearch, FiStar, FiArrowRight } from 'react-icons/fi'
+import { FiSearch, FiStar, FiArrowRight, FiUser, FiShoppingBag, FiTag, FiX } from 'react-icons/fi'
 import { getCategoryEmoji } from '@/lib/categoryEmoji'
+
+type HomeSuggestion = {
+  id: string
+  name: string
+  type:
+    | 'master'
+    | 'product'
+    | 'service'
+    | 'category'
+    | 'subcategory'
+    | 'product_category'
+    | 'product_subcategory'
+}
+
+const SUGGESTION_ICON: Record<HomeSuggestion['type'], React.ReactNode> = {
+  master: <FiUser size={13} />,
+  product: <FiShoppingBag size={13} />,
+  service: <FiTag size={13} />,
+  category: <FiTag size={13} />,
+  subcategory: <FiTag size={13} />,
+  product_category: <FiShoppingBag size={13} />,
+  product_subcategory: <FiShoppingBag size={13} />,
+}
+
+const SUGGESTION_LABEL: Record<HomeSuggestion['type'], string> = {
+  master: 'Мастер',
+  product: 'Товар',
+  service: 'Услуга',
+  category: 'Категория мастеров',
+  subcategory: 'Подкатегория мастеров',
+  product_category: 'Категория товаров',
+  product_subcategory: 'Каталог товаров',
+}
 
 interface HomeClientProps {
   initialBanners?: AdBanner[] | null
@@ -255,6 +288,79 @@ export default function HomeClient({
   const [products, setProducts] = useState<Product[]>([])
   const [stories, setStories] = useState<Story[]>([])
 
+  // Автодополнение поиска: мастера + товары + услуги + категории в одном списке
+  const [suggestions, setSuggestions] = useState<HomeSuggestion[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const searchWrapperRef = useRef<HTMLDivElement>(null)
+  const suggestAbortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    const q = searchQ.trim()
+    if (q.length < 2) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+    if (suggestAbortRef.current) suggestAbortRef.current.abort()
+    const ctrl = new AbortController()
+    suggestAbortRef.current = ctrl
+    setLoadingSuggestions(true)
+    setShowSuggestions(true)
+    const t = setTimeout(() => {
+      fetch(`/api/autocomplete?q=${encodeURIComponent(q)}&type=all`, { signal: ctrl.signal })
+        .then((r) => (r.ok ? r.json() : { suggestions: [] }))
+        .then((data) => {
+          if (ctrl.signal.aborted) return
+          setSuggestions(data.suggestions || [])
+          setShowSuggestions(true)
+        })
+        .catch(() => {
+          if (!ctrl.signal.aborted) setSuggestions([])
+        })
+        .finally(() => {
+          if (!ctrl.signal.aborted) setLoadingSuggestions(false)
+        })
+    }, 300)
+    return () => {
+      clearTimeout(t)
+      ctrl.abort()
+    }
+  }, [searchQ])
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+
+  const goToSuggestion = useCallback(
+    (item: HomeSuggestion) => {
+      setShowSuggestions(false)
+      if (item.type === 'master') {
+        router.push(`/profile/${item.id}`)
+      } else if (item.type === 'product') {
+        router.push(`/products/${item.id}`)
+      } else if (item.type === 'product_category') {
+        router.push(`/products?category=${item.id}`)
+      } else if (item.type === 'product_subcategory') {
+        router.push(`/products?subcategory=${item.id}`)
+      } else if (item.type === 'category') {
+        router.push(`/search?category=${item.id}`)
+      } else if (item.type === 'subcategory') {
+        router.push(`/search?subcategory=${item.id}`)
+      } else {
+        setSearchQ(item.name)
+        router.push(`/search?q=${encodeURIComponent(item.name)}`)
+      }
+    },
+    [router]
+  )
+
   const heroCats = useMemo((): HeroCat[] => {
     const fromDb = (initialCategories ?? []).slice(0, 4).map((c) => ({
       label: c.name,
@@ -327,28 +433,87 @@ export default function HomeClient({
           и продавцы — в одном месте
         </p>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            onSearch()
-          }}
-          className="flex items-center gap-2.5 bg-[#f5f5f7] rounded-2xl px-3.5 py-3 mb-3.5 border border-[#f0f0f0]"
-        >
-          <FiSearch className="text-brand-accent flex-shrink-0" size={18} />
-          <input
-            type="text"
-            value={searchQ}
-            onChange={(e) => setSearchQ(e.target.value)}
-            placeholder="Что нужно сделать?"
-            className="flex-1 bg-transparent text-[13px] text-[#111] placeholder:text-[#aaa] outline-none min-w-0"
-          />
-          <button
-            type="submit"
-            className="bg-brand-accent text-white text-xs font-bold px-3.5 py-1.5 rounded-xl flex-shrink-0"
+        <div className="relative mb-3.5" ref={searchWrapperRef}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              setShowSuggestions(false)
+              onSearch()
+            }}
+            className="flex items-center gap-2.5 bg-[#f5f5f7] rounded-2xl px-3.5 py-3 border border-[#f0f0f0]"
           >
-            Найти
-          </button>
-        </form>
+            <FiSearch className="text-brand-accent flex-shrink-0" size={18} />
+            <input
+              type="text"
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              onFocus={() => searchQ.trim().length >= 2 && setShowSuggestions(true)}
+              placeholder="Мастер, услуга или товар..."
+              autoComplete="off"
+              className="flex-1 bg-transparent text-[13px] text-[#111] placeholder:text-[#aaa] outline-none min-w-0"
+            />
+            {searchQ && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQ('')
+                  setSuggestions([])
+                  setShowSuggestions(false)
+                }}
+                aria-label="Очистить"
+                className="text-[#bbb] flex-shrink-0 p-0.5"
+              >
+                <FiX size={15} />
+              </button>
+            )}
+            <button
+              type="submit"
+              className="bg-brand-accent text-white text-xs font-bold px-3.5 py-1.5 rounded-xl flex-shrink-0"
+            >
+              Найти
+            </button>
+          </form>
+
+          {showSuggestions && (
+            <div className="absolute left-0 right-0 top-full mt-1.5 z-50 w-full max-w-full bg-white rounded-2xl border border-[#f0f0f0] shadow-card-hover overflow-hidden">
+              {loadingSuggestions ? (
+                <div className="px-4 py-3 text-xs text-[#888]">Ищем…</div>
+              ) : suggestions.length === 0 ? (
+                <div className="px-4 py-3 text-xs text-[#888]">Ничего не найдено</div>
+              ) : (
+                <ul className="py-1 max-h-[280px] overflow-y-auto">
+                  {suggestions.map((item) => (
+                    <li key={`${item.type}-${item.id}`}>
+                      <button
+                        type="button"
+                        onClick={() => goToSuggestion(item)}
+                        className="w-full flex items-center gap-2.5 text-left px-4 py-2.5 hover:bg-[#f5f5f7] transition-colors"
+                      >
+                        <span
+                          className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${
+                            item.type === 'master'
+                              ? 'bg-brand-accent/10 text-brand-accent'
+                              : item.type === 'product' ||
+                                  item.type === 'product_category' ||
+                                  item.type === 'product_subcategory'
+                                ? 'bg-[#eef6ff] text-[#2563eb]'
+                                : 'bg-[#f5f5f7] text-[#888]'
+                          }`}
+                        >
+                          {SUGGESTION_ICON[item.type]}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[13px] text-[#111] font-medium truncate">{item.name}</span>
+                          <span className="block text-[10px] text-[#999]">{SUGGESTION_LABEL[item.type]}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
           {heroCats.map((cat) => (

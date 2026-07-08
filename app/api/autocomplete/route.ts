@@ -97,7 +97,14 @@ export async function GET(request: NextRequest) {
     const suggestions: Array<{
       id: string
       name: string
-      type: 'master' | 'product' | 'service' | 'category' | 'subcategory'
+      type:
+        | 'master'
+        | 'product'
+        | 'service'
+        | 'category'
+        | 'subcategory'
+        | 'product_category'
+        | 'product_subcategory'
     }> = []
 
     // Поиск мастеров
@@ -190,6 +197,36 @@ export async function GET(request: NextRequest) {
         }
       } catch (error) {
         console.error('Error fetching categories/subcategories:', error)
+      }
+    }
+
+    // Поиск категорий и подкатегорий каталога товаров
+    if (type === 'all' || type === 'product') {
+      try {
+        const [prodCatRes, prodSubRes] = await Promise.all([
+          supabase.from('product_categories').select('id, name').ilike('name', `%${query}%`).limit(3),
+          supabase.from('product_subcategories').select('id, name').ilike('name', `%${query}%`).limit(3),
+        ])
+        if (prodCatRes.data?.length) {
+          suggestions.push(
+            ...prodCatRes.data.map((c) => ({
+              id: c.id,
+              name: c.name,
+              type: 'product_category' as const,
+            }))
+          )
+        }
+        if (prodSubRes.data?.length) {
+          suggestions.push(
+            ...prodSubRes.data.map((s) => ({
+              id: s.id,
+              name: s.name,
+              type: 'product_subcategory' as const,
+            }))
+          )
+        }
+      } catch (error) {
+        console.error('Error fetching product categories/subcategories:', error)
       }
     }
 

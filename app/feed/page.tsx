@@ -8,12 +8,12 @@ import { supabase, PortfolioItem, PortfolioComment } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
-import { FiHeart, FiMessageCircle } from 'react-icons/fi'
+import { FiHeart, FiMessageCircle, FiMessageSquare, FiMapPin } from 'react-icons/fi'
 import StoriesCircle from '@/components/StoriesCircle'
 import PostImageSlider from '@/components/PostImageSlider'
 import { Story } from '@/lib/supabase'
-
-const FEED_MEDIA_MAX_HEIGHT = 320
+import { formatDistanceToNow } from 'date-fns'
+import { ru } from 'date-fns/locale'
 
 interface ItemWithInteractions extends PortfolioItem {
   liked?: boolean
@@ -33,7 +33,7 @@ export default function FeedPage() {
   const [storiesLoading, setStoriesLoading] = useState(false)
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({})
   const [submittingComments, setSubmittingComments] = useState<Record<string, boolean>>({})
-  const [feedTab, setFeedTab] = useState<'all' | 'masters' | 'sellers' | 'subs'>('all')
+  const [feedTab, setFeedTab] = useState<'all' | 'masters' | 'sellers'>('all')
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
 
   const ITEMS_PER_PAGE = 9
@@ -209,14 +209,12 @@ export default function FeedPage() {
         page: 'feed',
         currentUserId: user.id,
       })
-      console.log('Fetching stories for feed page with userId:', user.id)
       const response = await fetch(`/api/stories?${params.toString()}`)
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || 'Failed to fetch stories')
       }
       const data = await response.json()
-      console.log('Stories fetched for feed:', data.stories?.length || 0, 'stories')
       setStories(data.stories || [])
     } catch (error) {
       console.error('Error fetching stories:', error)
@@ -335,11 +333,11 @@ export default function FeedPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto">
-        <div className="h-12 bg-white animate-pulse mb-2" />
-        <div className="h-16 bg-white animate-pulse mb-2" />
+      <div className="min-h-screen bg-bg-primary max-w-lg mx-auto">
+        <div className="h-12 bg-white animate-pulse mb-3" />
+        <div className="h-20 bg-white rounded-2xl mx-3 mb-3 animate-pulse" />
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="h-48 bg-white mb-2 animate-pulse" />
+          <div key={i} className="h-64 bg-white rounded-2xl mx-3 mb-3 animate-pulse" />
         ))}
       </div>
     )
@@ -351,7 +349,6 @@ export default function FeedPage() {
     { key: 'all' as const, label: 'Все' },
     { key: 'masters' as const, label: 'Мастера' },
     { key: 'sellers' as const, label: 'Продавцы' },
-    { key: 'subs' as const, label: 'Подписки' },
   ]
 
   const filteredItems = items.filter((item) => {
@@ -362,103 +359,232 @@ export default function FeedPage() {
   })
 
   return (
-    <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full pb-24">
+    <div className="min-h-screen bg-bg-primary max-w-lg mx-auto w-full pb-24">
       <Navbar />
 
+      {/* Панель историй — тёмная графитовая подложка, отделяет ленту от шапки */}
       {stories.length > 0 && (
-        <div className="bg-white border-b border-[#e5e5ea]/80 px-4 py-3 overflow-x-auto">
+        <div className="bg-graphite-primary px-4 py-3.5 overflow-x-auto">
           <StoriesCircle stories={stories} currentUser={user} isOwnProfile={false} onStoryCreated={fetchStories} />
         </div>
       )}
 
-      <div className="bg-white border-b border-[#e5e5ea]/80 flex">
-        {FEED_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setFeedTab(tab.key)}
-            className={`flex-1 text-center py-2.5 text-[11px] font-medium border-b-[1.5px] -mb-px ${
-              feedTab === tab.key ? 'text-[#c0392b] font-semibold border-[#c0392b]' : 'text-[#8e8e93] border-transparent'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Сегментированный переключатель вместо подчёркнутых вкладок */}
+      <div className="px-3 pt-3 pb-1">
+        <div className="flex gap-1 bg-white rounded-full p-1 border border-border-light shadow-card">
+          {FEED_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setFeedTab(tab.key)}
+              className={`flex-1 text-center py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
+                feedTab === tab.key
+                  ? 'bg-brand-accent text-white shadow-sm'
+                  : 'text-text-secondary hover:text-graphite-primary'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="w-full mb-2">
-        <AdBannerSlider page="feed" />
+      <div className="w-full px-3 mt-2">
+        <div className="rounded-2xl overflow-hidden">
+          <AdBannerSlider page="feed" />
+        </div>
       </div>
 
-      <div className="pb-4">
+      <div className="px-3 pt-3 pb-4 flex flex-col gap-3">
         {filteredItems.length === 0 && !loading ? (
-          <div className="bg-white text-center text-[#8e8e93] py-14 px-6">
-            <p className="text-[15px] font-semibold text-[#1c1c1e] mb-2">Лента пуста</p>
-            <p className="text-[12px] leading-relaxed">Подпишитесь на мастеров и продавцов — их работы появятся здесь</p>
+          <div className="bg-white rounded-2xl border border-border-light text-center text-text-secondary py-14 px-6 shadow-card">
+            <div className="text-3xl mb-3" aria-hidden>
+              📭
+            </div>
+            <p className="text-[15px] font-bold text-graphite-primary mb-1.5">Лента пуста</p>
+            <p className="text-[12px] leading-relaxed text-text-secondary">
+              Подпишитесь на мастеров и продавцов — их работы появятся здесь
+            </p>
+            <Link
+              href="/search"
+              className="inline-block mt-4 bg-brand-accent text-white text-xs font-bold px-4 py-2 rounded-xl"
+            >
+              Найти мастеров
+            </Link>
           </div>
         ) : (
           <>
-            {filteredItems.map((item) => (
-              <div key={item.id} className="bg-white mb-2">
-                <div className="flex items-center gap-2.5 px-4 pt-3 pb-0">
-                  <Link href={`/profile/${item.master?.id}`} className="w-[38px] h-[38px] rounded-full bg-[#c0392b] text-white flex items-center justify-center text-xs font-semibold overflow-hidden flex-shrink-0 relative">
-                    {item.master?.avatar_url ? (
-                      <Image src={item.master.avatar_url} alt="" fill className="object-cover" sizes="38px" />
-                    ) : (
-                      item.master?.full_name?.[0]?.toUpperCase() || 'M'
-                    )}
-                  </Link>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-semibold text-[#1c1c1e] truncate flex items-center gap-1">
-                      {item.master?.full_name || 'Мастер'}
+            {filteredItems.map((item) => {
+              const isSeller = item.master?.role === 'seller'
+              return (
+                <article
+                  key={item.id}
+                  className="bg-white rounded-2xl border border-border-light shadow-card overflow-hidden"
+                >
+                  {/* Шапка карточки: аватар с цветным кольцом по роли, имя, роль, город, время */}
+                  <div className="flex items-center gap-3 px-4 pt-3.5 pb-3">
+                    <Link
+                      href={`/profile/${item.master?.id}`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold overflow-hidden flex-shrink-0 relative ring-2 ${
+                        isSeller ? 'ring-[#2563eb]/40 bg-[#2563eb]' : 'ring-brand-accent/40 bg-brand-accent'
+                      } text-white`}
+                    >
+                      {item.master?.avatar_url ? (
+                        <Image src={item.master.avatar_url} alt="" fill className="object-cover" sizes="40px" />
+                      ) : (
+                        item.master?.full_name?.[0]?.toUpperCase() || 'M'
+                      )}
+                    </Link>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <Link
+                          href={`/profile/${item.master?.id}`}
+                          className="text-[13.5px] font-bold text-graphite-primary truncate hover:underline"
+                        >
+                          {item.master?.full_name || 'Мастер'}
+                        </Link>
+                        <span
+                          className={`flex-shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
+                            isSeller ? 'bg-[#eef6ff] text-[#2563eb]' : 'bg-brand-accent/10 text-brand-accent'
+                          }`}
+                        >
+                          {isSeller ? 'Продавец' : 'Мастер'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] text-text-secondary truncate mt-0.5">
+                        {item.master?.city && (
+                          <span className="flex items-center gap-0.5 truncate">
+                            <FiMapPin size={10} className="flex-shrink-0" />
+                            {item.master.city}
+                          </span>
+                        )}
+                        {item.master?.city && <span aria-hidden>·</span>}
+                        <span className="flex-shrink-0">
+                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: ru })}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-[10px] text-[#8e8e93] truncate">
-                      {item.master?.role === 'seller' ? 'Продавец' : 'Мастер'}
-                      {item.master?.city ? ` · ${item.master.city}` : ''}
+                  </div>
+
+                  {/* Заголовок и описание — текст важнее фото в этой карточке, читается первым */}
+                  {(item.title || item.description) && (
+                    <div className="px-4 pb-3">
+                      {item.title && (
+                        <h3 className="text-[14px] font-bold text-graphite-primary leading-snug mb-1">{item.title}</h3>
+                      )}
+                      {item.description && (
+                        <p className="text-[13px] text-text-secondary leading-relaxed line-clamp-3">
+                          {item.description}
+                        </p>
+                      )}
                     </div>
+                  )}
+
+                  {/* Медиа — с отступами и скруглением, не во всю ширину карточки */}
+                  {item.images && item.images.length > 0 ? (
+                    <div className="px-4 pb-3.5">
+                      <div className="h-[200px] rounded-xl overflow-hidden bg-bg-secondary">
+                        <PostImageSlider
+                          images={item.images}
+                          alt={item.title}
+                          className="w-full h-full [&_img]:!h-[200px] [&_img]:!object-cover"
+                        />
+                      </div>
+                    </div>
+                  ) : item.videos && item.videos.length > 0 ? (
+                    <div className="px-4 pb-3.5">
+                      <div className="h-[200px] rounded-xl overflow-hidden bg-bg-secondary">
+                        <video src={item.videos[0]} controls className="w-full h-full object-cover" />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Действия — пилюли вместо голых иконок IG-стиля */}
+                  <div className="flex items-center gap-2 px-4 pb-3.5">
+                    <button
+                      type="button"
+                      onClick={() => handleLike(item.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-colors ${
+                        item.liked
+                          ? 'bg-brand-accent/10 border-brand-accent/30 text-brand-accent'
+                          : 'bg-bg-secondary border-border-light text-text-secondary hover:border-brand-accent/30'
+                      }`}
+                    >
+                      <FiHeart size={13} className={item.liked ? 'fill-current' : ''} />
+                      {item.likes_count > 0 ? item.likes_count : 'Нравится'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextOpen = !item.showComments
+                        setCommentsOpen(item.id, nextOpen)
+                        if (nextOpen) fetchAllComments(item.id)
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-colors ${
+                        item.showComments
+                          ? 'bg-graphite-primary border-graphite-primary text-white'
+                          : 'bg-bg-secondary border-border-light text-text-secondary hover:border-graphite-primary/30'
+                      }`}
+                    >
+                      <FiMessageCircle size={13} />
+                      {(item.comments_count ?? 0) > 0 ? item.comments_count : 'Комментарии'}
+                    </button>
+                    <Link
+                      href={`/profile/${item.master?.id}`}
+                      className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold text-text-secondary hover:text-brand-accent"
+                    >
+                      <FiMessageSquare size={13} />
+                      Написать
+                    </Link>
                   </div>
-                </div>
-                {item.description && (
-                  <p className="px-4 pt-2.5 text-[13px] text-[#3c3c43] leading-relaxed">{item.description}</p>
-                )}
-                {item.images && item.images.length > 0 ? (
-                  <div className="mt-2.5 h-[180px] bg-[#f2f2f7] overflow-hidden">
-                    <PostImageSlider images={item.images} alt={item.title} className="w-full h-full [&_img]:!h-[180px] [&_img]:!object-cover" />
-                  </div>
-                ) : item.videos && item.videos.length > 0 ? (
-                  <div className="mt-2.5 h-[180px] bg-[#f2f2f7] overflow-hidden">
-                    <video src={item.videos[0]} controls className="w-full h-full object-cover" />
-                  </div>
-                ) : null}
-                <div className="flex items-center px-3 py-2 border-t border-[#f2f2f7] gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleLike(item.id)}
-                    className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium ${item.liked ? 'text-[#c0392b]' : 'text-[#6d6d72]'}`}
-                  >
-                    <FiHeart size={14} className={item.liked ? 'fill-current' : ''} />
-                    {item.likes_count > 0 ? item.likes_count : ''}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextOpen = !item.showComments
-                      setCommentsOpen(item.id, nextOpen)
-                      if (nextOpen) fetchAllComments(item.id)
-                    }}
-                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-[#6d6d72]"
-                  >
-                    <FiMessageCircle size={14} />
-                    {(item.comments_count ?? 0) > 0 ? item.comments_count : ''}
-                  </button>
-                </div>
-                {item.title && (
-                  <p className="px-4 pb-2 text-[12px] font-semibold text-[#1c1c1e]">{item.title}</p>
-                )}
-              </div>
-            ))}
+
+                  {/* Комментарии — раскрываются в отдельном блоке снизу карточки */}
+                  {item.showComments && (
+                    <div className="border-t border-border-light bg-bg-secondary/60 px-4 py-3">
+                      {(item.comments ?? []).length === 0 ? (
+                        <p className="text-[12px] text-text-secondary mb-2">Комментариев пока нет</p>
+                      ) : (
+                        <ul className="flex flex-col gap-2 mb-2.5">
+                          {(item.comments ?? []).map((c) => (
+                            <li key={c.id} className="flex items-start gap-2">
+                              <span className="w-6 h-6 rounded-full bg-graphite-tertiary text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                {c.user?.full_name?.[0]?.toUpperCase() || '?'}
+                              </span>
+                              <span className="text-[12px] text-graphite-primary leading-snug">
+                                <span className="font-semibold mr-1">{c.user?.full_name || 'Пользователь'}</span>
+                                {c.content}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={commentTexts[item.id] || ''}
+                          onChange={(e) => setCommentTexts({ ...commentTexts, [item.id]: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSubmitComment(item.id)
+                          }}
+                          placeholder="Написать комментарий…"
+                          className="flex-1 bg-white border border-border-light rounded-full px-3.5 py-2 text-[12px] outline-none focus:border-brand-accent/40 min-w-0"
+                        />
+                        <button
+                          type="button"
+                          disabled={!commentTexts[item.id]?.trim() || submittingComments[item.id]}
+                          onClick={() => handleSubmitComment(item.id)}
+                          className="flex-shrink-0 bg-brand-accent text-white text-[11px] font-bold px-3.5 py-2 rounded-full disabled:opacity-40"
+                        >
+                          {submittingComments[item.id] ? '…' : 'Отправить'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </article>
+              )
+            })}
             <div ref={loadMoreSentinelRef} className="h-2 w-full" aria-hidden />
-            {loadingMore && <div className="text-center text-xs text-[#8e8e93] py-2">Загрузка…</div>}
+            {loadingMore && <div className="text-center text-xs text-text-secondary py-2">Загрузка…</div>}
           </>
         )}
       </div>
