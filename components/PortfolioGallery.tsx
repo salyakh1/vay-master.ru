@@ -14,6 +14,8 @@ interface PortfolioGalleryProps {
   onClose: () => void
   initialCommentId?: string
   focusCommentInput?: boolean
+  onNearEnd?: () => void
+  hasMore?: boolean
 }
 
 type TreeComment = PortfolioComment & { user?: User; replies?: TreeComment[] }
@@ -40,7 +42,15 @@ function buildTree(flat: (PortfolioComment & { user?: User })[]): TreeComment[] 
   return attach(roots)
 }
 
-export default function PortfolioGallery({ items, initialIndex, onClose, initialCommentId, focusCommentInput }: PortfolioGalleryProps) {
+export default function PortfolioGallery({
+  items,
+  initialIndex,
+  onClose,
+  initialCommentId,
+  focusCommentInput,
+  onNearEnd,
+  hasMore,
+}: PortfolioGalleryProps) {
   const { user: currentUser } = useAuth()
   const [currentItemIndex, setCurrentItemIndex] = useState(initialIndex)
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0)
@@ -271,16 +281,21 @@ export default function PortfolioGallery({ items, initialIndex, onClose, initial
 
   const handleNextItem = useCallback(() => {
     if (items.length <= 1) return
-    
+
     const now = Date.now()
     if (now - lastItemChangeTime.current < 250) return
     lastItemChangeTime.current = now
-    
+
     setSlideDirection('up')
     setShowComments(false)
-    setCurrentItemIndex((prev) => (prev < items.length - 1 ? prev + 1 : 0))
+    setReplyingTo(null)
+    setCurrentItemIndex((prev) => {
+      if (prev >= items.length - 3 && onNearEnd) onNearEnd()
+      if (prev < items.length - 1) return prev + 1
+      return hasMore ? prev : 0
+    })
     setTimeout(() => setSlideDirection(null), 300)
-  }, [items.length])
+  }, [items.length, onNearEnd, hasMore])
 
   const handlePreviousMedia = useCallback(() => {
     if (allMedia.length <= 1) return

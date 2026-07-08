@@ -14,6 +14,8 @@ import PostImageSlider from '@/components/PostImageSlider'
 import { Story } from '@/lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import ExploreMasonryGrid from '@/components/ExploreMasonryGrid'
+import PortfolioGallery from '@/components/PortfolioGallery'
 
 interface ItemWithInteractions extends PortfolioItem {
   liked?: boolean
@@ -38,6 +40,7 @@ export default function FeedPage() {
   // 'explore' — вообще все публикации на платформе, аналог Explore в Instagram / «Новости» во VK
   const [feedMode, setFeedMode] = useState<'following' | 'explore'>('following')
   const [initialFeedModeResolved, setInitialFeedModeResolved] = useState(false)
+  const [selectedExploreIndex, setSelectedExploreIndex] = useState<number | null>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
 
   const ITEMS_PER_PAGE = 9
@@ -74,6 +77,10 @@ export default function FeedPage() {
       fetchItems(1, true)
     }
   }, [user, feedMode, initialFeedModeResolved])
+
+  useEffect(() => {
+    setSelectedExploreIndex(null)
+  }, [feedMode, feedTab])
 
   useEffect(() => {
     if (user) {
@@ -397,7 +404,12 @@ export default function FeedPage() {
     return true
   })
 
+  const exploreGalleryItems = filteredItems.filter(
+    (item) => (item.images?.length ?? 0) > 0 || (item.videos?.length ?? 0) > 0
+  )
+
   return (
+    <>
     <div className="min-h-screen bg-bg-primary max-w-lg mx-auto w-full pb-24">
       <Navbar />
 
@@ -499,7 +511,13 @@ export default function FeedPage() {
           </div>
         ) : (
           <>
-            {filteredItems.map((item) => {
+            {feedMode === 'explore' ? (
+              <ExploreMasonryGrid
+                items={exploreGalleryItems}
+                onItemClick={(_item, index) => setSelectedExploreIndex(index)}
+              />
+            ) : (
+              filteredItems.map((item) => {
               const isSeller = item.master?.role === 'seller'
               return (
                 <article
@@ -667,13 +685,27 @@ export default function FeedPage() {
                   )}
                 </article>
               )
-            })}
+            })
+            )}
             <div ref={loadMoreSentinelRef} className="h-2 w-full" aria-hidden />
             {loadingMore && <div className="text-center text-xs text-text-secondary py-2">Загрузка…</div>}
           </>
         )}
       </div>
     </div>
+
+    {selectedExploreIndex !== null && exploreGalleryItems.length > 0 && (
+      <PortfolioGallery
+        items={exploreGalleryItems}
+        initialIndex={selectedExploreIndex}
+        onClose={() => setSelectedExploreIndex(null)}
+        hasMore={hasMore}
+        onNearEnd={() => {
+          if (hasMore && !loadingMore) loadMore()
+        }}
+      />
+    )}
+    </>
   )
 }
 
