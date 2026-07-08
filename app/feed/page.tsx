@@ -34,6 +34,10 @@ export default function FeedPage() {
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({})
   const [submittingComments, setSubmittingComments] = useState<Record<string, boolean>>({})
   const [feedTab, setFeedTab] = useState<'all' | 'masters' | 'sellers'>('all')
+  // Режим ленты: 'following' — только те, на кого подписан (как раньше);
+  // 'explore' — вообще все публикации на платформе, аналог Explore в Instagram / «Новости» во VK
+  const [feedMode, setFeedMode] = useState<'following' | 'explore'>('following')
+  const [initialFeedModeResolved, setInitialFeedModeResolved] = useState(false)
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
 
   const ITEMS_PER_PAGE = 9
@@ -44,9 +48,35 @@ export default function FeedPage() {
     }
   }, [user, authLoading, router])
 
+  // Новым пользователям без подписок сразу показываем «Рекомендации», а не пустые «Подписки»
+  useEffect(() => {
+    if (!user || initialFeedModeResolved) return
+    let cancelled = false
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user.id)
+        .limit(1)
+      if (cancelled) return
+      if (!error && (!data || data.length === 0)) {
+        setFeedMode('explore')
+      }
+      setInitialFeedModeResolved(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user, initialFeedModeResolved])
+
+  useEffect(() => {
+    if (user && initialFeedModeResolved) {
+      fetchItems(1, true)
+    }
+  }, [user, feedMode, initialFeedModeResolved])
+
   useEffect(() => {
     if (user) {
-      fetchItems(1, true)
       fetchStories()
     }
   }, [user])
@@ -87,19 +117,23 @@ export default function FeedPage() {
         setLoadingMore(true)
       }
 
-      const { data: subs, error: subsError } = await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', user!.id)
-      if (subsError) throw subsError
-      const followingIds = subs?.map((s) => s.following_id) || []
+      let followingIds: string[] = []
 
-      if (followingIds.length === 0) {
-        setItems([])
-        setLoading(false)
-        setLoadingMore(false)
-        setHasMore(false)
-        return
+      if (feedMode === 'following') {
+        const { data: subs, error: subsError } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user!.id)
+        if (subsError) throw subsError
+        followingIds = subs?.map((s) => s.following_id) || []
+
+        if (followingIds.length === 0) {
+          setItems([])
+          setLoading(false)
+          setLoadingMore(false)
+          setHasMore(false)
+          return
+        }
       }
 
       const from = (pageNum - 1) * ITEMS_PER_PAGE
@@ -111,9 +145,14 @@ export default function FeedPage() {
           *,
           master:profiles(id, full_name, avatar_url, role, city)
         `, { count: 'exact' })
-        .in('master_id', followingIds)
         .order('created_at', { ascending: false })
         .range(from, to)
+
+      // В режиме «Подписки» показываем только тех, на кого подписан.
+      // В режиме «Рекомендации» — все публикации платформы без ограничений (Explore-логика).
+      if (feedMode === 'following') {
+        query = query.in('master_id', followingIds)
+      }
 
       const { data, error, count } = await query
       if (error) throw error
@@ -331,7 +370,7 @@ export default function FeedPage() {
     }
   }
 
-  if (authLoading || loading) {
+  if (authLoading || !initialFeedModeResolved || loading) {
     return (
       <div className="min-h-screen bg-bg-primary max-w-lg mx-auto">
         <div className="h-12 bg-white animate-pulse mb-3" />
@@ -362,6 +401,32 @@ export default function FeedPage() {
     <div className="min-h-screen bg-bg-primary max-w-lg mx-auto w-full pb-24">
       <Navbar />
 
+      {/* Верхний переключатель: своя лента (подписки) vs общая лента платформы (Explore) */}
+      <div className="flex bg-white border-b border-border-light">
+        <button
+          type="button"
+          onClick={() => setFeedMode('following')}
+          className={`flex-1 text-center py-3 text-[13px] font-bold border-b-2 transition-colors ${
+            feedMode === 'following'
+              ? 'border-brand-accent text-graphite-primary'
+              : 'border-transparent text-text-secondary'
+          }`}
+        >
+          Подписки
+        </button>
+        <button
+          type="button"
+          onClick={() => setFeedMode('explore')}
+          className={`flex-1 text-center py-3 text-[13px] font-bold border-b-2 transition-colors ${
+            feedMode === 'explore'
+              ? 'border-brand-accent text-graphite-primary'
+              : 'border-transparent text-text-secondary'
+          }`}
+        >
+          Рекомендации
+        </button>
+      </div>
+
       {/* Панель историй — тёмная графитовая подложка, отделяет ленту от шапки */}
       {stories.length > 0 && (
         <div className="bg-graphite-primary px-4 py-3.5 overflow-x-auto">
@@ -369,7 +434,7 @@ export default function FeedPage() {
         </div>
       )}
 
-      {/* Сегментированный переключатель вместо подчёркнутых вкладок */}
+      {/* Сегментированный переключатель вместо подчёркнутых вкладок — фильтр по роли внутри выбранного режима */}
       <div className="px-3 pt-3 pb-1">
         <div className="flex gap-1 bg-white rounded-full p-1 border border-border-light shadow-card">
           {FEED_TABS.map((tab) => (
@@ -401,16 +466,36 @@ export default function FeedPage() {
             <div className="text-3xl mb-3" aria-hidden>
               📭
             </div>
-            <p className="text-[15px] font-bold text-graphite-primary mb-1.5">Лента пуста</p>
-            <p className="text-[12px] leading-relaxed text-text-secondary">
-              Подпишитесь на мастеров и продавцов — их работы появятся здесь
-            </p>
-            <Link
-              href="/search"
-              className="inline-block mt-4 bg-brand-accent text-white text-xs font-bold px-4 py-2 rounded-xl"
-            >
-              Найти мастеров
-            </Link>
+            {feedMode === 'following' ? (
+              <>
+                <p className="text-[15px] font-bold text-graphite-primary mb-1.5">В подписках пока пусто</p>
+                <p className="text-[12px] leading-relaxed text-text-secondary">
+                  Подпишитесь на мастеров и продавцов — их работы появятся здесь
+                </p>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 mt-4 max-w-xs mx-auto">
+                  <Link
+                    href="/search"
+                    className="bg-brand-accent text-white text-xs font-bold px-4 py-2 rounded-xl"
+                  >
+                    Найти мастеров
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setFeedMode('explore')}
+                    className="bg-bg-secondary text-graphite-primary text-xs font-bold px-4 py-2 rounded-xl border border-border-light"
+                  >
+                    Смотреть рекомендации
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-[15px] font-bold text-graphite-primary mb-1.5">Пока нет публикаций</p>
+                <p className="text-[12px] leading-relaxed text-text-secondary">
+                  Как только мастера и продавцы начнут выкладывать работы, они появятся здесь
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <>
