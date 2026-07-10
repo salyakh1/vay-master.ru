@@ -584,7 +584,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
         {...scrollerFilters}
       />
 
-      {/* Блок «Все мастера» — 6 карточек списком */}
+      {/* Блок «Все мастера» — сетка 2×2 */}
       <div className="bg-white">
         <p className="text-[11px] font-bold text-[#1c1c1e] px-3.5 pt-3 pb-1.5">
           Все мастера · {listTotal}
@@ -601,7 +601,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
         )}
 
         {showListSkeleton ? (
-          <div className="flex flex-col gap-2 px-3.5 pb-2">
+          <div className="grid grid-cols-2 gap-2 px-3.5 pb-2">
             {Array.from({ length: 6 }).map((_, i) => (
               <MasterListCardSkeleton key={i} />
             ))}
@@ -611,7 +611,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
             {query.trim() ? `По запросу «${query.trim()}» ничего не найдено` : 'Мастера не найдены'}
           </div>
         ) : (
-          <div className="flex flex-col gap-2 px-3.5 pb-2">
+          <div className="grid grid-cols-2 gap-2 px-3.5 pb-2">
             {listMasters.map((master, i) => (
               <MasterListCard key={master.id} master={master} colorIndex={i} />
             ))}

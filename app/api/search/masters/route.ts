@@ -1,18 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
 import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { haversineKm } from '@/lib/geo'
+import { stripPhone } from '@/lib/guest-access'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseAdmin = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  auth: { persistSession: false },
+})
 
 export const dynamic = 'force-dynamic'
 
 const ITEMS_PER_PAGE = 20
 const MAX_LOCATION_FETCH = 2000
+
+async function isAuthenticatedRequest(request: NextRequest): Promise<boolean> {
+  try {
+    const cookieStore = await cookies()
+    const token =
+      cookieStore.get('sb-access-token')?.value ||
+      request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+    if (!token) return false
+
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false },
+    })
+    const { data: { user }, error } = await supabaseClient.auth.getUser()
+    return !error && !!user
+  } catch {
+    return false
+  }
+}
+
+function sanitizeMastersForGuest<T extends { phone?: string | null }>(
+  masters: T[],
+  isAuthenticated: boolean
+): T[] {
+  if (isAuthenticated) return masters
+  return masters.map((m) => stripPhone(m) as T)
+}
 
 const PROFILE_SELECT = `
   *,
@@ -36,6 +65,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url)
+    const isAuthenticated = await isAuthenticatedRequest(request)
     const q = (searchParams.get('q') || '').trim()
     const city = (searchParams.get('city') || '').trim()
     let category = searchParams.get('category') || ''
@@ -225,7 +255,7 @@ export async function GET(request: NextRequest) {
       })
 
       const total = list.length
-      const pageSlice = list.slice(from, from + limit)
+      const pageSlice = sanitizeMastersForGuest(list.slice(from, from + limit), isAuthenticated)
       const hasMore = from + limit < total
       return NextResponse.json({ masters: pageSlice, hasMore, total })
     }
@@ -236,7 +266,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    const list = (masters || []) as any[]
+    const list = sanitizeMastersForGuest((masters || []) as any[], isAuthenticated)
     list.sort((a, b) => (b.master_rating ?? 0) - (a.master_rating ?? 0))
     const hasMore = list.length === limit && (count || 0) > page * limit
 

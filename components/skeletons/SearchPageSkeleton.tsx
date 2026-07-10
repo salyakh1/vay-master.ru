@@ -31,7 +31,7 @@ export default function SearchPageSkeleton() {
 
       <div className="bg-white px-3.5 pt-3 pb-2">
         <div className="h-3.5 w-28 bg-[#f2f2f7] rounded animate-pulse mb-3" />
-        <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {Array.from({ length: 6 }).map((_, i) => (
             <MasterListCardSkeleton key={i} />
           ))}

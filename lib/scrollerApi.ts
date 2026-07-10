@@ -1,4 +1,5 @@
 import type { Product, User } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 export const SCROLLER_PAGE_SIZE = 15
 export const LIST_PAGE_SIZE = 6
@@ -53,7 +54,13 @@ export async function fetchMastersPage(
     sp.set('radius_km', String(radiusKm))
   }
 
-  const res = await fetch(`/api/search/masters?${sp}`)
+  const { data: { session } } = await supabase.auth.getSession()
+  const headers: HeadersInit = {}
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`
+  }
+
+  const res = await fetch(`/api/search/masters?${sp}`, { headers })
   if (!res.ok) return { items: [], total: 0, hasMore: false }
   const data = await res.json()
   const items = (data.masters || []) as MasterScrollerItem[]
