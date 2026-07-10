@@ -26,6 +26,9 @@ import ReviewReplyForm from '@/components/ReviewReplyForm'
 import RatingStars from '@/components/RatingStars'
 import StoriesCircle from '@/components/StoriesCircle'
 import ProfileStrictHeader from '@/components/profile/ProfileStrictHeader'
+import ProfileServicesRow from '@/components/profile/ProfileServicesRow'
+import ProfileServicesSheet from '@/components/profile/ProfileServicesSheet'
+import ProfileReviewsPreview from '@/components/profile/ProfileReviewsPreview'
 
 const StoreLocationMapModal = dynamic(() => import('@/components/StoreLocationMapModal'), { ssr: false })
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
@@ -94,6 +97,7 @@ export default function ProfilePage() {
   const [showStoresMap, setShowStoresMap] = useState(false)
   const [showStoreLocationMap, setShowStoreLocationMap] = useState(false)
   const [showCatalogModal, setShowCatalogModal] = useState(false)
+  const [showServicesSheet, setShowServicesSheet] = useState(false)
 
   // Гости не могут открывать профили — редирект на вход с returnTo
   useEffect(() => {
@@ -903,9 +907,9 @@ export default function ProfilePage() {
   const returnTo = searchParams.get('returnTo')
 
   return (
-    <div className="min-h-screen pb-20 bg-[#f2f2f7]">
+    <div className="min-h-screen pb-20 bg-[#f4f4f4]">
       <Navbar />
-      <div className="w-full mx-auto py-4 sm:py-6 max-w-lg px-0">
+      <div className="w-full mx-auto max-w-lg px-0">
         <div className="w-full mx-auto max-w-lg">
           {/* Back to Responses Button */}
           {returnTo && (
@@ -919,28 +923,28 @@ export default function ProfilePage() {
               </button>
             </div>
           )}
-          {/* Tabs */}
-          <div className="flex gap-1 sm:gap-2 mb-6 sm:mb-8 border-b border-border-color/40 overflow-x-auto scrollbar-hide">
-            <span className="px-3 sm:px-4 py-2 font-medium text-sm sm:text-base border-b-2 whitespace-nowrap flex-shrink-0 border-brand-accent text-graphite-secondary">
+          {/* Tabs — только для своего профиля */}
+          {isOwnProfile && (
+          <div className="flex gap-1 mb-2 border-b border-[#e5e7eb] overflow-x-auto scrollbar-hide bg-white px-3">
+            <span className="px-3 py-2 font-medium text-sm border-b-2 whitespace-nowrap flex-shrink-0 border-brand-accent text-[#111]">
               Профиль
             </span>
-            {isOwnProfile && (
               <Link
                 href="/settings"
-                className="px-3 sm:px-4 py-2 font-medium text-sm sm:text-base transition-colors border-b-2 whitespace-nowrap flex-shrink-0 border-transparent text-text-secondary hover:text-text-primary"
+                className="px-3 py-2 font-medium text-sm transition-colors border-b-2 whitespace-nowrap flex-shrink-0 border-transparent text-[#6b7280] hover:text-[#111]"
               >
                 Настройки
               </Link>
-            )}
-            {isOwnProfile && (currentUser?.role === 'master' || currentUser?.role === 'seller') && (
+            {(currentUser?.role === 'master' || currentUser?.role === 'seller') && (
               <button
                 onClick={() => router.push('/pro')}
-                className="px-3 sm:px-4 py-2 font-semibold text-sm sm:text-base transition-colors border-b-2 whitespace-nowrap flex-shrink-0 border-transparent text-brand-accent hover:text-brand-accent-hover"
+                className="px-3 py-2 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap flex-shrink-0 border-transparent text-brand-accent"
               >
                 PRO / Подписка
               </button>
             )}
           </div>
+          )}
 
           {/* Profile Tab Content */}
               <ProfileStrictHeader
@@ -952,22 +956,16 @@ export default function ProfilePage() {
                 followersCount={followersCount}
                 followingCount={followingCount}
                 profileSubcategories={profileSubcategories}
-                ordersCount={masterOrdersCount}
                 productsCount={productsCount}
                 onFollow={toggleFollow}
                 onMessage={handleStartChat}
                 onFollowersClick={() => setShowFollowModal('followers')}
                 onEdit={() => router.push('/settings')}
                 backHref={returnTo || null}
-                orderHref={
-                  !isOwnProfile && profile.role === 'master'
-                    ? `/orders/new?master=${profile.id}&title=${encodeURIComponent(`Заказ для ${profile.full_name}`)}`
-                    : null
-                }
               />
 
-              {(profile.role === 'master' || profile.role === 'seller') && (
-                <div className="bg-white px-4 py-3 mb-2">
+              {(profile.role === 'master' || profile.role === 'seller') && profileStories.length > 0 && (
+                <div className="bg-white px-3.5 py-3 mt-2">
                   <StoriesCircle
                     stories={profileStories}
                     currentUser={currentUser}
@@ -980,109 +978,64 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {profile.role === 'master' && profileServices.length > 0 && (
-                <div className="bg-white px-4 py-3 mb-2">
-                  <p className="text-[10px] font-semibold text-[#8e8e93] uppercase tracking-wide mb-2">Услуги</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {profileServices.map((svc) => (
-                      <span
-                        key={svc.id}
-                        className="text-[10px] font-medium text-[#3c3c43] bg-[#f2f2f7] border border-[#e5e5ea] px-2 py-1 rounded-md"
-                      >
-                        {svc.name}
-                      </span>
-                    ))}
-                  </div>
+              {profile.role === 'master' &&
+                (profileServices.length > 0 || profileSubcategories.length > 0) && (
+                <>
+                  <ProfileServicesRow
+                    serviceNames={
+                      profileServices.length > 0
+                        ? profileServices.map((s) => s.name)
+                        : profileSubcategories.map((s) => s.name)
+                    }
+                    onClick={() => setShowServicesSheet(true)}
+                  />
+                  <ProfileServicesSheet
+                    open={showServicesSheet}
+                    services={
+                      profileServices.length > 0
+                        ? profileServices
+                        : profileSubcategories.map((s) => ({ id: s.id, name: s.name }) as Service)
+                    }
+                    onClose={() => setShowServicesSheet(false)}
+                  />
+                </>
+              )}
+
+              {profile.role === 'master' && !reviewsExpanded && (
+                <div ref={reviewsSectionRef}>
+                  <ProfileReviewsPreview
+                    reviews={masterReviews}
+                    totalCount={profile.master_reviews_count ?? masterReviews.length}
+                    loading={reviewsLoading && !reviewsFetched}
+                    onShowAll={() => {
+                      setReviewsExpanded(true)
+                      if (!reviewsFetched) {
+                        setReviewsFetched(true)
+                        const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                        if (profileId) fetchMasterReviews(profileId)
+                      }
+                    }}
+                  />
                 </div>
               )}
 
-              {profile.role === 'master' && (
-                <div className="px-4">
-                  <div className="bg-white rounded-xl p-4 mb-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {profile.services && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-graphite-secondary">
-                            <FiBriefcase size={16} />
-                            <span>Описание услуг</span>
-                          </div>
-                          <p className="text-sm text-text-secondary leading-relaxed">{profile.services}</p>
-                        </div>
-                      )}
-                      {profile.service_location && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-graphite-secondary">
-                            <FiHome size={16} />
-                            <span>Место обслуживания</span>
-                          </div>
-                          <p className="text-sm text-text-secondary">
-                            {profile.service_location === 'home' && 'Выезд на дом'}
-                            {profile.service_location === 'workshop' && 'В мастерской'}
-                            {profile.service_location === 'both' && 'Выезд и в мастерской'}
-                          </p>
-                        </div>
-                      )}
-                      {profile.experience_years && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-graphite-secondary">
-                            <FiBriefcase size={16} />
-                            <span>Опыт работы</span>
-                          </div>
-                          <p className="text-sm text-text-secondary">{profile.experience_years} {profile.experience_years === 1 ? 'год' : profile.experience_years < 5 ? 'года' : 'лет'}</p>
-                        </div>
-                      )}
-                      {profile.work_schedule && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-graphite-secondary">
-                            <FiClock size={16} />
-                            <span>График работы</span>
-                          </div>
-                          <p className="text-sm text-text-secondary">{profile.work_schedule}</p>
-                        </div>
-                      )}
-                    </div>
+              {profile.role === 'master' && reviewsExpanded && (
+                <div ref={reviewsSectionRef} className="bg-white mt-2 px-3.5 py-3.5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[13px] font-medium text-[#111111]">
+                      Отзывы · {profile.master_reviews_count ?? masterReviews.length}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setReviewsExpanded(false)}
+                      className="text-[11px] text-[#9ca3af]"
+                    >
+                      Свернуть
+                    </button>
                   </div>
-
-                    {/* Отзывы о мастере - раскрываемая секция - Render-on-Demand */}
-                    {profile.role === 'master' && (
-                      <div ref={reviewsSectionRef} className="mt-8 border-t border-border-color/40 pt-6">
-                        <button
-                          onClick={() => setReviewsExpanded(!reviewsExpanded)}
-                          className="w-full flex items-center justify-between text-left"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-semibold text-graphite-secondary">Отзывы</span>
-                            {(masterReviews.length > 0 || (profile.master_reviews_count && profile.master_reviews_count > 0)) ? (
-                              <div className="flex items-center gap-1.5">
-                                {profile.master_rating && profile.master_rating > 0 ? (
-                                  <>
-                                    <span className="text-sm">⭐</span>
-                                    <span className="text-xs text-text-secondary font-medium">
-                                      {profile.master_rating.toFixed(1)} · {(masterReviews.length > 0 ? masterReviews.length : profile.master_reviews_count || 0)} {(masterReviews.length === 1 || (profile.master_reviews_count === 1)) ? 'отзыв' : ((masterReviews.length < 5 || (profile.master_reviews_count && profile.master_reviews_count < 5)) ? 'отзыва' : 'отзывов')}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className="text-xs text-text-secondary font-medium">
-                                    {(masterReviews.length > 0 ? masterReviews.length : profile.master_reviews_count || 0)} {(masterReviews.length === 1 || (profile.master_reviews_count === 1)) ? 'отзыв' : ((masterReviews.length < 5 || (profile.master_reviews_count && profile.master_reviews_count < 5)) ? 'отзыва' : 'отзывов')}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-text-secondary">Пока нет отзывов</span>
-                            )}
-                          </div>
-                          {reviewsExpanded ? (
-                            <FiChevronUp size={18} className="text-text-secondary" />
-                          ) : (
-                            <FiChevronDown size={18} className="text-text-secondary" />
-                          )}
-                        </button>
-
-                        {/* Раскрываемая область с отзывами и полем ввода (стиль чата) */}
-                        {reviewsExpanded && (
-                          <div className="mt-4 card-glossy p-0 overflow-hidden flex flex-col" style={{ maxHeight: '600px' }}>
+                  <div className="overflow-hidden flex flex-col rounded-xl border border-[#e5e7eb]" style={{ maxHeight: '600px' }}>
                             {/* Список отзывов (прокручиваемая область) */}
-                            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 max-h-[450px]">
+                            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 max-h-[450px]">
                               {reviewsLoading ? (
                                 <div className="text-center text-text-secondary py-10">
                                   Загрузка отзывов...
@@ -1326,10 +1279,7 @@ export default function ProfilePage() {
                                 )}
                               </div>
                             )}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                  </div>
                 </div>
               )}
 
@@ -1705,17 +1655,26 @@ export default function ProfilePage() {
 
               {/* Portfolio for Masters - Render-on-Demand */}
               {profile.role === 'master' && (
-                <div ref={portfolioSectionRef} className="mb-10 sm:mb-12 w-full">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
-                    <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight">Портфолио</h2>
+                <div ref={portfolioSectionRef} className="bg-white mt-2 px-3.5 pt-3.5 pb-1 w-full">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <p className="text-[13px] font-medium text-[#111111]">Портфолио</p>
                     <div className="flex items-center gap-2">
+                      {portfolioHasMore && (
+                        <button
+                          type="button"
+                          onClick={() => void loadMorePortfolio()}
+                          disabled={loadingMorePortfolio}
+                          className="text-[11px] font-medium text-brand-accent disabled:opacity-50"
+                        >
+                          {loadingMorePortfolio ? '…' : 'Все →'}
+                        </button>
+                      )}
                       {isOwnProfile && (
                         <Link
                           href="/portfolio/new"
-                          className="btn btn-primary text-sm w-full sm:w-auto flex items-center justify-center gap-1.5"
+                          className="text-[11px] font-medium text-brand-accent"
                         >
-                          <FiPlus size={14} />
-                          Добавить работу
+                          + Добавить
                         </Link>
                       )}
                     </div>
