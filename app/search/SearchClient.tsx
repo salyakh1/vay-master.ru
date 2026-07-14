@@ -11,12 +11,15 @@ import { FiSearch, FiSliders, FiBriefcase, FiArrowLeft, FiMapPin } from 'react-i
 import { MastersScrollerSection } from '@/components/scrollers/MastersScrollerSection'
 import { ProductsScrollerSection } from '@/components/scrollers/ProductsScrollerSection'
 import { MasterListCard, MasterListCardSkeleton } from '@/components/search/MasterListCard'
+import dynamic from 'next/dynamic'
 import { fetchMastersPage, LIST_PAGE_SIZE, type MasterScrollerItem } from '@/lib/scrollerApi'
 import { useUserLocation } from '@/hooks/useUserLocation'
 import { Story } from '@/lib/supabase'
 import type { AdBanner } from '@/lib/supabase'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs, getProductCategoriesForCategorySlugs } from '@/lib/specialization-product-mapping'
 import { getCategoryEmoji } from '@/lib/categoryEmoji'
+
+const RadiusPickerModal = dynamic(() => import('@/components/RadiusPickerModal'), { ssr: false })
 
 type CitySuggestion = {
   display_name: string
@@ -56,7 +59,8 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   const autocompleteAbortRef = useRef<AbortController | null>(null)
   const cityAutocompleteAbortRef = useRef<AbortController | null>(null)
 
-  const { lat, lng, radiusKm, city: userLocCity, locationReady } = useUserLocation()
+  const { lat, lng, radiusKm, city: userLocCity, locationReady, setRadiusKm } = useUserLocation()
+  const [showRadiusModal, setShowRadiusModal] = useState(false)
   const [listMasters, setListMasters] = useState<MasterScrollerItem[]>([])
   const [listPage, setListPage] = useState(1)
   const [listTotal, setListTotal] = useState(0)
@@ -563,10 +567,15 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
             <strong className="text-[#1c1c1e] font-bold truncate">{activeCity}</strong>
           </div>
         ) : (
-          <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
+          <button
+            type="button"
+            onClick={() => setShowRadiusModal(true)}
+            className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium active:scale-95 transition-transform"
+          >
             <span aria-hidden>📍</span>
             <strong className="text-[#1c1c1e] font-bold">{radiusKm} км</strong>
-          </div>
+            <span aria-hidden className="text-[8px] text-[#8e8e93]">▾</span>
+          </button>
         )}
         <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
           Найдено: <strong className="text-[#1c1c1e] font-bold">{showListSkeleton ? '…' : listTotal}</strong>
@@ -920,6 +929,18 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
               </div>
             </div>
           )}
+
+      <RadiusPickerModal
+        isOpen={showRadiusModal}
+        currentRadiusKm={radiusKm}
+        lat={lat}
+        lng={lng}
+        city={userLocCity}
+        resultsCount={listTotal}
+        resultsUnit="мастеров"
+        onSelect={setRadiusKm}
+        onClose={() => setShowRadiusModal(false)}
+      />
 
     </div>
   )

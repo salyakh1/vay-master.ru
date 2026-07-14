@@ -22,6 +22,7 @@ import { LIST_PAGE_SIZE } from '@/lib/scrollerApi'
 import { getProductCategoryEmoji } from '@/lib/categoryEmoji'
 
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
+const RadiusPickerModal = dynamic(() => import('@/components/RadiusPickerModal'), { ssr: false })
 
 function ProductsContent() {
   const { user } = useAuth()
@@ -73,7 +74,9 @@ function ProductsContent() {
     return null
   })
   const [nearbyGeoloading, setNearbyGeoloading] = useState(false)
-  const DEFAULT_NEARBY_RADIUS_KM = 10
+
+  const { lat: userLat, lng: userLng, radiusKm: userRadiusKm, setRadiusKm } = useUserLocation()
+  const [showRadiusModal, setShowRadiusModal] = useState(false)
 
   const hasMasterZone =
     user?.role === 'master' &&
@@ -82,9 +85,9 @@ function ProductsContent() {
     user.service_radius_km != null
 
   const nearbyCenter = hasMasterZone
-    ? { lat: user!.master_lat!, lng: user!.master_lng!, radiusKm: user!.service_radius_km! }
+    ? { lat: user!.master_lat!, lng: user!.master_lng!, radiusKm: userRadiusKm }
     : nearbyViewLocation
-      ? { lat: nearbyViewLocation.lat, lng: nearbyViewLocation.lng, radiusKm: DEFAULT_NEARBY_RADIUS_KM }
+      ? { lat: nearbyViewLocation.lat, lng: nearbyViewLocation.lng, radiusKm: userRadiusKm }
       : null
 
   const requestNearbyGeolocation = () => {
@@ -106,7 +109,6 @@ function ProductsContent() {
   }
   
   const ITEMS_PER_PAGE = LIST_PAGE_SIZE
-  const { lat: userLat, lng: userLng, radiusKm: userRadiusKm } = useUserLocation()
 
   // Загружаем подкатегории мастера для рекомендаций «под ваши услуги»
   const [masterSubcategorySlugs, setMasterSubcategorySlugs] = useState<string[]>([])
@@ -554,10 +556,15 @@ function ProductsContent() {
 
       <div className="flex items-center gap-2 px-3.5 py-2">
         {nearbyCenter && (
-          <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
+          <button
+            type="button"
+            onClick={() => setShowRadiusModal(true)}
+            className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium active:scale-95 transition-transform"
+          >
             <span aria-hidden>📍</span>
             <strong className="text-[#1c1c1e] font-bold">{nearbyCenter.radiusKm} км</strong>
-          </div>
+            <span aria-hidden className="text-[8px] text-[#8e8e93]">▾</span>
+          </button>
         )}
         <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
           Найдено: <strong className="text-[#1c1c1e] font-bold">{totalCount || products.length}</strong>
@@ -857,6 +864,18 @@ function ProductsContent() {
         isOpen={showAuthModal} 
         onClose={() => setShowAuthModal(false)} 
         type="product"
+      />
+
+      <RadiusPickerModal
+        isOpen={showRadiusModal}
+        currentRadiusKm={nearbyCenter?.radiusKm ?? userRadiusKm}
+        lat={nearbyCenter?.lat ?? userLat}
+        lng={nearbyCenter?.lng ?? userLng}
+        city={user?.city}
+        resultsCount={totalCount || products.length}
+        resultsUnit="товаров"
+        onSelect={setRadiusKm}
+        onClose={() => setShowRadiusModal(false)}
       />
     </div>
   )

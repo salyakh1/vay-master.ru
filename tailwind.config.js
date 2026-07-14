@@ -109,6 +109,7 @@ module.exports = {
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
         'float': 'float 3s ease-in-out infinite',
         'glossy-shine': 'glossy-shine 3s ease-in-out infinite',
+        'slide-up': 'slide-up 0.22s ease-out',
       },
       keyframes: {
         shimmer: {
@@ -127,6 +128,10 @@ module.exports = {
           '0%': { backgroundPosition: '0% 50%' },
           '50%': { backgroundPosition: '100% 50%' },
           '100%': { backgroundPosition: '0% 50%' },
+        },
+        'slide-up': {
+          '0%': { transform: 'translateY(100%)' },
+          '100%': { transform: 'translateY(0)' },
         },
       },
     },
