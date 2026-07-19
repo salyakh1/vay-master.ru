@@ -18,6 +18,12 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: 'VayMaster - Социальная сеть для мастеров и продавцов',
   description: 'Платформа для строителей, автомехаников и продавцов строительных материалов',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'VayMaster',
+  },
   icons: {
     icon: '/icon.jpg',
     apple: '/apple-icon.jpg',
@@ -31,6 +37,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
+  themeColor: '#C7362F',
 }
 
 export default function RootLayout({

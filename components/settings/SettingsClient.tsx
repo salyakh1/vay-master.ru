@@ -14,6 +14,7 @@ import {
   type NotificationPrefKey,
   type NotificationPrefs,
 } from '@/lib/notification-prefs'
+import { enableWebPush, disableWebPush } from '@/lib/webPushClient'
 import {
   SettingsAccordionItem,
   SettingsBadge,
@@ -150,6 +151,8 @@ export default function SettingsClient() {
   const [portfolioCount, setPortfolioCount] = useState(0)
   const [productsCount, setProductsCount] = useState(0)
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>({})
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [openPanel, setOpenPanel] = useState<SettingsPanelId | null>(null)
 
@@ -185,6 +188,7 @@ export default function SettingsClient() {
     if (!user) return
     setNotifPrefs(getNotificationPrefs(user.id, user.role))
     loadStats(user.id, user.role)
+    setPushEnabled(typeof window !== 'undefined' && localStorage.getItem('vay_push_enabled') === '1')
   }, [user, loadStats])
 
   useEffect(() => {
@@ -202,6 +206,32 @@ export default function SettingsClient() {
     if (!user) return
     setNotifPrefs(setNotificationPref(user.id, user.role, key, !notifPrefs[key]))
   }
+
+  const togglePush = async () => {
+    if (pushBusy) return
+    setPushBusy(true)
+    try {
+      if (pushEnabled) {
+        await disableWebPush()
+        setPushEnabled(false)
+      } else {
+        const res = await enableWebPush()
+        if (res.ok) setPushEnabled(true)
+        else alert(res.error || 'Не удалось включить push')
+      }
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
+  const pushToggleRow = (
+    <SettingsRow
+      icon="📱"
+      title="Push на телефоне"
+      subtitle={pushEnabled ? 'Включены' : 'Уведомления о заказах и сообщениях'}
+      right={<SettingsToggle checked={pushEnabled} onChange={() => void togglePush()} />}
+    />
+  )
 
   const handleLogout = async () => {
     if (!confirm('Выйти из аккаунта?')) return
@@ -294,7 +324,8 @@ export default function SettingsClient() {
               </SettingsSection>
 
               <SettingsSection title="Уведомления">
-                <SettingsRow icon="🔔" title="Новые заказы" subtitle="Push и в приложении" right={<SettingsToggle checked={!!notifPrefs.new_orders} onChange={() => toggleNotif('new_orders')} />} />
+                {pushToggleRow}
+                <SettingsRow icon="🔔" title="Новые заказы" subtitle="В чате и push" right={<SettingsToggle checked={!!notifPrefs.new_orders} onChange={() => toggleNotif('new_orders')} />} />
                 <SettingsRow icon="💬" title="Сообщения в чатах" right={<SettingsToggle checked={!!notifPrefs.chat_messages} onChange={() => toggleNotif('chat_messages')} />} />
                 <SettingsRow icon="⭐" title="Новые отзывы" right={<SettingsToggle checked={!!notifPrefs.new_reviews} onChange={() => toggleNotif('new_reviews')} />} />
                 <SettingsRow icon="📢" title="Акции и новости" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
@@ -337,6 +368,7 @@ export default function SettingsClient() {
               </SettingsSection>
 
               <SettingsSection title="Уведомления">
+                {pushToggleRow}
                 <SettingsRow icon="💬" title="Сообщения покупателей" right={<SettingsToggle checked={!!notifPrefs.buyer_messages} onChange={() => toggleNotif('buyer_messages')} />} />
                 <SettingsRow icon="⭐" title="Новые отзывы на товары" right={<SettingsToggle checked={!!notifPrefs.product_reviews} onChange={() => toggleNotif('product_reviews')} />} />
                 <SettingsRow icon="📢" title="Акции и маркетинг" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
@@ -362,6 +394,7 @@ export default function SettingsClient() {
               </SettingsSection>
 
               <SettingsSection title="Уведомления">
+                {pushToggleRow}
                 <SettingsRow icon="📋" title="Отклики на мои заказы" right={<SettingsToggle checked={!!notifPrefs.order_responses} onChange={() => toggleNotif('order_responses')} />} />
                 <SettingsRow icon="💬" title="Новые сообщения" right={<SettingsToggle checked={!!notifPrefs.chat_messages} onChange={() => toggleNotif('chat_messages')} />} />
                 <SettingsRow icon="📢" title="Акции и предложения" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />

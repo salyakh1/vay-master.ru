@@ -6,10 +6,37 @@ import { supabase } from '@/lib/supabase'
 import { logAdminAction } from '@/lib/admin'
 import { FiTrendingUp, FiUsers, FiBriefcase, FiShoppingBag, FiAlertCircle, FiBarChart2 } from 'react-icons/fi'
 
+type Period = 'day' | 'week' | 'month'
+
+type PeriodStats = {
+  period: Period
+  total: { users: number; orders: number; masters: number; sellers: number; pro: number }
+  period_stats: {
+    new_users: number
+    new_orders: number
+    new_products: number
+    new_messages: number
+    new_complaints: number
+    new_pro_payments: number
+  }
+  revenue_rub: number
+  pro_revenue_rub: number
+  pro_conversion_pct: number
+}
+
+const PERIOD_LABEL: Record<Period, string> = {
+  day: 'День',
+  week: 'Неделя',
+  month: 'Месяц',
+}
+
 export default function AdminAnalyticsPage() {
   const { user: currentUser } = useAuth()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<any>({})
+  const [period, setPeriod] = useState<Period>('week')
+  const [periodStats, setPeriodStats] = useState<PeriodStats | null>(null)
+  const [periodLoading, setPeriodLoading] = useState(false)
 
   useEffect(() => {
     fetchAnalytics()
@@ -18,11 +45,36 @@ export default function AdminAnalyticsPage() {
     }
   }, [currentUser])
 
+  useEffect(() => {
+    if (!currentUser) return
+    void fetchPeriodStats(period)
+  }, [currentUser, period])
+
+  const fetchPeriodStats = async (p: Period) => {
+    try {
+      setPeriodLoading(true)
+      const { data: session } = await supabase.auth.getSession()
+      const token = session.session?.access_token
+      if (!token) return
+
+      const res = await fetch(`/api/admin/stats?period=${p}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('stats failed')
+      const json = (await res.json()) as PeriodStats
+      setPeriodStats(json)
+    } catch (e) {
+      console.error('period stats', e)
+      setPeriodStats(null)
+    } finally {
+      setPeriodLoading(false)
+    }
+  }
+
   const fetchAnalytics = async () => {
     try {
       setLoading(true)
 
-      // Fetch various statistics
       const [
         { count: totalUsers },
         { count: totalMasters },
@@ -47,7 +99,6 @@ export default function AdminAnalyticsPage() {
         supabase.from('complaints').select('*', { count: 'exact', head: true }).in('status', ['new', 'in_review']),
       ])
 
-      // Fetch orders without responses
       const { data: ordersData } = await supabase
         .from('orders')
         .select('id')
@@ -63,7 +114,6 @@ export default function AdminAnalyticsPage() {
       const ordersWithResponses = new Set(responsesData?.map((r) => r.order_id) || [])
       const ordersWithoutResponses = orderIds.filter((id) => !ordersWithResponses.has(id)).length
 
-      // Fetch popular categories
       const { data: ordersByCategory } = await supabase
         .from('orders')
         .select('category')
@@ -103,6 +153,8 @@ export default function AdminAnalyticsPage() {
     return <div className="text-text-secondary">Загрузка аналитики...</div>
   }
 
+  const ps = periodStats?.period_stats
+
   return (
     <div className="space-y-6">
       <div>
@@ -110,7 +162,82 @@ export default function AdminAnalyticsPage() {
         <p className="text-text-secondary">Статистика и метрики платформы</p>
       </div>
 
-      {/* Overview Stats */}
+      {/* Period switcher */}
+      <div className="card space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-text-primary">За период</h2>
+            <p className="text-sm text-text-secondary">Новые события и выручка</p>
+          </div>
+          <div className="flex gap-1 bg-bg-secondary rounded-lg p-1">
+            {(['day', 'week', 'month'] as Period[]).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  period === p
+                    ? 'bg-brand-accent text-white'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {PERIOD_LABEL[p]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {periodLoading && !periodStats ? (
+          <p className="text-sm text-text-secondary">Загрузка…</p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg bg-bg-secondary p-3">
+              <div className="text-xs text-text-secondary">Новые пользователи</div>
+              <div className="text-xl font-bold text-text-primary">{ps?.new_users ?? '—'}</div>
+            </div>
+            <div className="rounded-lg bg-bg-secondary p-3">
+              <div className="text-xs text-text-secondary">Новые заказы</div>
+              <div className="text-xl font-bold text-text-primary">{ps?.new_orders ?? '—'}</div>
+            </div>
+            <div className="rounded-lg bg-bg-secondary p-3">
+              <div className="text-xs text-text-secondary">PRO оплат</div>
+              <div className="text-xl font-bold text-brand-accent">{ps?.new_pro_payments ?? '—'}</div>
+            </div>
+            <div className="rounded-lg bg-bg-secondary p-3">
+              <div className="text-xs text-text-secondary">Выручка за период</div>
+              <div className="text-xl font-bold text-green-600">
+                {periodStats ? `${periodStats.revenue_rub.toLocaleString('ru-RU')} ₽` : '—'}
+              </div>
+            </div>
+            <div className="rounded-lg bg-bg-secondary p-3">
+              <div className="text-xs text-text-secondary">Выручка PRO</div>
+              <div className="text-xl font-bold text-text-primary">
+                {periodStats ? `${periodStats.pro_revenue_rub.toLocaleString('ru-RU')} ₽` : '—'}
+              </div>
+            </div>
+            <div className="rounded-lg bg-bg-secondary p-3">
+              <div className="text-xs text-text-secondary">Новые товары</div>
+              <div className="text-xl font-bold text-text-primary">{ps?.new_products ?? '—'}</div>
+            </div>
+            <div className="rounded-lg bg-bg-secondary p-3">
+              <div className="text-xs text-text-secondary">Сообщения</div>
+              <div className="text-xl font-bold text-text-primary">{ps?.new_messages ?? '—'}</div>
+            </div>
+            <div className="rounded-lg bg-bg-secondary p-3">
+              <div className="text-xs text-text-secondary">Жалобы</div>
+              <div className="text-xl font-bold text-text-primary">{ps?.new_complaints ?? '—'}</div>
+            </div>
+          </div>
+        )}
+
+        {periodStats && (
+          <p className="text-xs text-text-muted">
+            PRO среди мастеров: {periodStats.total.pro} / {periodStats.total.masters} (
+            {periodStats.pro_conversion_pct}%)
+          </p>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="card">
           <div className="flex items-center justify-between">
@@ -150,10 +277,9 @@ export default function AdminAnalyticsPage() {
         </div>
       </div>
 
-      {/* Orders Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="card">
-          <div className="text-sm text-text-secondary">Новые заказы</div>
+          <div className="text-sm text-text-secondary">Новые заказы (статус)</div>
           <div className="text-2xl font-bold text-brand-accent">{stats.newOrders}</div>
         </div>
         <div className="card">
@@ -175,7 +301,6 @@ export default function AdminAnalyticsPage() {
         </div>
       </div>
 
-      {/* Content Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div className="card">
           <div className="text-sm text-text-secondary">Товаров</div>
@@ -191,7 +316,6 @@ export default function AdminAnalyticsPage() {
         </div>
       </div>
 
-      {/* Popular Categories */}
       {stats.popularCategories && stats.popularCategories.length > 0 && (
         <div className="card">
           <h2 className="text-lg font-semibold text-text-primary mb-4">Популярные категории заказов</h2>
@@ -206,7 +330,6 @@ export default function AdminAnalyticsPage() {
         </div>
       )}
 
-      {/* Issues */}
       <div className="card border-yellow-400">
         <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
           <FiAlertCircle className="text-yellow-600" size={20} />
@@ -234,5 +357,3 @@ export default function AdminAnalyticsPage() {
     </div>
   )
 }
-
-

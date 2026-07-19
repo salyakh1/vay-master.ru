@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { notifyUser } from '@/lib/notify'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -127,7 +128,7 @@ export async function POST(
     // Проверяем заказ
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
-      .select('id, client_id, status')
+      .select('id, client_id, status, title')
       .eq('id', orderId)
       .single()
 
@@ -203,8 +204,26 @@ export async function POST(
       )
     }
 
-    // Отклики отображаются во вкладке "Отклики", не отправляем сообщение в чат
-    // Уведомление будет видно только во вкладке "Отклики" на странице /chats
+    // Уведомление клиенту в личный чат (+ push) — без email
+    if (order.client_id) {
+      const masterName = profile.full_name || 'Мастер'
+      const orderTitle = order.title || 'заказ'
+      const pricePart =
+        price != null && String(price).trim() !== ''
+          ? `\nПредложение: ${parseFloat(price)} ₽`
+          : ''
+      try {
+        await notifyUser(supabaseAdmin, {
+          userId: order.client_id,
+          chatText: `Новый отклик на заказ «${orderTitle}»\n\n${masterName} откликнулся.${pricePart}\n\nОткройте «Чаты → Отклики», чтобы принять или отклонить.`,
+          pushTitle: 'Новый отклик на заказ',
+          pushBody: `${masterName} откликнулся на «${orderTitle}»`,
+          pushUrl: '/chats',
+        })
+      } catch (e) {
+        console.error('notify client on response', e)
+      }
+    }
 
     return NextResponse.json({ data: response }, { status: 201 })
   } catch (error: any) {

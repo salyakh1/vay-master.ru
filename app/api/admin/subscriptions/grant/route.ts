@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin, requireSuperAdmin } from '../_shared'
+import { notifyUser } from '@/lib/notify'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +51,15 @@ export async function POST(request: NextRequest) {
       resource_type: 'profile',
       resource_id: userId,
       details: { days, pro_until: newUntil.toISOString() },
+    })
+
+    const untilLabel = newUntil.toLocaleDateString('ru-RU')
+    await notifyUser(supabaseAdmin, {
+      userId,
+      chatText: `Вам выдан PRO ✅\n\nПодписка активна до ${untilLabel} (+${days} дн.).`,
+      pushTitle: 'PRO активирован',
+      pushBody: `Действует до ${untilLabel}`,
+      pushUrl: '/pro',
     })
 
     return NextResponse.json({ ok: true, pro_until: newUntil.toISOString() })

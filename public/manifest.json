@@ -1,0 +1,24 @@
+{
+  "name": "VayMaster",
+  "short_name": "VayMaster",
+  "description": "Мастера, заказы и товары рядом с вами",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4F4F4",
+  "theme_color": "#C7362F",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/icon.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-icon.jpg",
+      "sizes": "180x180",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { tinkoffVerifyNotificationToken } from '@/lib/tinkoff'
 import { extendProByDays } from '@/lib/proSubscription'
+import { notifyUser } from '@/lib/notify'
 
 const supabaseService = () =>
   createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -61,8 +62,10 @@ export async function POST(request: Request) {
   if (kind === 'pro_subscription') {
     const raw = session.payload as { days?: unknown }
     const days = typeof raw?.days === 'number' && raw.days > 0 ? Math.floor(raw.days) : 30
+    let proUntil = ''
     try {
-      await extendProByDays(admin, session.user_id, days)
+      const extended = await extendProByDays(admin, session.user_id, days)
+      proUntil = extended.pro_until
     } catch (e) {
       console.error('Tinkoff notification: extend PRO', e)
       return NextResponse.json({ Success: false, Message: 'PRO update failed' }, { status: 500 })
@@ -74,6 +77,17 @@ export async function POST(request: Request) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', orderId)
+
+    const untilLabel = proUntil
+      ? new Date(proUntil).toLocaleDateString('ru-RU')
+      : `${days} дн.`
+    await notifyUser(admin, {
+      userId: session.user_id,
+      chatText: `PRO активирован ✅\n\nПодписка продлена на ${days} дн. (до ${untilLabel}).\nСпасибо за оплату!`,
+      pushTitle: 'PRO активирован',
+      pushBody: `Подписка действует до ${untilLabel}`,
+      pushUrl: '/pro',
+    })
     return NextResponse.json({ Success: true })
   }
 
@@ -125,6 +139,15 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', orderId)
+
+  const title = String(payload.title || 'Заказ')
+  await notifyUser(admin, {
+    userId: session.user_id,
+    chatText: `Заказ опубликован ✅\n\n«${title}» уже видят мастера. Следите за откликами во вкладке «Отклики» в чатах.`,
+    pushTitle: 'Заказ опубликован',
+    pushBody: `«${title}» — ждите отклики мастеров`,
+    pushUrl: `/orders/${newOrder.id}`,
+  })
 
   return NextResponse.json({ Success: true })
 }
