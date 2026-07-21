@@ -6,7 +6,7 @@ import { useAuth } from '@/app/providers'
 import { supabase, User, Service } from '@/lib/supabase'
 import { fetchMasterCategoriesTree, type CategoryNode } from '@/lib/masterCategoriesTree'
 import SpecializationsEditor from '@/components/settings/SpecializationsEditor'
-import { FiCamera } from 'react-icons/fi'
+import { FiCamera, FiImage, FiTrash2 } from 'react-icons/fi'
 import Image from 'next/image'
 
 const MasterRadiusPicker = dynamic(() => import('@/components/MasterRadiusPicker'), { ssr: false })
@@ -268,6 +268,25 @@ export function useSettingsForms(onSaved?: () => void) {
     }
   }
 
+  const removeCover = async () => {
+    if (!user) return
+    if (!confirm('Убрать обложку профиля?')) return
+    setUploadingCover(true)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ cover_photo_url: null })
+        .eq('id', user.id)
+      if (error) throw error
+      await refreshUser()
+      onSaved?.()
+    } catch {
+      alert('Ошибка удаления')
+    } finally {
+      setUploadingCover(false)
+    }
+  }
+
   return {
     user,
     tree,
@@ -319,6 +338,7 @@ export function useSettingsForms(onSaved?: () => void) {
     uploadingAvatar,
     uploadingCover,
     uploadImage,
+    removeCover,
     refreshUser,
   }
 }
@@ -352,6 +372,47 @@ export function ProfileEditPanel({ forms }: { forms: ReturnType<typeof useSettin
             }}
           />
         </label>
+      </div>
+
+      <div>
+        <label className="block text-[11px] font-medium text-[#8e8e93] mb-1.5">Обложка профиля</label>
+        <div className="relative h-[88px] rounded-xl overflow-hidden bg-[#1c1c1e] border border-[#e5e7eb]">
+          {user.cover_photo_url ? (
+            <Image src={user.cover_photo_url} alt="" fill className="object-cover" sizes="400px" />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-[11px] text-[#8e8e93]">
+              Без картинки — тёмный фон
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-3 mt-2">
+          <label className="text-xs font-semibold text-brand-accent cursor-pointer inline-flex items-center gap-1">
+            <FiImage size={14} />
+            {forms.uploadingCover ? 'Загрузка…' : user.cover_photo_url ? 'Сменить обложку' : 'Загрузить обложку'}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={forms.uploadingCover}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) forms.uploadImage(f, 'cover')
+                e.target.value = ''
+              }}
+            />
+          </label>
+          {user.cover_photo_url && (
+            <button
+              type="button"
+              disabled={forms.uploadingCover}
+              onClick={() => void forms.removeCover()}
+              className="text-xs font-medium text-[#8e8e93] inline-flex items-center gap-1 disabled:opacity-50"
+            >
+              <FiTrash2 size={13} />
+              Убрать
+            </button>
+          )}
+        </div>
       </div>
 
       <div>
