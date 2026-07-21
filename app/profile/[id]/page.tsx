@@ -29,6 +29,7 @@ import ProfileStrictHeader from '@/components/profile/ProfileStrictHeader'
 import ProfileServicesRow from '@/components/profile/ProfileServicesRow'
 import ProfileServicesSheet from '@/components/profile/ProfileServicesSheet'
 import ProfileReviewsPreview from '@/components/profile/ProfileReviewsPreview'
+import SellerProductsSection from '@/components/profile/SellerProductsSection'
 
 const StoreLocationMapModal = dynamic(() => import('@/components/StoreLocationMapModal'), { ssr: false })
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
@@ -310,6 +311,7 @@ export default function ProfilePage() {
           fetchSellerProducts()
           fetchSellerStats(profileId)
           fetchProductReviews(profileId)
+          fetchSellerReviews(profileId)
         }
       }
       if (typeof requestIdleCallback !== 'undefined') {
@@ -1019,6 +1021,38 @@ export default function ProfilePage() {
                 </div>
               )}
 
+              {profile.role === 'seller' && !reviewsExpanded && (
+                <div ref={reviewsSectionRef}>
+                  <ProfileReviewsPreview
+                    reviews={sellerReviews}
+                    totalCount={profile.seller_reviews_count ?? sellerReviews.length}
+                    loading={reviewsLoading && !reviewsFetched}
+                    onShowAll={() => {
+                      setReviewsExpanded(true)
+                      if (!reviewsFetched) {
+                        setReviewsFetched(true)
+                        const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                        if (profileId) fetchSellerReviews(profileId)
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
+              {profile.role === 'seller' && (
+                <SellerProductsSection
+                  products={products}
+                  totalCount={productsCount || products.length}
+                  isOwnProfile={isOwnProfile}
+                  storeAddress={profile.store_address}
+                  city={profile.city}
+                  hasMap={isOwnProfile && profile.seller_lat != null && profile.seller_lng != null}
+                  onShowMap={() => setShowStoresMap(true)}
+                  hasMore={productsHasMore}
+                  loadMoreRef={productsLoadMoreSentinelRef}
+                />
+              )}
+
               {profile.role === 'master' && reviewsExpanded && (
                 <div ref={reviewsSectionRef} className="bg-white mt-2 px-3.5 py-3.5">
                   <div className="flex items-center justify-between mb-3">
@@ -1283,373 +1317,116 @@ export default function ProfilePage() {
                 </div>
               )}
 
-                {/* Seller-specific information */}
-                {profile.role === 'seller' && (
-                  <div className="mt-10 pt-8 px-4 sm:px-5 border-t border-border-color/40">
-                    {profile.store_address && (
-                      <div className="mb-6">
-                        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-graphite-secondary">
-                          <FiMapPin size={16} className="text-brand-accent" />
-                          <span>Адрес магазина</span>
-                        </div>
-                        {profile.seller_lat != null && profile.seller_lng != null ? (
-                          <button
-                            type="button"
-                            onClick={() => setShowStoreLocationMap(true)}
-                            className="text-sm text-text-secondary text-left underline decoration-brand-accent/60 underline-offset-2 hover:decoration-brand-accent hover:text-brand-accent transition-colors"
-                          >
-                            {profile.store_address}
-                          </button>
-                        ) : (
-                          <p className="text-sm text-text-secondary">{profile.store_address}</p>
-                        )}
-                      </div>
+              {profile.role === 'seller' && reviewsExpanded && (
+                <div ref={reviewsSectionRef} className="bg-white mt-2 px-3.5 py-3.5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[13px] font-medium text-[#111111]">
+                      Отзывы · {profile.seller_reviews_count ?? sellerReviews.length}
+                    </p>
+                    <button type="button" onClick={() => setReviewsExpanded(false)} className="text-[11px] text-[#9ca3af]">
+                      Свернуть
+                    </button>
+                  </div>
+                  {currentUser && !isOwnProfile && (
+                    <button
+                      type="button"
+                      onClick={() => { setShowReviewForm(true); setEditingReview(null) }}
+                      className="mb-3 w-full bg-brand-accent text-white text-[12px] font-medium py-2.5 rounded-[10px]"
+                    >
+                      Оставить отзыв
+                    </button>
+                  )}
+                  {showReviewForm && currentUser && !isOwnProfile && (
+                    <div className="mb-4">
+                      <ReviewForm
+                        targetId={Array.isArray(params.id) ? params.id[0] : params.id}
+                        targetType="seller"
+                        currentUserId={currentUser.id}
+                        existingReview={editingReview}
+                        onSuccess={() => {
+                          setShowReviewForm(false)
+                          setEditingReview(null)
+                          const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                          if (profileId) { fetchSellerReviews(profileId); fetchProfile() }
+                        }}
+                        onCancel={() => { setShowReviewForm(false); setEditingReview(null) }}
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-3 max-h-[450px] overflow-y-auto">
+                    {reviewsLoading ? (
+                      <p className="text-center text-[12px] text-[#9ca3af] py-8">Загрузка…</p>
+                    ) : sellerReviews.length === 0 && productReviews.length === 0 ? (
+                      <p className="text-center text-[12px] text-[#9ca3af] py-8">Пока нет отзывов</p>
+                    ) : (
+                      <>
+                        {sellerReviews.map((review) => (
+                          <ReviewCard
+                            key={review.id}
+                            review={review}
+                            reviewType="seller"
+                            currentUser={currentUser}
+                            onReply={(reviewId) => setReplyingToReview(replyingToReview === reviewId ? null : reviewId)}
+                            onEdit={(review) => { setEditingReview(review); setShowReviewForm(true) }}
+                            onDelete={async (reviewId) => {
+                              if (!confirm('Удалить отзыв?')) return
+                              try {
+                                const { error } = await supabase.from('seller_reviews').delete().eq('id', reviewId)
+                                if (error) throw error
+                                const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                                if (profileId) { fetchSellerReviews(profileId); fetchProfile() }
+                              } catch (e) { console.error(e); alert('Ошибка при удалении') }
+                            }}
+                          />
+                        ))}
+                        {productReviews.map((review) => (
+                          <ReviewCard
+                            key={review.id}
+                            review={review}
+                            reviewType="product"
+                            currentUser={currentUser}
+                            onReply={(reviewId) => setReplyingToReview(replyingToReview === reviewId ? null : reviewId)}
+                            onEdit={(review) => { setEditingReview(review); setShowReviewForm(true) }}
+                            onDelete={async (reviewId) => {
+                              if (!confirm('Удалить отзыв?')) return
+                              try {
+                                const { error } = await supabase.from('product_reviews').delete().eq('id', reviewId)
+                                if (error) throw error
+                                const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                                if (profileId) { fetchProductReviews(profileId); fetchSellerStats(profileId) }
+                              } catch (e) { console.error(e); alert('Ошибка при удалении') }
+                            }}
+                          />
+                        ))}
+                      </>
                     )}
-                    <div className="mb-6">
-                      <button
-                        type="button"
-                        onClick={() => setShowCatalogModal(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-bg-secondary border border-border-light/60 rounded-lg text-sm font-medium text-graphite-secondary hover:bg-border-light/30 hover:border-border-light transition-colors"
-                      >
-                        <FiBriefcase size={16} className="text-brand-accent" />
-                        <span>Каталог</span>
-                        {profile.product_categories && (
-                          <span className="text-xs text-text-secondary">
-                            ({profile.product_categories.split(',').filter(Boolean).length})
-                          </span>
-                        )}
-                      </button>
-                    </div>
                   </div>
-                )}
+                  {replyingToReview && currentUser && (
+                    <ReviewReplyForm
+                      reviewId={replyingToReview}
+                      reviewType="seller"
+                      currentUserId={currentUser.id}
+                      onSuccess={() => {
+                        setReplyingToReview(null)
+                        const profileId = Array.isArray(params.id) ? params.id[0] : params.id
+                        if (profileId) { fetchSellerReviews(profileId); fetchProductReviews(profileId) }
+                      }}
+                      onCancel={() => setReplyingToReview(null)}
+                    />
+                  )}
+                </div>
+              )}
 
-                {/* Модальное окно: категории и каталог товаров */}
-                {showCatalogModal && profile.role === 'seller' && (
-                  <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50" onClick={() => setShowCatalogModal(false)}>
-                    <div className="bg-bg-card rounded-xl shadow-xl max-w-md w-full max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-border-light/70">
-                        <h3 className="text-lg font-semibold text-graphite-secondary flex items-center gap-2">
-                          <FiBriefcase size={20} className="text-brand-accent" />
-                          Категории и каталог
-                        </h3>
-                        <button
-                          type="button"
-                          onClick={() => setShowCatalogModal(false)}
-                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                          aria-label="Закрыть"
-                        >
-                          <FiX className="w-5 h-5" />
-                        </button>
-                      </div>
-                      <div className="p-4 overflow-y-auto flex-1">
-                        {profile.product_categories ? (
-                          <div className="flex flex-wrap gap-2.5">
-                            {profile.product_categories.split(',').map((category, index) => (
-                              <span
-                                key={index}
-                                className="px-3 py-1.5 bg-bg-secondary border border-border-light/60 text-xs font-medium text-graphite-secondary rounded-md"
-                              >
-                                {category.trim()}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-text-secondary">Нет выбранных категорий</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              {/* PROFILE_RELATED реклама для мастеров */}
               {profile.role === 'master' && (
                 <div className="mb-10 sm:mb-12 w-full">
-                  <AdSlot 
-                    type="PROFILE_RELATED" 
-                    context={{ 
+                  <AdSlot
+                    type="PROFILE_RELATED"
+                    context={{
                       masterId: profile.id,
                       specialization: profile.specialization || profileSubcategories[0]?.name || undefined
                     }}
                     className="mb-6"
                   />
-                </div>
-              )}
-
-              {/* Products for Sellers */}
-              {profile.role === 'seller' && (
-                <div className="mb-6 w-full px-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
-                    <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight">Товары</h2>
-                    <div className="flex gap-2">
-                      {isOwnProfile && profile.role === 'seller' && profile.seller_lat != null && profile.seller_lng != null && (
-                        <button
-                          type="button"
-                          onClick={() => setShowStoresMap(true)}
-                          className="btn btn-secondary text-sm w-full sm:w-auto flex items-center gap-2"
-                        >
-                          <FiMapPin size={16} />
-                          Показать на карте
-                        </button>
-                      )}
-                      {isOwnProfile && (
-                        <Link
-                          href="/products/new"
-                          className="btn btn-primary text-sm w-full sm:w-auto"
-                        >
-                          Добавить товар
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                  {products.length === 0 ? (
-                    <div className="card text-center text-text-secondary py-10">
-                      Пока нет товаров
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      {products.map((product) => {
-                        const thumb = product.images && product.images.length > 0 ? product.images[0] : ''
-                        const imagesCount = product.images ? product.images.length : 0
-                        const timeAgo = product.created_at ? format(new Date(product.created_at), 'd MMMM в HH:mm', { locale: ru }) : ''
-                        const isToday = product.created_at ? new Date(product.created_at).toDateString() === new Date().toDateString() : false
-                        const isYesterday = product.created_at ? new Date(product.created_at).toDateString() === new Date(Date.now() - 86400000).toDateString() : false
-                        let timeDisplay = timeAgo
-                        if (isToday) {
-                          timeDisplay = `сегодня в ${format(new Date(product.created_at!), 'HH:mm', { locale: ru })}`
-                        } else if (isYesterday) {
-                          timeDisplay = `вчера в ${format(new Date(product.created_at!), 'HH:mm', { locale: ru })}`
-                        }
-                        
-                        return (
-                          <Link
-                            key={product.id}
-                            href={`/products/${product.id}`}
-                            className="card-glossy overflow-hidden group cursor-pointer flex flex-col !p-0 relative"
-                          >
-                            {/* Глянцевый эффект */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-10"></div>
-                            
-                            {/* Изображение товара */}
-                            <div className="w-full h-[180px] bg-bg-secondary relative overflow-hidden rounded-t-[12px] flex-shrink-0 group/image">
-                              {thumb ? (
-                                <>
-                                  <img
-                                    src={thumb}
-                                    alt={product.name}
-                                    className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
-                                  />
-                                  <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/20 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                                </>
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-text-secondary text-4xl bg-bg-secondary">
-                                  <FiShoppingBag size={48} strokeWidth={1.5} />
-                                </div>
-                              )}
-                              {/* Иконка сердца (избранное) */}
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                }}
-                                className="absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:bg-white transition-colors z-20"
-                              >
-                                <FiHeart size={16} className="text-text-secondary" />
-                              </button>
-                              {/* Количество фото */}
-                              {imagesCount > 0 && (
-                                <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-white px-2 py-1 text-xs font-medium rounded-lg flex items-center gap-1 z-20">
-                                  <FiCamera size={12} />
-                                  <span>{imagesCount}</span>
-                            </div>
-                              )}
-                              </div>
-
-                            {/* Информация о товаре */}
-                            <div className="flex flex-col flex-1 p-4 relative z-20">
-                              <div className="text-lg font-semibold text-brand-accent mb-2">
-                                {product.price.toLocaleString('ru-RU')} ₽
-                              </div>
-                              <h3 className="font-medium text-sm text-graphite-secondary mb-2 line-clamp-2 leading-tight group-hover:text-brand-accent transition-colors">
-                                {product.name}
-                              </h3>
-                              <div className="flex items-center gap-1.5 text-xs text-text-secondary mt-auto pt-2 border-t border-border-light/40">
-                                <FiMapPin size={12} />
-                                <span>{profile.store_address || profile.city || 'Адрес не указан'}</span>
-                              </div>
-                              <div className="text-xs text-text-secondary mt-1">
-                                {timeDisplay}
-                              </div>
-                            </div>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                  {productsHasMore && <div ref={productsLoadMoreSentinelRef} className="h-4" aria-hidden />}
-
-                  {/* Отзывы о продавце - Render-on-Demand */}
-                  <div ref={reviewsSectionRef} className="mt-10 sm:mt-12 px-4 sm:px-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
-                      <div>
-                        <h2 className="text-lg sm:text-xl font-semibold text-graphite-secondary tracking-tight mb-1">
-                          Отзывы
-                        </h2>
-                        {profile.seller_rating && profile.seller_reviews_count ? (
-                          <div className="flex items-center gap-2">
-                            <RatingStars rating={profile.seller_rating} size="sm" readonly showValue />
-                            <span className="text-sm text-text-secondary">
-                              ({profile.seller_reviews_count} {profile.seller_reviews_count === 1 ? 'отзыв' : profile.seller_reviews_count < 5 ? 'отзыва' : 'отзывов'})
-                            </span>
-                </div>
-                        ) : (
-                          <p className="text-sm text-text-secondary">Пока нет отзывов</p>
-                        )}
-                      </div>
-                      {currentUser && !isOwnProfile && (
-                        <button
-                          onClick={() => {
-                            setShowReviewForm(true)
-                            setEditingReview(null)
-                          }}
-                          className="btn btn-primary text-sm w-full sm:w-auto"
-                        >
-                          Оставить отзыв
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Форма отзыва о продавце */}
-                    {showReviewForm && currentUser && !isOwnProfile && (
-                      <div className="mb-6">
-                        <ReviewForm
-                          targetId={Array.isArray(params.id) ? params.id[0] : params.id}
-                          targetType="seller"
-                          currentUserId={currentUser.id}
-                          existingReview={editingReview}
-                          onSuccess={() => {
-                            setShowReviewForm(false)
-                            setEditingReview(null)
-                            const profileId = Array.isArray(params.id) ? params.id[0] : params.id
-                            if (profileId) {
-                              fetchSellerReviews(profileId)
-                              fetchProfile()
-                            }
-                          }}
-                          onCancel={() => {
-                            setShowReviewForm(false)
-                            setEditingReview(null)
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Список прямых отзывов о продавце */}
-                    {sellerReviews.length > 0 && (
-                      <div className="mb-6">
-                        <h3 className="text-md font-semibold text-graphite-secondary mb-4">Прямые отзывы о продавце</h3>
-                        <div className="space-y-4">
-                          {sellerReviews.map((review) => (
-                            <ReviewCard
-                              key={review.id}
-                              review={review}
-                              reviewType="seller"
-                              currentUser={currentUser}
-                              onReply={(reviewId) => setReplyingToReview(replyingToReview === reviewId ? null : reviewId)}
-                              onEdit={(review) => {
-                                setEditingReview(review)
-                                setShowReviewForm(true)
-                              }}
-                              onDelete={async (reviewId) => {
-                                if (confirm('Вы уверены, что хотите удалить отзыв?')) {
-                                  try {
-                                    const { error } = await supabase
-                                      .from('seller_reviews')
-                                      .delete()
-                                      .eq('id', reviewId)
-                                    if (error) throw error
-                                    const profileId = Array.isArray(params.id) ? params.id[0] : params.id
-                                    if (profileId) {
-                                      fetchSellerReviews(profileId)
-                                      fetchProfile()
-                                    }
-                                  } catch (error) {
-                                    console.error('Error deleting review:', error)
-                                    alert('Ошибка при удалении отзыва')
-                                  }
-                                }
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Отзывы о товарах продавца */}
-                    {productReviews.length > 0 && (
-                      <div>
-                        <h3 className="text-md font-semibold text-graphite-secondary mb-4">Отзывы о товарах</h3>
-                        <div className="space-y-4">
-                          {productReviews.map((review) => (
-                            <ReviewCard
-                              key={review.id}
-                              review={review}
-                              reviewType="product"
-                              currentUser={currentUser}
-                              onReply={(reviewId) => setReplyingToReview(replyingToReview === reviewId ? null : reviewId)}
-                              onEdit={(review) => {
-                                setEditingReview(review)
-                                setShowReviewForm(true)
-                              }}
-                              onDelete={async (reviewId) => {
-                                if (confirm('Вы уверены, что хотите удалить отзыв?')) {
-                                  try {
-                                    const { error } = await supabase
-                                      .from('product_reviews')
-                                      .delete()
-                                      .eq('id', reviewId)
-                                    if (error) throw error
-                                    const profileId = Array.isArray(params.id) ? params.id[0] : params.id
-                                    if (profileId) {
-                                      fetchProductReviews(profileId)
-                                      fetchSellerStats(profileId)
-                                    }
-                                  } catch (error) {
-                                    console.error('Error deleting review:', error)
-                                    alert('Ошибка при удалении отзыва')
-                                  }
-                                }
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Сообщение, если нет отзывов */}
-                    {!reviewsLoading && sellerReviews.length === 0 && productReviews.length === 0 && (
-                      <div className="card text-center text-text-secondary py-10">
-                        Пока нет отзывов
-                      </div>
-                    )}
-
-                    {/* Форма ответа на отзыв */}
-                    {replyingToReview && (
-                      <ReviewReplyForm
-                        reviewId={replyingToReview}
-                        reviewType="seller"
-                        currentUserId={currentUser!.id}
-                        onSuccess={() => {
-                          setReplyingToReview(null)
-                          const profileId = Array.isArray(params.id) ? params.id[0] : params.id
-                          if (profileId) {
-                            fetchSellerReviews(profileId)
-                            fetchProductReviews(profileId)
-                          }
-                        }}
-                        onCancel={() => setReplyingToReview(null)}
-                      />
-                    )}
-                  </div>
                 </div>
               )}
 

@@ -336,16 +336,6 @@ export default function SettingsClient() {
           {role === 'seller' && (
             <>
               <SettingsSection title="Мой магазин">
-                <SettingsAccordionItem
-                  icon="🏪"
-                  iconBg="#fff1f2"
-                  title="Настройки магазина"
-                  subtitle="Описание, режим работы, доставка"
-                  expanded={openPanel === 'profile'}
-                  onToggle={() => togglePanel('profile')}
-                >
-                  <ProfileEditPanel forms={forms} />
-                </SettingsAccordionItem>
                 <SettingsRow
                   icon="📦"
                   iconBg="#fff1f2"
@@ -354,7 +344,19 @@ export default function SettingsClient() {
                   href="/products"
                   right={<SettingsArrow />}
                 />
-                <SettingsRow icon="📊" iconBg="#fff1f2" title="Аналитика продаж" subtitle="Просмотры и конверсия" href="/activity" right={<><SettingsBadge variant="green">Новое</SettingsBadge><SettingsArrow /></>} />
+                <SettingsRow
+                  icon="📊"
+                  iconBg="#fff1f2"
+                  title="Аналитика продаж"
+                  subtitle="Просмотры и конверсия"
+                  href="/activity"
+                  right={
+                    <>
+                      <SettingsBadge variant="green">Новое</SettingsBadge>
+                      <SettingsArrow />
+                    </>
+                  }
+                />
                 <SettingsAccordionItem
                   icon="📍"
                   iconBg="#fff1f2"
@@ -364,6 +366,16 @@ export default function SettingsClient() {
                   onToggle={() => togglePanel('store')}
                 >
                   <StoreAddressPanel onSaved={onSaved} />
+                </SettingsAccordionItem>
+                <SettingsAccordionItem
+                  icon="🏪"
+                  iconBg="#fff1f2"
+                  title="Настройки магазина"
+                  subtitle="Описание, режим работы"
+                  expanded={openPanel === 'profile'}
+                  onToggle={() => togglePanel('profile')}
+                >
+                  <ProfileEditPanel forms={forms} />
                 </SettingsAccordionItem>
               </SettingsSection>
 

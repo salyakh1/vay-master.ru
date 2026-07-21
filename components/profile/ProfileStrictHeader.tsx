@@ -53,7 +53,7 @@ export default function ProfileStrictHeader({
 
   const rolePillClass =
     profile.role === 'seller'
-      ? 'text-[#1d3557] bg-[#eaf0f8]'
+      ? 'text-[#0C447C] bg-[#E6F1FB]'
       : profile.role === 'master'
         ? 'text-brand-accent bg-[#fdedec]'
         : 'text-[#3b6d11] bg-[#eaf3de]'
@@ -97,7 +97,11 @@ export default function ProfileStrictHeader({
       <div className="bg-white px-3.5 pb-3.5">
         <div className="flex items-end justify-between -mt-7 mb-2">
           <div className="relative flex-shrink-0">
-            <div className="w-16 h-16 rounded-full border-[3px] border-white bg-brand-accent flex items-center justify-center text-white text-lg font-medium overflow-hidden shadow-sm">
+            <div
+              className={`w-16 h-16 rounded-full border-[3px] border-white flex items-center justify-center text-white text-lg font-medium overflow-hidden shadow-sm ${
+                isSeller ? 'bg-[#1d5fa6]' : 'bg-brand-accent'
+              }`}
+            >
               {profile.avatar_url ? (
                 <Image src={profile.avatar_url} alt="" width={64} height={64} className="object-cover w-full h-full" />
               ) : (
