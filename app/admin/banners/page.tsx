@@ -1078,7 +1078,7 @@ export default function AdminBannersPage() {
 
                   <div className="mt-3">
                     <label className="block text-sm font-medium text-text-primary mb-1">
-                      Регионы (через запятую, или "ALL" для всех)
+                      Регионы (через запятую, или «ALL» для всех)
                     </label>
                     <input
                       type="text"
@@ -1263,7 +1263,7 @@ export default function AdminBannersPage() {
                         }
                         className="rounded"
                       />
-                      <span className="text-sm text-text-primary">Показывать бейдж "Реклама"</span>
+                      <span className="text-sm text-text-primary">Показывать бейдж «Реклама»</span>
                     </label>
                   </div>
 
