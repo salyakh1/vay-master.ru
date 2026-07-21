@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { notifyUser } from '@/lib/notify'
+import { notifyUser, sendPushToUser } from '@/lib/notify'
+import { findOrCreateDirectChat, sendDirectChatMessage } from '@/lib/directChat'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -204,22 +205,37 @@ export async function POST(
       )
     }
 
-    // Уведомление клиенту в личный чат (+ push) — без email
+    // Чат клиент ↔ мастер: сообщение от мастера + push клиенту
     if (order.client_id) {
-      const masterName = profile.full_name || 'Мастер'
+      const masterId = user.id
+      const clientId = order.client_id as string
       const orderTitle = order.title || 'заказ'
+      const masterName = profile.full_name || 'Мастер'
       const pricePart =
         price != null && String(price).trim() !== ''
-          ? `\nПредложение: ${parseFloat(price)} ₽`
+          ? `\n\nМоё предложение: ${parseFloat(price)} ₽`
           : ''
+
       try {
-        await notifyUser(supabaseAdmin, {
-          userId: order.client_id,
-          chatText: `Новый отклик на заказ «${orderTitle}»\n\n${masterName} откликнулся.${pricePart}\n\nОткройте «Чаты → Отклики», чтобы принять или отклонить.`,
-          pushTitle: 'Новый отклик на заказ',
-          pushBody: `${masterName} откликнулся на «${orderTitle}»`,
-          pushUrl: '/chats',
-        })
+        const chatId = await findOrCreateDirectChat(supabaseAdmin, masterId, clientId)
+        if (chatId) {
+          const chatText = `Здравствуйте! Я откликнулся на ваш заказ «${orderTitle}».${pricePart}\n\n${message.trim()}`
+          await sendDirectChatMessage(supabaseAdmin, chatId, masterId, chatText)
+
+          await sendPushToUser(supabaseAdmin, clientId, {
+            title: 'Новый отклик на заказ',
+            body: `${masterName}: отклик на «${orderTitle}»`,
+            url: `/chats/${chatId}`,
+          })
+        } else {
+          await notifyUser(supabaseAdmin, {
+            userId: clientId,
+            chatText: `Новый отклик на заказ «${orderTitle}»\n\n${masterName} откликнулся.${pricePart}\n\nСмотрите «Чаты → Отклики».`,
+            pushTitle: 'Новый отклик на заказ',
+            pushBody: `${masterName} откликнулся на «${orderTitle}»`,
+            pushUrl: '/chats',
+          })
+        }
       } catch (e) {
         console.error('notify client on response', e)
       }

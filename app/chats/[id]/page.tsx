@@ -368,6 +368,22 @@ export default function ChatPage() {
         .from('chats')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', params.id)
+
+      const { data: session } = await supabase.auth.getSession()
+      const token = session?.session?.access_token
+      if (token) {
+        void fetch(`/api/chats/${params.id}/notify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            preview: messageContent || (imageUrl ? '' : ''),
+            hasImage: Boolean(imageUrl),
+          }),
+        }).catch(() => {})
+      }
     } catch (error) {
       console.error('Error sending message:', error)
       // Удаляем оптимистичное сообщение при ошибке

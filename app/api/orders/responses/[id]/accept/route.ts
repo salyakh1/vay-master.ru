@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendPushToUser } from '@/lib/notify'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -185,7 +186,7 @@ async function sendNotificationToMaster(
   // Отправляем сообщение от клиента мастеру
   const message = `Ваш отклик на заказ принят!\n\nКлиент ${client.full_name || 'Клиент'} выбрал вас в качестве исполнителя.\n\nПерейти к заказу: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://vay-master.ru'}/orders/${orderId}`
 
-  await supabaseAdmin
+    await supabaseAdmin
     .from('messages')
     .insert({
       chat_id: chat.id,
@@ -193,5 +194,11 @@ async function sendNotificationToMaster(
       content: message,
       read: false
     })
+
+  await sendPushToUser(supabaseAdmin, masterId, {
+    title: client.full_name || 'Клиент',
+    body: 'Ваш отклик принят — откройте чат',
+    url: `/chats/${chat.id}`,
+  })
 }
 

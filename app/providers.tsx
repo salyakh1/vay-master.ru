@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, User } from '@/lib/supabase'
 import PushRegistrar from '@/components/PushRegistrar'
+import PushEnableBanner from '@/components/PushEnableBanner'
 
 interface AuthContextType {
   user: User | null
@@ -106,6 +107,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{ user, loading, signOut, refreshUser }}>
       <PushRegistrar />
+      <PushEnableBanner />
       {children}
     </AuthContext.Provider>
   )
