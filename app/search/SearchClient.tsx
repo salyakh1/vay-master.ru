@@ -443,6 +443,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
     lat,
     lng,
     radiusKm,
+    showRadius: false,
   }
 
   return (

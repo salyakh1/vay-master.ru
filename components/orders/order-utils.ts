@@ -10,14 +10,14 @@ export const STATUS_CONFIG: Record<
   { label: string; pill: string; card: string }
 > = {
   open: {
-    label: 'Новый',
-    pill: 'bg-[#fff1f2] text-[#e63946]',
-    card: 'border-[#e63946] bg-[#fff8f8]',
+    label: 'Открыт',
+    pill: 'bg-[#E6F1FB] text-[#0C447C]',
+    card: 'border-[#c5daf0] bg-[#f5f9fd]',
   },
   new: {
-    label: 'Новый',
-    pill: 'bg-[#fff1f2] text-[#e63946]',
-    card: 'border-[#e63946] bg-[#fff8f8]',
+    label: 'Открыт',
+    pill: 'bg-[#E6F1FB] text-[#0C447C]',
+    card: 'border-[#c5daf0] bg-[#f5f9fd]',
   },
   in_progress: {
     label: 'В работе',

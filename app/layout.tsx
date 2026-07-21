@@ -30,12 +30,11 @@ export const metadata: Metadata = {
   },
 }
 
-/** Фиксированный масштаб: страница не увеличивается и не уменьшается (нет авто-зума). */
+/** Viewport: pinch-zoom разрешён (WCAG 1.4.4). */
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
   viewportFit: 'cover',
   themeColor: '#C7362F',
 }

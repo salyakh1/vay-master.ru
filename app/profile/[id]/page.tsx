@@ -97,7 +97,6 @@ export default function ProfilePage() {
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id
   const [showStoresMap, setShowStoresMap] = useState(false)
   const [showStoreLocationMap, setShowStoreLocationMap] = useState(false)
-  const [showCatalogModal, setShowCatalogModal] = useState(false)
   const [showServicesSheet, setShowServicesSheet] = useState(false)
 
   // Гости не могут открывать профили — редирект на вход с returnTo

@@ -596,6 +596,7 @@ function ProductsContent() {
             ? masterProductCategories.subcategorySlugs
             : undefined
         }
+        showRadius={false}
       />
 
       {gridSkeleton ? (
@@ -654,6 +655,7 @@ function ProductsContent() {
         lng={nearbyCenter?.lng ?? userLng}
         radiusKm={nearbyCenter?.radiusKm ?? userRadiusKm}
         city={user?.city || cityFilter || undefined}
+        showRadius={false}
       />
 
       <div className="h-2 bg-[#f2f2f7]" aria-hidden />
