@@ -720,9 +720,9 @@ export default function HomeClient({
       <div className="mx-4 mb-3 bg-brand-accent rounded-3xl px-5 py-5 text-center">
         <p className="text-white text-xl font-extrabold mb-1.5">Начните бесплатно</p>
         <p className="text-white/80 text-[13px] mb-4 leading-relaxed">
-          Регистрация за 1 минуту.
+          Регистрация бесплатна.
           <br />
-          Клиентам всегда бесплатно.
+          Публикация заказа — 200 ₽.
         </p>
         <Link
           href="/search"

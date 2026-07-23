@@ -25,7 +25,7 @@ export async function GET() {
     return NextResponse.json(
       {
         paymentOrderPublicationEnabled: true,
-        orderPublicationPriceRub: 199,
+        orderPublicationPriceRub: 200,
         orderPaymentProvider: 'tinkoff',
         paymentTinkoffEnabled: false,
         paymentSbpEnabled: true,

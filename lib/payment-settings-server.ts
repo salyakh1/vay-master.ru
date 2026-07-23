@@ -33,7 +33,7 @@ function getAdmin(): ReturnType<typeof createClient> | null {
 export async function getPaymentOrderSettings(): Promise<PaymentOrderSettings> {
   const defaults: PaymentOrderSettings = {
     paymentOrderPublicationEnabled: true,
-    orderPublicationPriceRub: 199,
+    orderPublicationPriceRub: 200,
     paymentTinkoffEnabled: false,
     paymentSbpEnabled: true,
     tinkoffEnvConfigured: Boolean(

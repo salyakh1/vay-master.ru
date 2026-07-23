@@ -52,7 +52,7 @@ function NewOrderForm() {
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [paymentSettings, setPaymentSettings] = useState<OrderPaymentSettings>({
     paymentOrderPublicationEnabled: true,
-    orderPublicationPriceRub: 199,
+    orderPublicationPriceRub: 200,
     tinkoffReady: false,
   })
 
@@ -91,7 +91,10 @@ function NewOrderForm() {
       .then((data) => {
         setPaymentSettings({
           paymentOrderPublicationEnabled: data.paymentOrderPublicationEnabled !== false,
-          orderPublicationPriceRub: typeof data.orderPublicationPriceRub === 'number' ? data.orderPublicationPriceRub : 199,
+          orderPublicationPriceRub:
+            typeof data.orderPublicationPriceRub === 'number' && data.orderPublicationPriceRub > 0
+              ? data.orderPublicationPriceRub
+              : 200,
           tinkoffReady: data.tinkoffReady === true,
         })
       })
@@ -235,8 +238,8 @@ function NewOrderForm() {
       return
     }
 
-    // Пока Тинькофф не готов — публикуем бесплатно, без модалки «оплатить»
-    if (!paymentSettings.paymentOrderPublicationEnabled || !paymentSettings.tinkoffReady) {
+    // Монетизация: публикация заказа всегда через экран оплаты (для любой роли)
+    if (!paymentSettings.paymentOrderPublicationEnabled) {
       await createOrder()
       return
     }
@@ -322,6 +325,16 @@ function NewOrderForm() {
           {masterId && (
             <div className="mb-4 rounded-xl bg-[#fff1f2] border border-[#fecdd3] px-4 py-3 text-sm text-[#1c1c1e]">
               Заказ для мастера из профиля. Опишите задачу — мастера категории получат уведомление.
+            </div>
+          )}
+
+          {paymentSettings.paymentOrderPublicationEnabled && (
+            <div className="mb-4 rounded-xl bg-[#fff8f0] border border-[#f5d0a9] px-4 py-3 text-sm text-[#1c1c1e]">
+              Публикация заказа —{' '}
+              <span className="font-semibold text-brand-accent">
+                {paymentSettings.orderPublicationPriceRub.toLocaleString('ru-RU')} ₽
+              </span>
+              . Оплата обязательна для всех ролей (клиент, мастер, продавец).
             </div>
           )}
 
@@ -482,7 +495,11 @@ function NewOrderForm() {
                 Отмена
               </Link>
               <button type="submit" disabled={saving || !descriptionOk} className="btn btn-primary flex-1">
-                {saving ? 'Создание...' : 'Создать заказ'}
+                {saving
+                  ? 'Создание...'
+                  : paymentSettings.paymentOrderPublicationEnabled
+                    ? `Далее · ${paymentSettings.orderPublicationPriceRub.toLocaleString('ru-RU')} ₽`
+                    : 'Создать заказ'}
               </button>
             </div>
           </form>

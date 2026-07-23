@@ -102,8 +102,8 @@ export default function AdminPaymentsPage() {
   const price = () => {
     const v = getVal('order_publication_price_rub')
     if (typeof v === 'number') return v
-    if (typeof v === 'string') return parseFloat(v) || 199
-    return 199
+    if (typeof v === 'string') return parseFloat(v) || 200
+    return 200
   }
 
   const proPrice = () => {
