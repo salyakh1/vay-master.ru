@@ -239,6 +239,26 @@ export default function SettingsClient() {
     router.push('/')
   }
 
+  const switchRole = async (newRole: 'master' | 'seller') => {
+    if (!user) return
+    const label = newRole === 'master' ? 'Мастер' : 'Продавец'
+    const ok = confirm(
+      newRole === 'master'
+        ? 'Сменить роль на «Мастер»? После подтверждения откроется настройка специализаций.'
+        : 'Открыть магазин? Роль сменится на «Продавец», затем можно выбрать категории товаров.'
+    )
+    if (!ok) return
+    try {
+      const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', user.id)
+      if (error) throw error
+      await refreshUser()
+      router.push(newRole === 'master' ? '/onboarding/specializations' : '/onboarding/seller')
+    } catch (e) {
+      console.error('switchRole', e)
+      alert(`Не удалось сменить роль на «${label}». Попробуйте ещё раз.`)
+    }
+  }
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-[#f2f2f7] flex items-center justify-center">
@@ -413,8 +433,27 @@ export default function SettingsClient() {
               </SettingsSection>
 
               <SettingsSection title="Возможности">
-                <SettingsRow icon="🔨" iconBg="#fff1f2" title="Стать мастером" subtitle="Начните получать заказы" href="/onboarding/specializations" right={<><SettingsBadge>Новое</SettingsBadge><SettingsArrow /></>} />
-                <SettingsRow icon="🛒" iconBg="#fff1f2" title="Открыть магазин" subtitle="Продавайте на платформе" href="/onboarding/seller" right={<SettingsArrow />} />
+                <SettingsRow
+                  icon="🔨"
+                  iconBg="#fff1f2"
+                  title="Стать мастером"
+                  subtitle="Начните получать заказы"
+                  onClick={() => void switchRole('master')}
+                  right={
+                    <>
+                      <SettingsBadge>Новое</SettingsBadge>
+                      <SettingsArrow />
+                    </>
+                  }
+                />
+                <SettingsRow
+                  icon="🛒"
+                  iconBg="#fff1f2"
+                  title="Открыть магазин"
+                  subtitle="Продавайте на платформе"
+                  onClick={() => void switchRole('seller')}
+                  right={<SettingsArrow />}
+                />
               </SettingsSection>
             </>
           )}
@@ -446,7 +485,7 @@ export default function SettingsClient() {
             )}
           </SettingsSection>
 
-          <div className="h-5" />
+          <div className="h-24" />
         </div>
       </div>
 

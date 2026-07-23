@@ -57,7 +57,7 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full flex flex-col">
-      <AuthBrandHero subtitle="Войдите, чтобы писать мастерам, оформлять заказы и сохранять избранное." />
+      <AuthBrandHero subtitle="Войдите, чтобы писать мастерам, создавать заказы и общаться в чате." />
 
       <div className="flex-1 px-4 -mt-6 relative z-10 pb-10">
         <div className="bg-white rounded-2xl border border-[#e5e5ea] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">

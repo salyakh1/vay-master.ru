@@ -101,7 +101,7 @@ export default function OnboardingPage() {
             <div
               key={i}
               className={`h-1.5 rounded-full flex-1 transition-all ${
-                i <= step ? 'bg-red-500' : 'bg-gray-200'
+                i <= step ? 'bg-brand-accent' : 'bg-gray-200'
               }`}
             />
           ))}
@@ -116,7 +116,7 @@ export default function OnboardingPage() {
 
           <Link
             href={current.href}
-            className="block w-full text-center bg-red-500 text-white py-3 rounded-xl font-medium mb-3"
+            className="block w-full text-center bg-brand-accent text-white py-3 rounded-xl font-medium mb-3"
           >
             {current.action}
           </Link>

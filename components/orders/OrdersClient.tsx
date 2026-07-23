@@ -124,12 +124,14 @@ export default function OrdersClient() {
         .order('created_at', { ascending: false })
       setStatsSource((data || []) as Order[])
     } else {
+      const freshSince = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
       const [{ count: avail }, { count: resp }] = await Promise.all([
         supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
           .in('status', ['open', 'new'])
-          .neq('client_id', user.id),
+          .neq('client_id', user.id)
+          .gte('created_at', freshSince),
         supabase
           .from('order_responses')
           .select('*', { count: 'exact', head: true })
@@ -187,11 +189,13 @@ export default function OrdersClient() {
             setResponseCounts((prev) => (reset ? counts : { ...prev, ...counts }))
           }
         } else if (activeTab === 'available') {
+          const freshSince = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
           let query = supabase
             .from('orders')
             .select(`*, client:profiles!client_id(id, full_name, avatar_url)`, { count: 'exact' })
             .in('status', ['open', 'new'])
             .neq('client_id', user.id)
+            .gte('created_at', freshSince)
             .order('created_at', { ascending: false })
             .range(from, to)
 

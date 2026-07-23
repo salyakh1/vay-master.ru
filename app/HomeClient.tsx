@@ -286,6 +286,7 @@ export default function HomeClient({
   const [searchQ, setSearchQ] = useState('')
   const [masters, setMasters] = useState<User[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [homeFeedLoading, setHomeFeedLoading] = useState(true)
   const [stories, setStories] = useState<Story[]>([])
 
   // Автодополнение поиска: мастера + товары + услуги + категории в одном списке
@@ -372,29 +373,47 @@ export default function HomeClient({
   }, [initialCategories])
 
   useEffect(() => {
-    fetch('/api/search/masters?page=1')
-      .then((r) => (r.ok ? r.json() : { masters: [] }))
-      .then((d) => setMasters((d.masters || []).slice(0, 8)))
-      .catch(() => setMasters([]))
-
-    supabase
-      .from('products')
-      .select('id, name, price, images, in_stock')
-      .eq('in_stock', true)
-      .order('created_at', { ascending: false })
-      .limit(8)
-      .then(({ data }) => {
-        const list = sanitizeProductsForGuest((data || []) as Product[], !!user)
-        setProducts(list)
-      })
+    let cancelled = false
+    setHomeFeedLoading(true)
+    Promise.all([
+      fetch('/api/search/masters?page=1')
+        .then((r) => (r.ok ? r.json() : { masters: [] }))
+        .then((d) => {
+          if (!cancelled) setMasters((d.masters || []).slice(0, 8))
+        })
+        .catch(() => {
+          if (!cancelled) setMasters([])
+        }),
+      supabase
+        .from('products')
+        .select('id, name, price, images, in_stock')
+        .eq('in_stock', true)
+        .order('created_at', { ascending: false })
+        .limit(8)
+        .then(({ data }) => {
+          if (cancelled) return
+          const list = sanitizeProductsForGuest((data || []) as Product[], !!user)
+          setProducts(list)
+        }),
+    ]).finally(() => {
+      if (!cancelled) setHomeFeedLoading(false)
+    })
 
     const storiesUrl = user
       ? `/api/stories?page=home&currentUserId=${user.id}`
       : '/api/stories?page=home'
     fetch(storiesUrl)
       .then((r) => (r.ok ? r.json() : { stories: [] }))
-      .then((d) => setStories((d.stories || []).slice(0, 6)))
-      .catch(() => setStories([]))
+      .then((d) => {
+        if (!cancelled) setStories((d.stories || []).slice(0, 6))
+      })
+      .catch(() => {
+        if (!cancelled) setStories([])
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [user])
 
   const onSearch = () => {
@@ -591,7 +610,13 @@ export default function HomeClient({
 
       {/* Masters */}
       <SectionHeader title="Мастера рядом" linkLabel="Все →" href="/search" />
-      {masters.length === 0 ? (
+      {homeFeedLoading ? (
+        <div className="flex gap-3 overflow-x-auto px-4 pb-3.5 scrollbar-hide">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="w-[140px] flex-shrink-0 h-[120px] rounded-[18px] bg-[#f0f0f0] animate-pulse" />
+          ))}
+        </div>
+      ) : masters.length === 0 ? (
         <div className="mx-4 mb-3.5 rounded-[18px] border border-dashed border-[#e0e0e0] bg-white px-4 py-6 text-center">
           <p className="text-sm text-[#888] mb-2">Пока нет мастеров в выдаче — попробуйте поиск по категории</p>
           <Link href="/search" className="text-brand-accent text-sm font-bold">
@@ -617,7 +642,13 @@ export default function HomeClient({
 
       {/* Products */}
       <SectionHeader title="Материалы и инструменты" linkLabel="Каталог →" href="/products" />
-      {products.length === 0 ? (
+      {homeFeedLoading ? (
+        <div className="flex gap-2.5 overflow-x-auto px-4 pb-3.5 scrollbar-hide">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="w-[120px] flex-shrink-0 h-[140px] rounded-[18px] bg-[#f0f0f0] animate-pulse" />
+          ))}
+        </div>
+      ) : products.length === 0 ? (
         <div className="mx-4 mb-3.5 rounded-[18px] border border-dashed border-[#e0e0e0] bg-white px-4 py-6 text-center">
           <p className="text-sm text-[#888] mb-2">Каталог материалов обновляется — загляните позже</p>
           <Link href="/products" className="text-brand-accent text-sm font-bold">

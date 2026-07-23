@@ -235,7 +235,8 @@ function NewOrderForm() {
       return
     }
 
-    if (!paymentSettings.paymentOrderPublicationEnabled) {
+    // Пока Тинькофф не готов — публикуем бесплатно, без модалки «оплатить»
+    if (!paymentSettings.paymentOrderPublicationEnabled || !paymentSettings.tinkoffReady) {
       await createOrder()
       return
     }

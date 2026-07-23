@@ -97,6 +97,11 @@ export default function NewProductPage() {
       alert('Выберите категорию и каталог')
       return
     }
+    const priceNum = parseFloat(price)
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
+      alert('Укажите цену больше 0 ₽')
+      return
+    }
 
     setSaving(true)
     try {
@@ -160,7 +165,7 @@ export default function NewProductPage() {
           seller_id: user.id,
           name: name.trim(),
           description: description.trim(),
-          price: parseFloat(price),
+          price: priceNum,
           category: productCategories.find((c) => c.id === categoryId)?.name || '',
           category_id: categoryId || null,
           subcategory_id: subcategoryId || null,
@@ -244,10 +249,10 @@ export default function NewProductPage() {
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     required
-                    min="0"
-                    step="0.01"
+                    min="1"
+                    step="1"
                     className="input"
-                    placeholder="0.00"
+                    placeholder="Например: 1500"
                   />
                 </div>
 

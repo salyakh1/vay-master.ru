@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { useAuth } from '@/app/providers'
 import { supabase, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiChevronLeft, FiChevronRight, FiArrowLeft, FiPhone, FiHeart, FiEdit2 } from 'react-icons/fi'
+import { FiChevronLeft, FiChevronRight, FiArrowLeft, FiPhone, FiEdit2 } from 'react-icons/fi'
 import Link from 'next/link'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
@@ -296,14 +296,6 @@ export default function ProductPage() {
         >
           <FiArrowLeft size={16} />
         </button>
-        <button
-          type="button"
-          className="absolute top-2.5 right-2.5 w-[30px] h-[30px] rounded-full bg-white/85 flex items-center justify-center text-[#111]"
-          aria-label="Избранное"
-        >
-          <FiHeart size={16} />
-        </button>
-
         {images.length > 1 && (
           <>
             <button

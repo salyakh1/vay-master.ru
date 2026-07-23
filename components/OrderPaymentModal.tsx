@@ -47,19 +47,27 @@ export default function OrderPaymentModal({
               <FiCreditCard size={22} className="text-brand-accent" />
             </div>
             <div>
-              <div className="text-lg font-semibold text-graphite-secondary">Публикация заказа платная</div>
-              <div className="text-sm text-text-secondary">Заказ появится в списке после оплаты</div>
+              <div className="text-lg font-semibold text-graphite-secondary">
+                {tinkoffReady ? 'Публикация заказа платная' : 'Публикация заказа'}
+              </div>
+              <div className="text-sm text-text-secondary">
+                {tinkoffReady
+                  ? 'Заказ появится в списке после оплаты'
+                  : 'Онлайн-оплата недоступна — заказ опубликуется бесплатно'}
+              </div>
             </div>
           </div>
 
-          <div className="bg-bg-secondary/60 border border-border-light/60 rounded-lg p-4 mb-5">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-text-secondary">Стоимость публикации</span>
-              <span className="text-lg font-semibold text-graphite-secondary">
-                {priceRub.toLocaleString('ru-RU')} ₽
-              </span>
+          {tinkoffReady && (
+            <div className="bg-bg-secondary/60 border border-border-light/60 rounded-lg p-4 mb-5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-text-secondary">Стоимость публикации</span>
+                <span className="text-lg font-semibold text-graphite-secondary">
+                  {priceRub.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           <button
             className="w-full btn btn-primary"
@@ -69,16 +77,16 @@ export default function OrderPaymentModal({
             {loading
               ? tinkoffReady
                 ? 'Переход к оплате...'
-                : 'Оплата...'
+                : 'Публикация...'
               : tinkoffReady
                 ? 'Перейти к оплате'
-                : 'Оплатить и опубликовать'}
+                : 'Опубликовать бесплатно'}
           </button>
 
           <p className="text-xs text-text-muted mt-3 text-center">
             {tinkoffReady
               ? 'Откроется защищённая страница банка (Тинькофф). После успешной оплаты заказ появится в списке.'
-              : 'Тестовый режим: заказ публикуется без реального списания. Подключите Тинькофф в админке и .env для живой оплаты.'}
+              : 'Онлайн-оплата временно недоступна. Заказ будет опубликован бесплатно.'}
           </p>
         </div>
       </div>

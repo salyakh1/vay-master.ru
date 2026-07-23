@@ -37,12 +37,25 @@ export const STATUS_CONFIG: Record<
 }
 
 export function formatOrderDate(dateStr: string): string {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
-  if (diff < 60) return 'Только что'
-  if (diff < 3600) return `${Math.floor(diff / 60)} мин назад`
-  if (diff < 86400) return 'Сегодня'
-  if (diff < 172800) return 'Вчера'
-  return `${Math.floor(diff / 86400)} дня назад`
+  const diffSec = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
+  if (diffSec < 60) return 'Только что'
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} мин назад`
+  if (diffSec < 86400) return 'Сегодня'
+  if (diffSec < 172800) return 'Вчера'
+  const days = Math.floor(diffSec / 86400)
+  if (days < 30) {
+    const mod10 = days % 10
+    const mod100 = days % 100
+    let unit = 'дней'
+    if (mod10 === 1 && mod100 !== 11) unit = 'день'
+    else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) unit = 'дня'
+    return `${days} ${unit} назад`
+  }
+  try {
+    return new Date(dateStr).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+  } catch {
+    return `${days} дней назад`
+  }
 }
 
 export function pluralResponse(n: number): string {
