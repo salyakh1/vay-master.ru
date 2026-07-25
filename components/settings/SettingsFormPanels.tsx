@@ -134,9 +134,9 @@ export function useSettingsForms(onSaved?: () => void) {
     const nextSvcIds = new Set(selectedServiceIds)
 
     const toAddSubs = selectedSubcategoryIds.filter((id) => !curSubIds.has(id))
-    const toDelSubs = [...curSubIds].filter((id) => !nextSubIds.has(id))
+    const toDelSubs = Array.from(curSubIds).filter((id) => !nextSubIds.has(id))
     const toAddSvcs = selectedServiceIds.filter((id) => !curSvcIds.has(id))
-    const toDelSvcs = [...curSvcIds].filter((id) => !nextSvcIds.has(id))
+    const toDelSvcs = Array.from(curSvcIds).filter((id) => !nextSvcIds.has(id))
 
     const ops: PromiseLike<{ error: { message: string } | null }>[] = []
 

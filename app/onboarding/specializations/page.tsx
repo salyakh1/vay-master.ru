@@ -110,9 +110,9 @@ export default function SpecializationsOnboardingPage() {
       const nextSub = new Set(selectedSubcategoryIds)
       const nextSvc = new Set(selectedServiceIds)
 
-      const toDelSubs = [...curSubIds].filter((id) => !nextSub.has(id))
+      const toDelSubs = Array.from(curSubIds).filter((id) => !nextSub.has(id))
       const toAddSubs = selectedSubcategoryIds.filter((id) => !curSubIds.has(id))
-      const toDelSvcs = [...curSvcIds].filter((id) => !nextSvc.has(id))
+      const toDelSvcs = Array.from(curSvcIds).filter((id) => !nextSvc.has(id))
       const toAddSvcs = selectedServiceIds.filter((id) => !curSvcIds.has(id))
 
       if (toDelSubs.length) {
