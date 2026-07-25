@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FiBriefcase } from 'react-icons/fi'
+import { FiBriefcase, FiCheck } from 'react-icons/fi'
 import type { CategoryNode } from '@/lib/masterCategoriesTree'
 
 type Props = {
@@ -11,6 +11,9 @@ type Props = {
   selectedSubcategoryIds: string[]
   selectedServiceIds: string[]
   saving: boolean
+  saveSuccess?: boolean
+  saveError?: string
+  onDismissFeedback?: () => void
   onToggleSubcategory: (id: string) => void
   onToggleService: (id: string) => void
   onSave: () => void
@@ -26,6 +29,9 @@ export default function SpecializationsEditor({
   selectedSubcategoryIds,
   selectedServiceIds,
   saving,
+  saveSuccess = false,
+  saveError = '',
+  onDismissFeedback,
   onToggleSubcategory,
   onToggleService,
   onSave,
@@ -41,6 +47,12 @@ export default function SpecializationsEditor({
     }
   }, [tree, currentCategoryId])
 
+  useEffect(() => {
+    if (!saveSuccess) return
+    const t = window.setTimeout(() => onDismissFeedback?.(), 2200)
+    return () => window.clearTimeout(t)
+  }, [saveSuccess, onDismissFeedback])
+
   const currentCategory = tree.find((c) => c.id === currentCategoryId)
   const subcategoriesForStep = currentCategory?.subcategories || []
   const selectedSubcategoriesInCurrent = subcategoriesForStep.filter((s) =>
@@ -48,7 +60,8 @@ export default function SpecializationsEditor({
   )
   const servicesForStep = selectedSubcategoriesInCurrent.flatMap((s) => s.services)
 
-  if (treeLoading) {
+  // Не прячем редактор при фоновой перезагрузке — иначе «зависает» на «Загрузка…»
+  if (treeLoading && tree.length === 0) {
     return (
       <div className="py-6 text-center text-sm text-[#8e8e93]">
         Загрузка категорий…
@@ -56,7 +69,7 @@ export default function SpecializationsEditor({
     )
   }
 
-  if (treeError) {
+  if (treeError && tree.length === 0) {
     return (
       <div className="py-4 space-y-3">
         <p className="text-sm text-red-600">{treeError}</p>
@@ -79,10 +92,33 @@ export default function SpecializationsEditor({
   }
 
   return (
-    <div className="space-y-4 pt-1">
+    <div className="space-y-4 pt-1 relative">
+      {saveSuccess && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center pointer-events-none px-6">
+          <div className="pointer-events-auto bg-[#1c1c1e]/92 text-white rounded-2xl px-5 py-4 shadow-xl max-w-xs w-full text-center animate-slide-up">
+            <div className="mx-auto mb-2 w-10 h-10 rounded-full bg-[#22a85e] flex items-center justify-center">
+              <FiCheck size={22} strokeWidth={3} />
+            </div>
+            <p className="text-[14px] font-bold">Специализации сохранены</p>
+            <p className="text-[11px] text-white/70 mt-1">
+              {selectedSubcategoryIds.length} подкатегор. · {selectedServiceIds.length} услуг
+            </p>
+          </div>
+        </div>
+      )}
+
       <p className="text-[11px] text-[#8e8e93] leading-relaxed">
         Выберите категорию, подкатегории и услуги, в которых вы работаете.
       </p>
+
+      <div className="flex gap-2 text-[10px] font-semibold">
+        <span className="bg-[#fff1f2] text-brand-accent px-2 py-1 rounded-full">
+          Подкатегории: {selectedSubcategoryIds.length}
+        </span>
+        <span className="bg-[#f5f5f7] text-[#555] px-2 py-1 rounded-full">
+          Услуги: {selectedServiceIds.length}
+        </span>
+      </div>
 
       {step === 'category' && (
         <>
@@ -90,6 +126,7 @@ export default function SpecializationsEditor({
           <div className="grid grid-cols-3 gap-2">
             {tree.map((cat) => {
               const showImage = cat.image_url && !filterImageFailed.has(cat.id)
+              const hasSelected = cat.subcategories.some((s) => selectedSubcategoryIds.includes(s.id))
               return (
                 <button
                   key={cat.id}
@@ -98,9 +135,11 @@ export default function SpecializationsEditor({
                     setCurrentCategoryId(cat.id)
                     setStep('subcategory')
                   }}
-                  className="flex flex-col overflow-hidden rounded-xl border border-[#e5e5ea] bg-white text-left active:scale-[0.98] transition-transform"
+                  className={`flex flex-col overflow-hidden rounded-xl border bg-white text-left active:scale-[0.98] transition-transform ${
+                    hasSelected ? 'border-brand-accent ring-1 ring-brand-accent/30' : 'border-[#e5e5ea]'
+                  }`}
                 >
-                  <div className="w-full aspect-square bg-[#f2f2f7] flex items-center justify-center">
+                  <div className="w-full aspect-square bg-[#f2f2f7] flex items-center justify-center relative">
                     {showImage ? (
                       <img
                         src={cat.image_url!}
@@ -110,6 +149,11 @@ export default function SpecializationsEditor({
                       />
                     ) : (
                       <FiBriefcase size={24} className="text-[#c7c7cc]" />
+                    )}
+                    {hasSelected && (
+                      <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-brand-accent text-white flex items-center justify-center">
+                        <FiCheck size={12} strokeWidth={3} />
+                      </span>
                     )}
                   </div>
                   <span className="text-[11px] font-medium text-center leading-tight line-clamp-2 px-1 py-2 text-[#1c1c1e]">
@@ -141,7 +185,7 @@ export default function SpecializationsEditor({
             {subcategoriesForStep.map((sub) => (
               <label
                 key={sub.id}
-                className={`flex items-center gap-3 border rounded-xl p-3 text-sm cursor-pointer ${
+                className={`flex items-center gap-3 border rounded-xl p-3 text-sm cursor-pointer transition-colors ${
                   selectedSubcategoryIds.includes(sub.id)
                     ? 'border-brand-accent bg-brand-accent/5 text-brand-accent'
                     : 'border-[#e5e5ea] bg-white text-[#1c1c1e]'
@@ -191,7 +235,7 @@ export default function SpecializationsEditor({
               servicesForStep.map((svc) => (
                 <label
                   key={svc.id}
-                  className={`flex items-center gap-3 border rounded-xl p-3 text-sm cursor-pointer ${
+                  className={`flex items-center gap-3 border rounded-xl p-3 text-sm cursor-pointer transition-colors ${
                     selectedServiceIds.includes(svc.id)
                       ? 'border-brand-accent bg-brand-accent/5 text-brand-accent'
                       : 'border-[#e5e5ea] bg-white text-[#1c1c1e]'
@@ -211,6 +255,8 @@ export default function SpecializationsEditor({
           <p className="text-[10px] text-[#8e8e93]">Выбрано услуг: {selectedServiceIds.length}</p>
         </>
       )}
+
+      {saveError && <p className="text-xs text-red-600">{saveError}</p>}
 
       <button
         type="button"

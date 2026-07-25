@@ -184,6 +184,7 @@ function ProPageInner() {
               <div className="bg-bg-card rounded-lg border border-border-light/60 p-4">
                 <div className="font-semibold text-graphite-secondary mb-1">PRO Мастер</div>
                 <ul className="text-sm text-text-secondary leading-relaxed space-y-1">
+                  <li>- Новые заказы сразу (без ожидания 24 часов)</li>
                   <li>- Без лимитов на истории</li>
                   <li>- Без лимитов на публикации работ</li>
                   <li>- Отклики на заказы без ограничений</li>

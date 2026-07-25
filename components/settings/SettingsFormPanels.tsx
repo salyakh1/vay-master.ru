@@ -35,6 +35,9 @@ export function useSettingsForms(onSaved?: () => void) {
   const [city, setCity] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
+  const [savingSpecializations, setSavingSpecializations] = useState(false)
+  const [specsSaveSuccess, setSpecsSaveSuccess] = useState(false)
+  const [specsSaveError, setSpecsSaveError] = useState('')
 
   const [servicesText, setServicesText] = useState('')
   const [serviceLocation, setServiceLocation] = useState<'home' | 'workshop' | 'both'>('both')
@@ -75,8 +78,8 @@ export function useSettingsForms(onSaved?: () => void) {
     if (user) hydrateFromUser(user)
   }, [user, hydrateFromUser])
 
-  const fetchTree = useCallback(async () => {
-    setTreeLoading(true)
+  const fetchTree = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setTreeLoading(true)
     setTreeError('')
     try {
       const nextTree = await fetchMasterCategoriesTree(supabase)
@@ -109,26 +112,65 @@ export function useSettingsForms(onSaved?: () => void) {
     }
   }, [])
 
+  // Дерево и выбор — только при смене пользователя/роли, не при каждом refreshUser
   useEffect(() => {
-    if (!user) return
-    if (user.role === 'master') {
-      fetchTree()
-      fetchSelections(user.id)
-    }
-  }, [user, fetchTree, fetchSelections])
+    if (!user || user.role !== 'master') return
+    void fetchTree()
+    void fetchSelections(user.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- намеренно только id/role
+  }, [user?.id, user?.role])
 
   const syncSelections = async (profileId: string) => {
-    await supabase.from('profile_subcategories').delete().eq('profile_id', profileId)
-    if (selectedSubcategoryIds.length > 0) {
-      await supabase.from('profile_subcategories').insert(
-        selectedSubcategoryIds.map((subId) => ({ profile_id: profileId, subcategory_id: subId }))
+    const [{ data: curSubs, error: curSubsErr }, { data: curSvcs, error: curSvcsErr }] = await Promise.all([
+      supabase.from('profile_subcategories').select('subcategory_id').eq('profile_id', profileId),
+      supabase.from('profile_services').select('service_id').eq('profile_id', profileId),
+    ])
+    if (curSubsErr) throw curSubsErr
+    if (curSvcsErr) throw curSvcsErr
+
+    const curSubIds = new Set((curSubs || []).map((r) => r.subcategory_id as string))
+    const curSvcIds = new Set((curSvcs || []).map((r) => r.service_id as string))
+    const nextSubIds = new Set(selectedSubcategoryIds)
+    const nextSvcIds = new Set(selectedServiceIds)
+
+    const toAddSubs = selectedSubcategoryIds.filter((id) => !curSubIds.has(id))
+    const toDelSubs = [...curSubIds].filter((id) => !nextSubIds.has(id))
+    const toAddSvcs = selectedServiceIds.filter((id) => !curSvcIds.has(id))
+    const toDelSvcs = [...curSvcIds].filter((id) => !nextSvcIds.has(id))
+
+    const ops: PromiseLike<{ error: { message: string } | null }>[] = []
+
+    if (toDelSubs.length > 0) {
+      ops.push(
+        supabase
+          .from('profile_subcategories')
+          .delete()
+          .eq('profile_id', profileId)
+          .in('subcategory_id', toDelSubs)
       )
     }
-    await supabase.from('profile_services').delete().eq('profile_id', profileId)
-    if (selectedServiceIds.length > 0) {
-      await supabase.from('profile_services').insert(
-        selectedServiceIds.map((svcId) => ({ profile_id: profileId, service_id: svcId }))
+    if (toDelSvcs.length > 0) {
+      ops.push(
+        supabase.from('profile_services').delete().eq('profile_id', profileId).in('service_id', toDelSvcs)
       )
+    }
+
+    const delResults = await Promise.all(ops)
+    for (const r of delResults) {
+      if (r.error) throw r.error
+    }
+
+    if (toAddSubs.length > 0) {
+      const { error } = await supabase.from('profile_subcategories').insert(
+        toAddSubs.map((subId) => ({ profile_id: profileId, subcategory_id: subId }))
+      )
+      if (error) throw error
+    }
+    if (toAddSvcs.length > 0) {
+      const { error } = await supabase.from('profile_services').insert(
+        toAddSvcs.map((svcId) => ({ profile_id: profileId, service_id: svcId }))
+      )
+      if (error) throw error
     }
   }
 
@@ -193,16 +235,30 @@ export function useSettingsForms(onSaved?: () => void) {
 
   const saveSpecializations = async () => {
     if (!user) return
-    setSaving(true)
+    if (selectedSubcategoryIds.length === 0) {
+      setSpecsSaveError('Выберите хотя бы одну подкатегорию')
+      return
+    }
+    setSavingSpecializations(true)
+    setSpecsSaveError('')
+    setSpecsSaveSuccess(false)
     try {
       await syncSelections(user.id)
-      onSaved?.()
-    } catch {
-      alert('Ошибка при сохранении')
+      setSpecsSaveSuccess(true)
+      // Не ждём refresh — иначе UI «висит»; счётчик обновим в фоне
+      void Promise.resolve(onSaved?.())
+    } catch (e) {
+      console.error(e)
+      setSpecsSaveError(e instanceof Error ? e.message : 'Ошибка при сохранении')
     } finally {
-      setSaving(false)
+      setSavingSpecializations(false)
     }
   }
+
+  const clearSpecsSaveFeedback = useCallback(() => {
+    setSpecsSaveSuccess(false)
+    setSpecsSaveError('')
+  }, [])
 
   const changePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -323,6 +379,10 @@ export function useSettingsForms(onSaved?: () => void) {
     toggleService,
     filteredServices,
     saving,
+    savingSpecializations,
+    specsSaveSuccess,
+    specsSaveError,
+    clearSpecsSaveFeedback,
     saveProfile,
     saveSpecializations,
     changePassword,
@@ -490,7 +550,21 @@ export function ProfileEditPanel({ forms }: { forms: ReturnType<typeof useSettin
 }
 
 export function SpecializationsPanel({ forms }: { forms: ReturnType<typeof useSettingsForms> }) {
-  const { tree, treeLoading, treeError, reloadTree, selectedSubcategoryIds, selectedServiceIds, saving, toggleSubcategory, toggleService, saveSpecializations } = forms
+  const {
+    tree,
+    treeLoading,
+    treeError,
+    reloadTree,
+    selectedSubcategoryIds,
+    selectedServiceIds,
+    savingSpecializations,
+    specsSaveSuccess,
+    specsSaveError,
+    clearSpecsSaveFeedback,
+    toggleSubcategory,
+    toggleService,
+    saveSpecializations,
+  } = forms
 
   useEffect(() => {
     if (tree.length === 0 && !treeLoading && !treeError) {
@@ -505,11 +579,14 @@ export function SpecializationsPanel({ forms }: { forms: ReturnType<typeof useSe
       treeError={treeError}
       selectedSubcategoryIds={selectedSubcategoryIds}
       selectedServiceIds={selectedServiceIds}
-      saving={saving}
+      saving={savingSpecializations}
+      saveSuccess={specsSaveSuccess}
+      saveError={specsSaveError}
+      onDismissFeedback={clearSpecsSaveFeedback}
       onToggleSubcategory={toggleSubcategory}
       onToggleService={toggleService}
       onSave={saveSpecializations}
-      onRetry={() => void reloadTree()}
+      onRetry={() => void reloadTree({ silent: tree.length > 0 })}
     />
   )
 }

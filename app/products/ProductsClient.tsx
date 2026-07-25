@@ -50,7 +50,7 @@ function ProductsContent() {
   const [productSubcategories, setProductSubcategories] = useState<ProductSubcategory[]>([])
   const [showFilters, setShowFilters] = useState(false)
   const [filterStep, setFilterStep] = useState<'categories' | 'subcategories'>('categories')
-  const [sortPriceAsc, setSortPriceAsc] = useState(true)
+  const [sortMode, setSortMode] = useState<'newest' | 'price_asc' | 'price_desc'>('newest')
   const [totalCount, setTotalCount] = useState(0)
   const [categoryImageFailed, setCategoryImageFailed] = useState<Set<string>>(new Set())
   const [showAuthModal, setShowAuthModal] = useState(false)
@@ -308,7 +308,7 @@ function ProductsContent() {
     setHasMore(true)
     fetchProducts(1, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, categoryId, subcategoryIds, cityFilter, showFilters, sortPriceAsc])
+  }, [searchQuery, categoryId, subcategoryIds, cityFilter, showFilters, sortMode])
 
   const fetchCategories = async () => {
     try {
@@ -402,8 +402,17 @@ function ProductsContent() {
           reviews_count
         `, { count: 'exact' })
         .eq('in_stock', true)
-        .order('price', { ascending: sortPriceAsc })
-        .range(from, to)
+
+      // Новые публикации продавцов — всегда выше старых (по умолчанию и как вторичный ключ при сортировке по цене)
+      if (sortMode === 'newest') {
+        query = query.order('created_at', { ascending: false })
+      } else if (sortMode === 'price_asc') {
+        query = query.order('price', { ascending: true }).order('created_at', { ascending: false })
+      } else {
+        query = query.order('price', { ascending: false }).order('created_at', { ascending: false })
+      }
+
+      query = query.range(from, to)
 
       if (sellerIds && sellerIds.length > 0) {
         query = query.in('seller_id', sellerIds)
@@ -571,10 +580,18 @@ function ProductsContent() {
         </div>
         <button
           type="button"
-          onClick={() => setSortPriceAsc((v) => !v)}
+          onClick={() =>
+            setSortMode((m) =>
+              m === 'newest' ? 'price_asc' : m === 'price_asc' ? 'price_desc' : 'newest'
+            )
+          }
           className="ml-auto text-[10px] text-brand-accent font-bold"
         >
-          По цене {sortPriceAsc ? '↑' : '↓'}
+          {sortMode === 'newest'
+            ? 'Сначала новые'
+            : sortMode === 'price_asc'
+              ? 'По цене ↑'
+              : 'По цене ↓'}
         </button>
       </div>
 

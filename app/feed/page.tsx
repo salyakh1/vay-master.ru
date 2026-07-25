@@ -4,17 +4,17 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useAuth } from '../providers'
-import { supabase, PortfolioItem, PortfolioComment } from '@/lib/supabase'
+import { supabase, PortfolioItem, PortfolioComment, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
-import { FiHeart, FiMessageCircle, FiMessageSquare, FiMapPin } from 'react-icons/fi'
+import { FiHeart, FiMessageCircle, FiMessageSquare, FiMapPin, FiShoppingBag } from 'react-icons/fi'
 import StoriesCircle from '@/components/StoriesCircle'
 import PostImageSlider from '@/components/PostImageSlider'
 import { Story } from '@/lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import ExploreMasonryGrid from '@/components/ExploreMasonryGrid'
+import ExploreMasonryGrid, { type ExploreGridItem } from '@/components/ExploreMasonryGrid'
 import PortfolioGallery from '@/components/PortfolioGallery'
 
 interface ItemWithInteractions extends PortfolioItem {
@@ -23,10 +23,26 @@ interface ItemWithInteractions extends PortfolioItem {
   showComments?: boolean
 }
 
+type UnifiedFeedItem = {
+  key: string
+  type: 'portfolio' | 'product'
+  created_at: string
+  portfolio?: ItemWithInteractions
+  product?: Product & {
+    seller?: {
+      id: string
+      full_name?: string | null
+      avatar_url?: string | null
+      role?: string
+      city?: string | null
+    } | null
+  }
+}
+
 export default function FeedPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
-  const [items, setItems] = useState<ItemWithInteractions[]>([])
+  const [items, setItems] = useState<UnifiedFeedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
@@ -41,6 +57,7 @@ export default function FeedPage() {
   const [feedMode, setFeedMode] = useState<'following' | 'explore'>('following')
   const [initialFeedModeResolved, setInitialFeedModeResolved] = useState(false)
   const [selectedExploreIndex, setSelectedExploreIndex] = useState<number | null>(null)
+  const [explorePortfolioItems, setExplorePortfolioItems] = useState<PortfolioItem[]>([])
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
 
   const ITEMS_PER_PAGE = 9
@@ -146,93 +163,118 @@ export default function FeedPage() {
       const from = (pageNum - 1) * ITEMS_PER_PAGE
       const to = from + ITEMS_PER_PAGE - 1
 
-      let query = supabase
+      let portfolioQuery = supabase
         .from('portfolio_items')
-        .select(`
+        .select(
+          `
           *,
           master:profiles(id, full_name, avatar_url, role, city)
-        `, { count: 'exact' })
+        `,
+          { count: 'exact' }
+        )
         .order('created_at', { ascending: false })
         .range(from, to)
 
-      // В режиме «Подписки» показываем только тех, на кого подписан.
-      // В режиме «Рекомендации» — все публикации платформы без ограничений (Explore-логика).
+      let productsQuery = supabase
+        .from('products')
+        .select(
+          `
+          *,
+          seller:profiles(id, full_name, avatar_url, role, city)
+        `,
+          { count: 'exact' }
+        )
+        .eq('in_stock', true)
+        .order('created_at', { ascending: false })
+        .range(from, to)
+
       if (feedMode === 'following') {
-        query = query.in('master_id', followingIds)
+        portfolioQuery = portfolioQuery.in('master_id', followingIds)
+        productsQuery = productsQuery.in('seller_id', followingIds)
       }
 
-      const { data, error, count } = await query
-      if (error) throw error
-      
-      const portfolioItems = (data as PortfolioItem[]) || []
-      
-      // Получаем данные о лайках и комментариях для всех работ
+      const [portfolioRes, productsRes] = await Promise.all([portfolioQuery, productsQuery])
+      if (portfolioRes.error) throw portfolioRes.error
+      if (productsRes.error) throw productsRes.error
+
+      const portfolioItems = (portfolioRes.data as PortfolioItem[]) || []
+      const products = (productsRes.data as Product[]) || []
+
+      let portfolioWithInteractions: ItemWithInteractions[] = portfolioItems.map((item) => ({
+        ...item,
+        liked: false,
+        comments: [],
+        showComments: false,
+      }))
+
       if (portfolioItems.length > 0 && user) {
-        const itemIds = portfolioItems.map(item => item.id)
-        
-        // Получаем лайки текущего пользователя
-        const { data: likesData } = await supabase
-          .from('portfolio_likes')
-          .select('portfolio_item_id')
-          .eq('user_id', user.id)
-          .in('portfolio_item_id', itemIds)
-        
-        const likedItemIds = new Set(likesData?.map(l => l.portfolio_item_id) || [])
-        
-        // Получаем комментарии для всех работ (не более 60 на порцию — ~3 на пост)
-        const { data: commentsData } = await supabase
-          .from('portfolio_comments')
-          .select(`
+        const itemIds = portfolioItems.map((item) => item.id)
+        const [{ data: likesData }, { data: commentsData }] = await Promise.all([
+          supabase
+            .from('portfolio_likes')
+            .select('portfolio_item_id')
+            .eq('user_id', user.id)
+            .in('portfolio_item_id', itemIds),
+          supabase
+            .from('portfolio_comments')
+            .select(
+              `
             *,
             user:profiles(id, full_name, avatar_url, role)
-          `)
-          .in('portfolio_item_id', itemIds)
-          .order('created_at', { ascending: true })
-          .limit(60)
-        
-        // Группируем комментарии по работам
+          `
+            )
+            .in('portfolio_item_id', itemIds)
+            .order('created_at', { ascending: true })
+            .limit(60),
+        ])
+
+        const likedItemIds = new Set(likesData?.map((l) => l.portfolio_item_id) || [])
         const commentsByItem = new Map<string, PortfolioComment[]>()
         commentsData?.forEach((comment: any) => {
           const itemId = comment.portfolio_item_id
-          if (!commentsByItem.has(itemId)) {
-            commentsByItem.set(itemId, [])
-          }
+          if (!commentsByItem.has(itemId)) commentsByItem.set(itemId, [])
           commentsByItem.get(itemId)!.push(comment as PortfolioComment)
         })
-        
-        // Объединяем данные
-        const itemsWithInteractions: ItemWithInteractions[] = portfolioItems.map(item => ({
+
+        portfolioWithInteractions = portfolioItems.map((item) => ({
           ...item,
           liked: likedItemIds.has(item.id),
-          comments: commentsByItem.get(item.id)?.slice(0, 3) || [], // Первые 3 комментария
+          comments: commentsByItem.get(item.id)?.slice(0, 3) || [],
           showComments: false,
         }))
-        
-        if (reset) {
-          setItems(itemsWithInteractions)
-        } else {
-          setItems(prev => [...prev, ...itemsWithInteractions])
-        }
-      } else {
-        const newItems = portfolioItems.map(item => ({
-          ...item,
-          liked: false,
-          comments: [],
-          showComments: false,
-        }))
-        
-        if (reset) {
-          setItems(newItems)
-        } else {
-          setItems(prev => [...prev, ...newItems])
-        }
       }
 
-      // Проверяем, есть ли ещё данные
-      const totalFetched = reset ? portfolioItems.length : items.length + portfolioItems.length
-      setHasMore(portfolioItems.length === ITEMS_PER_PAGE && (count || 0) > pageNum * ITEMS_PER_PAGE)
+      const unified: UnifiedFeedItem[] = [
+        ...portfolioWithInteractions.map((item) => ({
+          key: `portfolio-${item.id}`,
+          type: 'portfolio' as const,
+          created_at: item.created_at,
+          portfolio: item,
+        })),
+        ...products.map((product) => ({
+          key: `product-${product.id}`,
+          type: 'product' as const,
+          created_at: product.created_at,
+          product: product as UnifiedFeedItem['product'],
+        })),
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+      if (reset) {
+        setItems(unified)
+      } else {
+        setItems((prev) => {
+          const seen = new Set(prev.map((i) => i.key))
+          return [...prev, ...unified.filter((i) => !seen.has(i.key))]
+        })
+      }
+
+      const portfolioHasMore =
+        portfolioItems.length === ITEMS_PER_PAGE && (portfolioRes.count || 0) > pageNum * ITEMS_PER_PAGE
+      const productsHasMore =
+        products.length === ITEMS_PER_PAGE && (productsRes.count || 0) > pageNum * ITEMS_PER_PAGE
+      setHasMore(portfolioHasMore || productsHasMore)
     } catch (error) {
-      console.error('Error fetching portfolio items:', error)
+      console.error('Error fetching feed items:', error)
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -270,13 +312,27 @@ export default function FeedPage() {
     }
   }
 
+  const updatePortfolio = (
+    itemId: string,
+    patch: (p: ItemWithInteractions) => ItemWithInteractions
+  ) => {
+    setItems((prev) =>
+      prev.map((i) =>
+        i.type === 'portfolio' && i.portfolio?.id === itemId && i.portfolio
+          ? { ...i, portfolio: patch(i.portfolio) }
+          : i
+      )
+    )
+  }
+
   const handleLike = async (itemId: string) => {
     if (!user) {
       router.push('/auth/login')
       return
     }
 
-    const item = items.find(i => i.id === itemId)
+    const wrap = items.find((i) => i.type === 'portfolio' && i.portfolio?.id === itemId)
+    const item = wrap?.portfolio
     if (!item) return
 
     try {
@@ -288,25 +344,23 @@ export default function FeedPage() {
           .eq('user_id', user.id)
 
         if (error) throw error
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === itemId
-              ? { ...i, liked: false, likes_count: Math.max(0, i.likes_count - 1) }
-              : i
-          )
-        )
+        updatePortfolio(itemId, (p) => ({
+          ...p,
+          liked: false,
+          likes_count: Math.max(0, (p.likes_count || 0) - 1),
+        }))
       } else {
-        const { error } = await supabase
-          .from('portfolio_likes')
-          .insert({
-            portfolio_item_id: itemId,
-            user_id: user.id,
-          })
+        const { error } = await supabase.from('portfolio_likes').insert({
+          portfolio_item_id: itemId,
+          user_id: user.id,
+        })
 
         if (error) throw error
-        setItems((prev) =>
-          prev.map((i) => (i.id === itemId ? { ...i, liked: true, likes_count: i.likes_count + 1 } : i))
-        )
+        updatePortfolio(itemId, (p) => ({
+          ...p,
+          liked: true,
+          likes_count: (p.likes_count || 0) + 1,
+        }))
       }
     } catch (error) {
       console.error('Error toggling like:', error)
@@ -314,27 +368,28 @@ export default function FeedPage() {
   }
 
   const setCommentsOpen = (itemId: string, open: boolean) => {
-    setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, showComments: open } : i)))
+    updatePortfolio(itemId, (p) => ({ ...p, showComments: open }))
   }
 
   const fetchAllComments = async (itemId: string) => {
     try {
       const { data, error } = await supabase
         .from('portfolio_comments')
-        .select(`
+        .select(
+          `
           *,
           user:profiles(id, full_name, avatar_url, role)
-        `)
+        `
+        )
         .eq('portfolio_item_id', itemId)
         .order('created_at', { ascending: true })
 
       if (error) throw error
-      
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === itemId ? { ...i, comments: (data as PortfolioComment[]) || [] } : i
-        )
-      )
+
+      updatePortfolio(itemId, (p) => ({
+        ...p,
+        comments: (data as PortfolioComment[]) || [],
+      }))
     } catch (error) {
       console.error('Error fetching comments:', error)
     }
@@ -351,25 +406,22 @@ export default function FeedPage() {
 
     setSubmittingComments({ ...submittingComments, [itemId]: true })
     try {
-      const { error } = await supabase
-        .from('portfolio_comments')
-        .insert({
-          portfolio_item_id: itemId,
-          user_id: user.id,
-          content: commentText,
-        })
+      const { error } = await supabase.from('portfolio_comments').insert({
+        portfolio_item_id: itemId,
+        user_id: user.id,
+        content: commentText,
+      })
 
       if (error) throw error
-      
+
       setCommentTexts({ ...commentTexts, [itemId]: '' })
       await fetchAllComments(itemId)
-      
-      // Обновляем счетчик комментариев
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === itemId ? { ...i, comments_count: (i.comments_count || 0) + 1, showComments: true } : i
-        )
-      )
+
+      updatePortfolio(itemId, (p) => ({
+        ...p,
+        comments_count: (p.comments_count || 0) + 1,
+        showComments: true,
+      }))
     } catch (error) {
       console.error('Error submitting comment:', error)
     } finally {
@@ -398,15 +450,44 @@ export default function FeedPage() {
   ]
 
   const filteredItems = items.filter((item) => {
-    const role = item.master?.role
-    if (feedTab === 'masters') return role === 'master'
-    if (feedTab === 'sellers') return role === 'seller'
+    if (feedTab === 'masters') return item.type === 'portfolio'
+    if (feedTab === 'sellers') return item.type === 'product'
     return true
   })
 
-  const exploreGalleryItems = filteredItems.filter(
-    (item) => (item.images?.length ?? 0) > 0 || (item.videos?.length ?? 0) > 0
-  )
+  const exploreGridItems: ExploreGridItem[] = filteredItems.map((item) => {
+    if (item.type === 'product' && item.product) {
+      return {
+        id: item.product.id,
+        kind: 'product' as const,
+        imageUrl: item.product.images?.[0] || null,
+        title: item.product.name,
+        price: item.product.price,
+      }
+    }
+    const p = item.portfolio!
+    return {
+      id: p.id,
+      kind: 'portfolio' as const,
+      imageUrl: p.images?.[0] || null,
+      videoUrl: p.videos?.[0] || null,
+      title: p.title,
+      likesCount: p.likes_count ?? 0,
+    }
+  })
+
+  const handleExploreClick = (gridItem: ExploreGridItem) => {
+    if (gridItem.kind === 'product') {
+      router.push(`/products/${gridItem.id}`)
+      return
+    }
+    const portfolioOnly = filteredItems
+      .filter((i) => i.type === 'portfolio' && i.portfolio)
+      .map((i) => i.portfolio!) as PortfolioItem[]
+    const idx = portfolioOnly.findIndex((p) => p.id === gridItem.id)
+    setExplorePortfolioItems(portfolioOnly)
+    setSelectedExploreIndex(idx >= 0 ? idx : 0)
+  }
 
   return (
     <>
@@ -482,7 +563,7 @@ export default function FeedPage() {
               <>
                 <p className="text-[15px] font-bold text-graphite-primary mb-1.5">В подписках пока пусто</p>
                 <p className="text-[12px] leading-relaxed text-text-secondary">
-                  Подпишитесь на мастеров и продавцов — их работы появятся здесь
+                  Подпишитесь на мастеров и продавцов — их работы и товары появятся здесь
                 </p>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 mt-4 max-w-xs mx-auto">
                   <Link
@@ -504,7 +585,7 @@ export default function FeedPage() {
               <>
                 <p className="text-[15px] font-bold text-graphite-primary mb-1.5">Пока нет публикаций</p>
                 <p className="text-[12px] leading-relaxed text-text-secondary">
-                  Как только мастера и продавцы начнут выкладывать работы, они появятся здесь
+                  Работы мастеров и товары продавцов появятся здесь в одной ленте
                 </p>
               </>
             )}
@@ -512,16 +593,101 @@ export default function FeedPage() {
         ) : (
           <>
             {feedMode === 'explore' ? (
-              <ExploreMasonryGrid
-                items={exploreGalleryItems}
-                onItemClick={(_item, index) => setSelectedExploreIndex(index)}
-              />
+              <ExploreMasonryGrid items={exploreGridItems} onItemClick={(item) => handleExploreClick(item)} />
             ) : (
-              filteredItems.map((item) => {
-              const isSeller = item.master?.role === 'seller'
-              return (
+              filteredItems.map((feedItem) => {
+                if (feedItem.type === 'product' && feedItem.product) {
+                  const product = feedItem.product
+                  const seller = product.seller
+                  const cover = product.images?.[0]
+                  return (
+                    <article
+                      key={feedItem.key}
+                      className="bg-white rounded-2xl border border-border-light shadow-card overflow-hidden"
+                    >
+                      <div className="flex items-center gap-3 px-4 pt-3.5 pb-3">
+                        <Link
+                          href={`/profile/${seller?.id || ''}`}
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold overflow-hidden flex-shrink-0 relative ring-2 ring-[#2563eb]/40 bg-[#2563eb] text-white"
+                        >
+                          {seller?.avatar_url ? (
+                            <Image src={seller.avatar_url} alt="" fill className="object-cover" sizes="40px" />
+                          ) : (
+                            seller?.full_name?.[0]?.toUpperCase() || 'П'
+                          )}
+                        </Link>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <Link
+                              href={`/profile/${seller?.id || ''}`}
+                              className="text-[13.5px] font-bold text-graphite-primary truncate hover:underline"
+                            >
+                              {seller?.full_name || 'Продавец'}
+                            </Link>
+                            <span className="flex-shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-[#eef6ff] text-[#2563eb]">
+                              Товар
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[11px] text-text-secondary truncate mt-0.5">
+                            {seller?.city && (
+                              <span className="flex items-center gap-0.5 truncate">
+                                <FiMapPin size={10} className="flex-shrink-0" />
+                                {seller.city}
+                              </span>
+                            )}
+                            {seller?.city && <span aria-hidden>·</span>}
+                            <span className="flex-shrink-0">
+                              {formatDistanceToNow(new Date(feedItem.created_at), { addSuffix: true, locale: ru })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="px-4 pb-2">
+                        <h3 className="text-[14px] font-bold text-graphite-primary leading-snug mb-1">
+                          {product.name}
+                        </h3>
+                        <p className="text-[16px] font-bold text-brand-accent">
+                          {Number(product.price).toLocaleString('ru-RU')} ₽
+                        </p>
+                      </div>
+
+                      {cover && (
+                        <Link href={`/products/${product.id}`} className="block px-4 pb-3.5">
+                          <div className="relative h-[200px] rounded-xl overflow-hidden bg-bg-secondary">
+                            <Image src={cover} alt={product.name} fill className="object-cover" sizes="100vw" />
+                          </div>
+                        </Link>
+                      )}
+
+                      <div className="flex items-center gap-2 px-4 pb-3.5">
+                        <Link
+                          href={`/products/${product.id}`}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold bg-brand-accent text-white"
+                        >
+                          <FiShoppingBag size={13} />
+                          Открыть товар
+                        </Link>
+                        {seller?.id && (
+                          <Link
+                            href={`/profile/${seller.id}`}
+                            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold text-text-secondary hover:text-brand-accent"
+                          >
+                            <FiMessageSquare size={13} />
+                            К продавцу
+                          </Link>
+                        )}
+                      </div>
+                    </article>
+                  )
+                }
+
+                const item = feedItem.portfolio
+                if (!item) return null
+                const isSeller = item.master?.role === 'seller'
+                return (
                 <article
-                  key={item.id}
+                  key={feedItem.key}
                   className="bg-white rounded-2xl border border-border-light shadow-card overflow-hidden"
                 >
                   {/* Шапка карточки: аватар с цветным кольцом по роли, имя, роль, город, время */}
@@ -694,11 +860,14 @@ export default function FeedPage() {
       </div>
     </div>
 
-    {selectedExploreIndex !== null && exploreGalleryItems.length > 0 && (
+    {selectedExploreIndex !== null && explorePortfolioItems.length > 0 && (
       <PortfolioGallery
-        items={exploreGalleryItems}
+        items={explorePortfolioItems}
         initialIndex={selectedExploreIndex}
-        onClose={() => setSelectedExploreIndex(null)}
+        onClose={() => {
+          setSelectedExploreIndex(null)
+          setExplorePortfolioItems([])
+        }}
         hasMore={hasMore}
         onNearEnd={() => {
           if (hasMore && !loadingMore) loadMore()

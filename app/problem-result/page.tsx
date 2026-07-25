@@ -8,6 +8,7 @@ import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import { FiUser, FiShoppingBag, FiCheck, FiX, FiMessageCircle, FiEdit2, FiSearch } from 'react-icons/fi'
 import AutocompleteInput from '@/components/AutocompleteInput'
+import { findOrCreateChat } from '@/lib/chatHelpers'
 
 interface ProblemResult {
   problemText: string
@@ -134,31 +135,8 @@ function ProblemResultContent() {
     }
 
     try {
-      // Проверяем, есть ли уже чат между этими двумя пользователями
-      const { data: existingChats } = await supabase
-        .from('chats')
-        .select('id')
-        .or(`and(user1_id.eq.${user.id},user2_id.eq.${masterId}),and(user1_id.eq.${masterId},user2_id.eq.${user.id})`)
-        .maybeSingle()
-
-      if (existingChats) {
-        router.push(`/chats/${existingChats.id}`)
-        return
-      }
-
-      // Создаем новый чат
-      const { data: newChat, error } = await supabase
-        .from('chats')
-        .insert({
-          user1_id: user.id,
-          user2_id: masterId,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      router.push(`/chats/${newChat.id}`)
+      const chatId = await findOrCreateChat(user.id, masterId)
+      router.push(`/chats/${chatId}`)
     } catch (error) {
       console.error('Error creating chat:', error)
       alert('Ошибка при создании чата')

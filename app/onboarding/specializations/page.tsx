@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiBriefcase } from 'react-icons/fi'
+import { FiBriefcase, FiCheck } from 'react-icons/fi'
 
 type TreeCategory = {
   id: string
@@ -35,6 +35,7 @@ export default function SpecializationsOnboardingPage() {
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
   const [error, setError] = useState('')
   const [filterImageFailed, setFilterImageFailed] = useState<Set<string>>(new Set())
 
@@ -98,24 +99,56 @@ export default function SpecializationsOnboardingPage() {
     }
     setSaving(true)
     setError('')
+    setSaveSuccess(false)
     try {
-      await supabase.from('profile_subcategories').delete().eq('profile_id', user.id)
-      await supabase.from('profile_services').delete().eq('profile_id', user.id)
-      if (selectedSubcategoryIds.length > 0) {
-        await supabase.from('profile_subcategories').insert(
-          selectedSubcategoryIds.map((subId) => ({ profile_id: user.id, subcategory_id: subId }))
-        )
+      const [{ data: curSubs }, { data: curSvcs }] = await Promise.all([
+        supabase.from('profile_subcategories').select('subcategory_id').eq('profile_id', user.id),
+        supabase.from('profile_services').select('service_id').eq('profile_id', user.id),
+      ])
+      const curSubIds = new Set((curSubs || []).map((r) => r.subcategory_id as string))
+      const curSvcIds = new Set((curSvcs || []).map((r) => r.service_id as string))
+      const nextSub = new Set(selectedSubcategoryIds)
+      const nextSvc = new Set(selectedServiceIds)
+
+      const toDelSubs = [...curSubIds].filter((id) => !nextSub.has(id))
+      const toAddSubs = selectedSubcategoryIds.filter((id) => !curSubIds.has(id))
+      const toDelSvcs = [...curSvcIds].filter((id) => !nextSvc.has(id))
+      const toAddSvcs = selectedServiceIds.filter((id) => !curSvcIds.has(id))
+
+      if (toDelSubs.length) {
+        const { error: e } = await supabase
+          .from('profile_subcategories')
+          .delete()
+          .eq('profile_id', user.id)
+          .in('subcategory_id', toDelSubs)
+        if (e) throw e
       }
-      if (selectedServiceIds.length > 0) {
-        await supabase.from('profile_services').insert(
-          selectedServiceIds.map((svcId) => ({ profile_id: user.id, service_id: svcId }))
-        )
+      if (toDelSvcs.length) {
+        const { error: e } = await supabase
+          .from('profile_services')
+          .delete()
+          .eq('profile_id', user.id)
+          .in('service_id', toDelSvcs)
+        if (e) throw e
       }
-      router.push('/')
-    } catch (err: any) {
+      if (toAddSubs.length) {
+        const { error: e } = await supabase.from('profile_subcategories').insert(
+          toAddSubs.map((subId) => ({ profile_id: user.id, subcategory_id: subId }))
+        )
+        if (e) throw e
+      }
+      if (toAddSvcs.length) {
+        const { error: e } = await supabase.from('profile_services').insert(
+          toAddSvcs.map((svcId) => ({ profile_id: user.id, service_id: svcId }))
+        )
+        if (e) throw e
+      }
+
+      setSaveSuccess(true)
+      window.setTimeout(() => router.push('/'), 900)
+    } catch (err: unknown) {
       console.error('Error saving:', err)
-      setError(err?.message || 'Ошибка при сохранении')
-    } finally {
+      setError(err instanceof Error ? err.message : 'Ошибка при сохранении')
       setSaving(false)
     }
   }
@@ -145,6 +178,17 @@ export default function SpecializationsOnboardingPage() {
   return (
     <div className="min-h-screen bg-white pb-24">
       <Navbar />
+      {saveSuccess && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center px-6 bg-black/30">
+          <div className="bg-[#1c1c1e]/95 text-white rounded-2xl px-5 py-4 shadow-xl max-w-xs w-full text-center">
+            <div className="mx-auto mb-2 w-10 h-10 rounded-full bg-[#22a85e] flex items-center justify-center">
+              <FiCheck size={22} strokeWidth={3} />
+            </div>
+            <p className="text-[14px] font-bold">Специализации сохранены</p>
+            <p className="text-[11px] text-white/70 mt-1">Переходим дальше…</p>
+          </div>
+        </div>
+      )}
       <div className="max-w-4xl mx-auto px-4 py-6">
         <h1 className="text-xl font-bold mb-1 text-black">Категории и услуги</h1>
         <p className="text-sm text-gray-600 mb-4">

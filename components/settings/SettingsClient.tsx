@@ -172,8 +172,9 @@ export default function SettingsClient() {
   }, [])
 
   const onSaved = useCallback(() => {
-    refreshUser()
-    if (user) loadStats(user.id, user.role)
+    // Не блокируем UI: обновление в фоне
+    void refreshUser()
+    if (user) void loadStats(user.id, user.role)
   }, [refreshUser, loadStats, user])
 
   const forms = useSettingsForms(onSaved)
@@ -324,7 +325,11 @@ export default function SettingsClient() {
                   icon="🔧"
                   iconBg="#fff1f2"
                   title="Специализации и услуги"
-                  subtitle={specCountLabel(specCount)}
+                  subtitle={specCountLabel(
+                    forms.selectedSubcategoryIds.length > 0
+                      ? forms.selectedSubcategoryIds.length
+                      : specCount
+                  )}
                   expanded={openPanel === 'specializations'}
                   onToggle={() => togglePanel('specializations')}
                 >

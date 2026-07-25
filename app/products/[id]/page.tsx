@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { useAuth } from '@/app/providers'
 import { supabase, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiChevronLeft, FiChevronRight, FiArrowLeft, FiPhone, FiEdit2 } from 'react-icons/fi'
+import { FiChevronLeft, FiChevronRight, FiArrowLeft, FiPhone, FiEdit2, FiX } from 'react-icons/fi'
 import Link from 'next/link'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
@@ -15,6 +15,7 @@ import ReviewCard from '@/components/ReviewCard'
 import ReviewForm from '@/components/ReviewForm'
 import ReviewReplyForm from '@/components/ReviewReplyForm'
 import ProductComments from '@/components/ProductComments'
+import ProductChatModal from '@/components/chats/ProductChatModal'
 
 export default function ProductPage() {
   const params = useParams()
@@ -25,11 +26,14 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeImage, setActiveImage] = useState<number>(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   const imageContainerRef = useRef<HTMLDivElement>(null)
   const touchStartX = useRef<number>(0)
   const touchEndX = useRef<number>(0)
+  const lightboxTouchStartX = useRef<number>(0)
 
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showChatModal, setShowChatModal] = useState(false)
   const [productReviews, setProductReviews] = useState<any[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [showReviewForm, setShowReviewForm] = useState(false)
@@ -100,26 +104,39 @@ export default function ProductPage() {
     }
   }
 
-  // Keyboard navigation
+  // Keyboard navigation + lightbox
   useEffect(() => {
     if (!product) return
-    
-    const images = product.images || []
-    if (images.length <= 1) return
+    const imgs = product.images || []
 
     const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && lightboxOpen) {
+        e.preventDefault()
+        setLightboxOpen(false)
+        return
+      }
+      if (imgs.length <= 1) return
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
-        setActiveImage((prev) => (prev - 1 + images.length) % images.length)
+        setActiveImage((prev) => (prev - 1 + imgs.length) % imgs.length)
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        setActiveImage((prev) => (prev + 1) % images.length)
+        setActiveImage((prev) => (prev + 1) % imgs.length)
       }
     }
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [product])
+  }, [product, lightboxOpen])
+
+  useEffect(() => {
+    if (!lightboxOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [lightboxOpen])
 
   const fetchProduct = async () => {
     try {
@@ -144,41 +161,14 @@ export default function ProductPage() {
     }
   }
 
-  const handleContact = async () => {
+  const handleContact = () => {
     if (!product) return
     const productId = Array.isArray(params.id) ? params.id[0] : params.id
     if (!user) {
       router.push(loginUrl(productId ? `/products/${productId}` : '/products'))
       return
     }
-
-    const seller = product.seller as { id: string }
-    try {
-      const { data: existingChat } = await supabase
-        .from('chats')
-        .select('id')
-        .or(`and(user1_id.eq.${user.id},user2_id.eq.${seller.id}),and(user1_id.eq.${seller.id},user2_id.eq.${user.id})`)
-        .single()
-
-      if (existingChat) {
-        router.push(`/chats/${existingChat.id}`)
-      } else {
-        const { data } = await supabase
-          .from('chats')
-          .insert({
-            user1_id: user.id,
-            user2_id: seller.id,
-          })
-          .select()
-          .single()
-
-        if (data) {
-          router.push(`/chats/${data.id}`)
-        }
-      }
-    } catch (error) {
-      console.error('Error starting chat:', error)
-    }
+    setShowChatModal(true)
   }
 
   const nextImage = () => {
@@ -283,7 +273,14 @@ export default function ProductPage() {
         onTouchEnd={handleTouchEnd}
       >
         {mainImage ? (
-          <Image src={mainImage} alt={product.name} fill className="object-cover" sizes="100vw" priority />
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            className="absolute inset-0 z-0 cursor-zoom-in"
+            aria-label="Открыть фото на весь экран"
+          >
+            <Image src={mainImage} alt={product.name} fill className="object-cover" sizes="100vw" priority />
+          </button>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[#ccc] text-sm">Нет фото</div>
         )}
@@ -291,7 +288,7 @@ export default function ProductPage() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="absolute top-2.5 left-2.5 w-[30px] h-[30px] rounded-full bg-white/85 flex items-center justify-center text-[#111]"
+          className="absolute top-2.5 left-2.5 z-10 w-[30px] h-[30px] rounded-full bg-white/85 flex items-center justify-center text-[#111]"
           aria-label="Назад"
         >
           <FiArrowLeft size={16} />
@@ -300,26 +297,35 @@ export default function ProductPage() {
           <>
             <button
               type="button"
-              onClick={prevImage}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center"
+              onClick={(e) => {
+                e.stopPropagation()
+                prevImage()
+              }}
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center"
               aria-label="Предыдущее"
             >
               <FiChevronLeft size={18} />
             </button>
             <button
               type="button"
-              onClick={nextImage}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center"
+              onClick={(e) => {
+                e.stopPropagation()
+                nextImage()
+              }}
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center"
               aria-label="Следующее"
             >
               <FiChevronRight size={18} />
             </button>
-            <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1">
+            <div className="absolute bottom-2.5 left-1/2 z-10 -translate-x-1/2 flex gap-1">
               {images.map((_, idx) => (
                 <button
                   key={idx}
                   type="button"
-                  onClick={() => setActiveImage(idx)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActiveImage(idx)
+                  }}
                   className={`h-1 rounded-full transition-all ${
                     idx === activeImage ? 'w-3.5 bg-white' : 'w-1 bg-white/50'
                   }`}
@@ -330,6 +336,88 @@ export default function ProductPage() {
           </>
         )}
       </div>
+
+      {lightboxOpen && mainImage && (
+        <div
+          className="fixed inset-0 z-[100] bg-black flex flex-col"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Просмотр фото"
+          onTouchStart={(e) => {
+            if (e.touches[0]) lightboxTouchStartX.current = e.touches[0].clientX
+          }}
+          onTouchEnd={(e) => {
+            if (!e.changedTouches[0] || images.length <= 1) return
+            const diff = lightboxTouchStartX.current - e.changedTouches[0].clientX
+            if (Math.abs(diff) < 50) return
+            if (diff > 0) nextImage()
+            else prevImage()
+          }}
+        >
+          <div className="flex items-center justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
+            <span className="text-white/80 text-[13px] font-medium">
+              {images.length > 1 ? `${activeImage + 1} / ${images.length}` : 'Фото'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(false)}
+              className="w-10 h-10 rounded-full bg-white/15 text-white flex items-center justify-center"
+              aria-label="Закрыть"
+            >
+              <FiX size={22} />
+            </button>
+          </div>
+
+          <div className="relative flex-1 min-h-0 mx-auto w-full max-w-lg">
+            <Image
+              src={mainImage}
+              alt={product.name}
+              fill
+              className="object-contain"
+              sizes="100vw"
+              priority
+            />
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={prevImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center"
+                  aria-label="Предыдущее"
+                >
+                  <FiChevronLeft size={22} />
+                </button>
+                <button
+                  type="button"
+                  onClick={nextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center"
+                  aria-label="Следующее"
+                >
+                  <FiChevronRight size={22} />
+                </button>
+              </>
+            )}
+          </div>
+
+          {images.length > 1 && (
+            <div className="flex justify-center gap-1.5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              {images.map((src, idx) => (
+                <button
+                  key={src + idx}
+                  type="button"
+                  onClick={() => setActiveImage(idx)}
+                  className={`relative w-11 h-11 rounded-lg overflow-hidden border-2 ${
+                    idx === activeImage ? 'border-white' : 'border-transparent opacity-60'
+                  }`}
+                  aria-label={`Фото ${idx + 1}`}
+                >
+                  <Image src={src} alt="" fill className="object-cover" sizes="44px" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Sheet */}
       <div className="relative -mt-3.5 bg-white rounded-t-2xl px-3.5 pt-4 pb-6">
@@ -529,6 +617,24 @@ export default function ProductPage() {
       </div>
 
       <AuthRequiredModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} type="product" />
+
+      {product && seller?.id && user && (
+        <ProductChatModal
+          isOpen={showChatModal}
+          onClose={() => setShowChatModal(false)}
+          product={{
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            images: product.images,
+          }}
+          seller={{
+            id: seller.id,
+            full_name: seller.full_name,
+            avatar_url: seller.avatar_url,
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -25,7 +25,7 @@ function CompactSellerProductCard({ product }: { product: Product }) {
       href={`/products/${product.id}`}
       className="bg-white border border-[#e5e7eb] rounded-xl overflow-hidden block active:scale-[0.99] transition-transform"
     >
-      <div className="relative h-[90px] bg-[#e8e8e8]">
+      <div className="relative aspect-[4/5] bg-[#e8e8e8]">
         {img ? (
           <Image src={img} alt={product.name} fill className="object-cover" sizes="50vw" />
         ) : (

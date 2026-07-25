@@ -26,6 +26,12 @@ const STEPS: Record<UserRole, Array<{ title: string; desc: string; action: strin
       action: 'Открыть профиль',
       href: '/portfolio/new',
     },
+    {
+      title: 'Опубликуйте заказ',
+      desc: 'Нужна помощь другого мастера? Создайте заказ от своего имени',
+      action: 'Создать заказ',
+      href: '/orders/new',
+    },
   ],
   seller: [
     {
@@ -39,6 +45,12 @@ const STEPS: Record<UserRole, Array<{ title: string; desc: string; action: strin
       desc: 'Начните продавать прямо сейчас',
       action: 'Добавить товар',
       href: '/products/new',
+    },
+    {
+      title: 'Опубликуйте заказ',
+      desc: 'Нужен мастер для монтажа или доставки? Создайте заказ',
+      action: 'Создать заказ',
+      href: '/orders/new',
     },
   ],
   client: [

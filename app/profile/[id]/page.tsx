@@ -19,6 +19,7 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import { profileLoginUrl } from '@/lib/guest-access'
+import { findOrCreateChat } from '@/lib/chatHelpers'
 import AdSlot from '@/components/AdSlot'
 import ReviewCard from '@/components/ReviewCard'
 import ReviewForm from '@/components/ReviewForm'
@@ -500,31 +501,8 @@ export default function ProfilePage() {
     if (!currentUser || !profile) return
 
     try {
-      // Check if chat already exists
-      const { data: existingChat } = await supabase
-        .from('chats')
-        .select('id')
-        .or(`and(user1_id.eq.${currentUser.id},user2_id.eq.${profile.id}),and(user1_id.eq.${profile.id},user2_id.eq.${currentUser.id})`)
-        .maybeSingle()
-
-      if (existingChat) {
-        router.push(`/chats/${existingChat.id}`)
-        return
-      }
-
-      // Create new chat
-      const { data, error } = await supabase
-        .from('chats')
-        .insert({
-          user1_id: currentUser.id,
-          user2_id: profile.id,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      router.push(`/chats/${data.id}`)
+      const chatId = await findOrCreateChat(currentUser.id, profile.id)
+      router.push(`/chats/${chatId}`)
     } catch (error) {
       console.error('Error starting chat:', error)
     }

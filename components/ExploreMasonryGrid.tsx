@@ -1,11 +1,20 @@
 'use client'
 
-import { PortfolioItem } from '@/lib/supabase'
-import { FiHeart, FiImage, FiPlay } from 'react-icons/fi'
+import { FiHeart, FiImage, FiPlay, FiShoppingBag } from 'react-icons/fi'
+
+export type ExploreGridItem = {
+  id: string
+  kind: 'portfolio' | 'product'
+  imageUrl?: string | null
+  videoUrl?: string | null
+  title?: string
+  likesCount?: number
+  price?: number
+}
 
 interface ExploreMasonryGridProps {
-  items: PortfolioItem[]
-  onItemClick: (item: PortfolioItem, index: number) => void
+  items: ExploreGridItem[]
+  onItemClick: (item: ExploreGridItem, index: number) => void
 }
 
 export function formatCompactCount(n: number): string {
@@ -22,44 +31,33 @@ export function formatCompactCount(n: number): string {
   return `${String(rounded).replace('.', ',')} млн`
 }
 
-function getFirstMedia(item: PortfolioItem) {
-  if (item.images?.length > 0) {
-    return { type: 'image' as const, url: item.images[0] }
-  }
-  if (item.videos?.length > 0) {
-    return { type: 'video' as const, url: item.videos[0] }
-  }
-  return null
-}
-
 export default function ExploreMasonryGrid({ items, onItemClick }: ExploreMasonryGridProps) {
   if (items.length === 0) return null
 
   return (
     <div className="columns-2 sm:columns-3 gap-2 [&>*]:mb-2 [&>*]:break-inside-avoid">
       {items.map((item, index) => {
-        const firstMedia = getFirstMedia(item)
-        const likesLabel = formatCompactCount(item.likes_count ?? 0)
+        const likesLabel = formatCompactCount(item.likesCount ?? 0)
 
         return (
           <button
-            key={item.id}
+            key={`${item.kind}-${item.id}`}
             type="button"
             onClick={() => onItemClick(item, index)}
             className="block w-full rounded-xl overflow-hidden bg-bg-secondary relative text-left"
           >
-            {firstMedia?.type === 'image' ? (
+            {item.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={firstMedia.url}
-                alt={item.title || 'Публикация'}
+                src={item.imageUrl}
+                alt={item.title || (item.kind === 'product' ? 'Товар' : 'Публикация')}
                 className="w-full h-auto block"
                 loading="lazy"
                 draggable={false}
               />
-            ) : firstMedia?.type === 'video' ? (
+            ) : item.videoUrl ? (
               <div className="relative w-full aspect-[3/4] bg-graphite-primary/10">
-                <video src={firstMedia.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                <video src={item.videoUrl} className="w-full h-full object-cover" muted playsInline preload="metadata" />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
                   <span className="w-10 h-10 rounded-full bg-black/45 flex items-center justify-center">
                     <FiPlay size={18} className="text-white ml-0.5" />
@@ -68,11 +66,17 @@ export default function ExploreMasonryGrid({ items, onItemClick }: ExploreMasonr
               </div>
             ) : (
               <div className="w-full aspect-[3/4] flex items-center justify-center bg-bg-secondary text-text-secondary">
-                <FiImage size={28} />
+                {item.kind === 'product' ? <FiShoppingBag size={28} /> : <FiImage size={28} />}
               </div>
             )}
 
-            {(item.likes_count ?? 0) > 0 && (
+            {item.kind === 'product' && item.price != null && (
+              <span className="absolute top-2 left-2 bg-brand-accent text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {Number(item.price).toLocaleString('ru-RU')} ₽
+              </span>
+            )}
+
+            {item.kind === 'portfolio' && (item.likesCount ?? 0) > 0 && (
               <span className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white text-[11px] font-semibold px-2 py-1 rounded-full">
                 <FiHeart size={11} className="fill-white" />
                 {likesLabel}
