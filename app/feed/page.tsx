@@ -1,21 +1,17 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import { useAuth } from '../providers'
 import { supabase, PortfolioItem, PortfolioComment, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import AdBannerSlider from '@/components/AdBannerSlider'
 import Link from 'next/link'
-import { FiHeart, FiMessageCircle, FiMessageSquare, FiMapPin, FiShoppingBag } from 'react-icons/fi'
+import { FiArrowLeft } from 'react-icons/fi'
 import StoriesCircle from '@/components/StoriesCircle'
-import PostImageSlider from '@/components/PostImageSlider'
 import { Story } from '@/lib/supabase'
-import { formatDistanceToNow } from 'date-fns'
-import { ru } from 'date-fns/locale'
-import ExploreMasonryGrid, { type ExploreGridItem } from '@/components/ExploreMasonryGrid'
-import PortfolioGallery from '@/components/PortfolioGallery'
+import InstagramGrid, { type InstagramGridItem } from '@/components/feed/InstagramGrid'
+import FeedPostCard from '@/components/feed/FeedPostCard'
 
 interface ItemWithInteractions extends PortfolioItem {
   liked?: boolean
@@ -52,13 +48,15 @@ export default function FeedPage() {
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({})
   const [submittingComments, setSubmittingComments] = useState<Record<string, boolean>>({})
   const [feedTab, setFeedTab] = useState<'all' | 'masters' | 'sellers'>('all')
-  // Режим ленты: 'following' — только те, на кого подписан (как раньше);
-  // 'explore' — вообще все публикации на платформе, аналог Explore в Instagram / «Новости» во VK
+  // Р РµР¶РёРј Р»РµРЅС‚С‹: 'following' вЂ” С‚РѕР»СЊРєРѕ С‚Рµ, РЅР° РєРѕРіРѕ РїРѕРґРїРёСЃР°РЅ (РєР°Рє СЂР°РЅСЊС€Рµ);
+  // 'explore' вЂ” РІРѕРѕР±С‰Рµ РІСЃРµ РїСѓР±Р»РёРєР°С†РёРё РЅР° РїР»Р°С‚С„РѕСЂРјРµ, Р°РЅР°Р»РѕРі Explore РІ Instagram / В«РќРѕРІРѕСЃС‚РёВ» РІРѕ VK
   const [feedMode, setFeedMode] = useState<'following' | 'explore'>('following')
   const [initialFeedModeResolved, setInitialFeedModeResolved] = useState(false)
-  const [selectedExploreIndex, setSelectedExploreIndex] = useState<number | null>(null)
-  const [explorePortfolioItems, setExplorePortfolioItems] = useState<PortfolioItem[]>([])
+  /** Р’ Р РµРєРѕРјРµРЅРґР°С†РёСЏС…: СЃРµС‚РєР° РёР»Рё РІРµСЂС‚РёРєР°Р»СЊРЅР°СЏ Р»РµРЅС‚Р° РїРѕСЃР»Рµ РєР»РёРєР° */
+  const [exploreView, setExploreView] = useState<'grid' | 'feed'>('grid')
+  const [viewerStartKey, setViewerStartKey] = useState<string | null>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
+  const feedScrollRef = useRef<HTMLDivElement>(null)
 
   const ITEMS_PER_PAGE = 9
 
@@ -68,7 +66,7 @@ export default function FeedPage() {
     }
   }, [user, authLoading, router])
 
-  // Новым пользователям без подписок сразу показываем «Рекомендации», а не пустые «Подписки»
+  // РќРѕРІС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј Р±РµР· РїРѕРґРїРёСЃРѕРє СЃСЂР°Р·Сѓ РїРѕРєР°Р·С‹РІР°РµРј В«Р РµРєРѕРјРµРЅРґР°С†РёРёВ», Р° РЅРµ РїСѓСЃС‚С‹Рµ В«РџРѕРґРїРёСЃРєРёВ»
   useEffect(() => {
     if (!user || initialFeedModeResolved) return
     let cancelled = false
@@ -96,8 +94,20 @@ export default function FeedPage() {
   }, [user, feedMode, initialFeedModeResolved])
 
   useEffect(() => {
-    setSelectedExploreIndex(null)
+    setExploreView('grid')
+    setViewerStartKey(null)
   }, [feedMode, feedTab])
+
+  useEffect(() => {
+    if (exploreView !== 'feed' || !viewerStartKey) return
+    const t = window.setTimeout(() => {
+      document.querySelector(`[data-feed-key="${viewerStartKey}"]`)?.scrollIntoView({
+        behavior: 'auto',
+        block: 'start',
+      })
+    }, 80)
+    return () => window.clearTimeout(t)
+  }, [exploreView, viewerStartKey, items.length])
 
   useEffect(() => {
     if (user) {
@@ -105,7 +115,7 @@ export default function FeedPage() {
     }
   }, [user])
 
-  // Обновляем истории при фокусе на странице (когда пользователь возвращается)
+  // РћР±РЅРѕРІР»СЏРµРј РёСЃС‚РѕСЂРёРё РїСЂРё С„РѕРєСѓСЃРµ РЅР° СЃС‚СЂР°РЅРёС†Рµ (РєРѕРіРґР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РІРѕР·РІСЂР°С‰Р°РµС‚СЃСЏ)
   useEffect(() => {
     const handleFocus = () => {
       if (user) {
@@ -116,7 +126,7 @@ export default function FeedPage() {
     return () => window.removeEventListener('focus', handleFocus)
   }, [user])
 
-  // Подгрузка при прокрутке вниз (sentinel в конце ленты)
+  // РџРѕРґРіСЂСѓР·РєР° РїСЂРё РїСЂРѕРєСЂСѓС‚РєРµ РІРЅРёР· (sentinel РІ РєРѕРЅС†Рµ Р»РµРЅС‚С‹)
   useEffect(() => {
     const sentinel = loadMoreSentinelRef.current
     if (!sentinel || items.length === 0 || !hasMore || loadingMore) return
@@ -431,12 +441,13 @@ export default function FeedPage() {
 
   if (authLoading || !initialFeedModeResolved || loading) {
     return (
-      <div className="min-h-screen bg-bg-primary max-w-lg mx-auto">
-        <div className="h-12 bg-white animate-pulse mb-3" />
-        <div className="h-20 bg-white rounded-2xl mx-3 mb-3 animate-pulse" />
-        {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="h-64 bg-white rounded-2xl mx-3 mb-3 animate-pulse" />
-        ))}
+      <div className="min-h-screen bg-[#fafafa] max-w-lg mx-auto">
+        <div className="h-11 bg-white border-b border-[#dbdbdb] animate-pulse" />
+        <div className="grid grid-cols-3 gap-[1px] bg-[#dbdbdb] mt-0">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="aspect-square bg-[#efefef] animate-pulse" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -455,10 +466,10 @@ export default function FeedPage() {
     return true
   })
 
-  const exploreGridItems: ExploreGridItem[] = filteredItems.map((item) => {
+  const gridItems: InstagramGridItem[] = filteredItems.map((item) => {
     if (item.type === 'product' && item.product) {
       return {
-        id: item.product.id,
+        key: item.key,
         kind: 'product' as const,
         imageUrl: item.product.images?.[0] || null,
         title: item.product.name,
@@ -467,7 +478,7 @@ export default function FeedPage() {
     }
     const p = item.portfolio!
     return {
-      id: p.id,
+      key: item.key,
       kind: 'portfolio' as const,
       imageUrl: p.images?.[0] || null,
       videoUrl: p.videos?.[0] || null,
@@ -476,405 +487,191 @@ export default function FeedPage() {
     }
   })
 
-  const handleExploreClick = (gridItem: ExploreGridItem) => {
-    if (gridItem.kind === 'product') {
-      router.push(`/products/${gridItem.id}`)
-      return
-    }
-    const portfolioOnly = filteredItems
-      .filter((i) => i.type === 'portfolio' && i.portfolio)
-      .map((i) => i.portfolio!) as PortfolioItem[]
-    const idx = portfolioOnly.findIndex((p) => p.id === gridItem.id)
-    setExplorePortfolioItems(portfolioOnly)
-    setSelectedExploreIndex(idx >= 0 ? idx : 0)
+  const showGrid = feedMode === 'explore' && exploreView === 'grid'
+  const showFeedList = feedMode === 'following' || (feedMode === 'explore' && exploreView === 'feed')
+
+  const openFeedFromGrid = (gridItem: InstagramGridItem) => {
+    setViewerStartKey(gridItem.key)
+    setExploreView('feed')
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-feed-key="${gridItem.key}"]`)
+      el?.scrollIntoView({ behavior: 'auto', block: 'start' })
+    })
   }
 
+  const backToGrid = () => {
+    setExploreView('grid')
+    setViewerStartKey(null)
+  }
+
+  const renderFeedList = () => (
+    <div ref={feedScrollRef} className="bg-[#fafafa]">
+      {filteredItems.map((feedItem) => {
+        if (feedItem.type === 'product' && feedItem.product) {
+          return (
+            <FeedPostCard
+              key={feedItem.key}
+              type="product"
+              item={feedItem.product}
+              createdAt={feedItem.created_at}
+            />
+          )
+        }
+        const item = feedItem.portfolio
+        if (!item) return null
+        return (
+          <FeedPostCard
+            key={feedItem.key}
+            type="portfolio"
+            item={item}
+            commentText={commentTexts[item.id] || ''}
+            submittingComment={!!submittingComments[item.id]}
+            onCommentChange={(text) => setCommentTexts((prev) => ({ ...prev, [item.id]: text }))}
+            onLike={() => handleLike(item.id)}
+            onToggleComments={() => {
+              const nextOpen = !item.showComments
+              setCommentsOpen(item.id, nextOpen)
+              if (nextOpen) void fetchAllComments(item.id)
+            }}
+            onSubmitComment={() => void handleSubmitComment(item.id)}
+          />
+        )
+      })}
+      <div ref={loadMoreSentinelRef} className="h-8 w-full" aria-hidden />
+      {loadingMore && <p className="text-center text-xs text-[#8e8e8e] py-3">Загрузка…</p>}
+    </div>
+  )
+
   return (
-    <>
-    <div className="min-h-screen bg-bg-primary max-w-lg mx-auto w-full pb-24">
-      <Navbar />
+    <div className="min-h-screen bg-[#fafafa] max-w-lg mx-auto w-full pb-24">
+      {feedMode === 'explore' && exploreView === 'feed' ? (
+        <Navbar bottomOnly />
+      ) : (
+        <Navbar />
+      )}
 
-      {/* Верхний переключатель: своя лента (подписки) vs общая лента платформы (Explore) */}
-      <div className="flex bg-white border-b border-border-light">
-        <button
-          type="button"
-          onClick={() => setFeedMode('following')}
-          className={`flex-1 text-center py-3 text-[13px] font-bold border-b-2 transition-colors ${
-            feedMode === 'following'
-              ? 'border-brand-accent text-graphite-primary'
-              : 'border-transparent text-text-secondary'
-          }`}
-        >
-          Подписки
-        </button>
-        <button
-          type="button"
-          onClick={() => setFeedMode('explore')}
-          className={`flex-1 text-center py-3 text-[13px] font-bold border-b-2 transition-colors ${
-            feedMode === 'explore'
-              ? 'border-brand-accent text-graphite-primary'
-              : 'border-transparent text-text-secondary'
-          }`}
-        >
-          Рекомендации
-        </button>
-      </div>
+      {/* Шапка: режимы */}
+      {!(feedMode === 'explore' && exploreView === 'feed') && (
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#dbdbdb]">
+          <div className="flex">
+            <button
+              type="button"
+              onClick={() => setFeedMode('following')}
+              className={`flex-1 text-center py-3 text-[13px] font-semibold ${
+                feedMode === 'following'
+                  ? 'text-[#262626] border-b-[1.5px] border-[#262626]'
+                  : 'text-[#8e8e8e]'
+              }`}
+            >
+              Подписки
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFeedMode('explore')
+                setExploreView('grid')
+              }}
+              className={`flex-1 text-center py-3 text-[13px] font-semibold ${
+                feedMode === 'explore'
+                  ? 'text-[#262626] border-b-[1.5px] border-[#262626]'
+                  : 'text-[#8e8e8e]'
+              }`}
+            >
+              Рекомендации
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* Панель историй — тёмная графитовая подложка, отделяет ленту от шапки */}
-      {stories.length > 0 && (
-        <div className="bg-graphite-primary px-4 py-3.5 overflow-x-auto">
+      {/* Шапка ленты из сетки */}
+      {feedMode === 'explore' && exploreView === 'feed' && (
+        <div className="sticky top-0 z-30 flex items-center gap-2 bg-white/95 backdrop-blur-md border-b border-[#dbdbdb] px-2 py-2.5">
+          <button
+            type="button"
+            onClick={backToGrid}
+            className="w-9 h-9 flex items-center justify-center text-[#262626]"
+            aria-label="Назад к сетке"
+          >
+            <FiArrowLeft size={22} />
+          </button>
+          <p className="text-[14px] font-semibold text-[#262626]">Рекомендации</p>
+        </div>
+      )}
+
+      {showGrid && stories.length > 0 && (
+        <div className="bg-white border-b border-[#efefef] px-3 py-2.5 overflow-x-auto">
           <StoriesCircle stories={stories} currentUser={user} isOwnProfile={false} onStoryCreated={fetchStories} />
         </div>
       )}
 
-      {/* Сегментированный переключатель вместо подчёркнутых вкладок — фильтр по роли внутри выбранного режима */}
-      <div className="px-3 pt-3 pb-1">
-        <div className="flex gap-1 bg-white rounded-full p-1 border border-border-light shadow-card">
+      {feedMode === 'following' && stories.length > 0 && (
+        <div className="bg-white border-b border-[#efefef] px-3 py-2.5 overflow-x-auto">
+          <StoriesCircle stories={stories} currentUser={user} isOwnProfile={false} onStoryCreated={fetchStories} />
+        </div>
+      )}
+
+      {!(feedMode === 'explore' && exploreView === 'feed') && (
+        <div className="flex gap-0 bg-white border-b border-[#efefef]">
           {FEED_TABS.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setFeedTab(tab.key)}
-              className={`flex-1 text-center py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
-                feedTab === tab.key
-                  ? 'bg-brand-accent text-white shadow-sm'
-                  : 'text-text-secondary hover:text-graphite-primary'
+              className={`flex-1 text-center py-2.5 text-[12px] font-semibold ${
+                feedTab === tab.key ? 'text-[#262626]' : 'text-[#8e8e8e]'
               }`}
             >
               {tab.label}
+              {feedTab === tab.key && (
+                <span className="block mx-auto mt-1.5 h-[1.5px] w-10 bg-[#262626] rounded-full" />
+              )}
             </button>
           ))}
         </div>
-      </div>
+      )}
 
-      <div className="w-full px-3 mt-2">
-        <div className="rounded-2xl overflow-hidden">
-          <AdBannerSlider page="feed" />
-        </div>
-      </div>
-
-      <div className="px-3 pt-3 pb-4 flex flex-col gap-3">
-        {filteredItems.length === 0 && !loading ? (
-          <div className="bg-white rounded-2xl border border-border-light text-center text-text-secondary py-14 px-6 shadow-card">
-            <div className="text-3xl mb-3" aria-hidden>
-              📭
-            </div>
-            {feedMode === 'following' ? (
-              <>
-                <p className="text-[15px] font-bold text-graphite-primary mb-1.5">В подписках пока пусто</p>
-                <p className="text-[12px] leading-relaxed text-text-secondary">
-                  Подпишитесь на мастеров и продавцов — их работы и товары появятся здесь
-                </p>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 mt-4 max-w-xs mx-auto">
-                  <Link
-                    href="/search"
-                    className="bg-brand-accent text-white text-xs font-bold px-4 py-2 rounded-xl"
-                  >
-                    Найти мастеров
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => setFeedMode('explore')}
-                    className="bg-bg-secondary text-graphite-primary text-xs font-bold px-4 py-2 rounded-xl border border-border-light"
-                  >
-                    Смотреть рекомендации
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-[15px] font-bold text-graphite-primary mb-1.5">Пока нет публикаций</p>
-                <p className="text-[12px] leading-relaxed text-text-secondary">
-                  Работы мастеров и товары продавцов появятся здесь в одной ленте
-                </p>
-              </>
-            )}
+      {showGrid && (
+        <div className="px-0 pt-0">
+          <div className="px-3 py-2">
+            <AdBannerSlider page="feed" />
           </div>
-        ) : (
-          <>
-            {feedMode === 'explore' ? (
-              <ExploreMasonryGrid items={exploreGridItems} onItemClick={(item) => handleExploreClick(item)} />
-            ) : (
-              filteredItems.map((feedItem) => {
-                if (feedItem.type === 'product' && feedItem.product) {
-                  const product = feedItem.product
-                  const seller = product.seller
-                  const cover = product.images?.[0]
-                  return (
-                    <article
-                      key={feedItem.key}
-                      className="bg-white rounded-2xl border border-border-light shadow-card overflow-hidden"
-                    >
-                      <div className="flex items-center gap-3 px-4 pt-3.5 pb-3">
-                        <Link
-                          href={`/profile/${seller?.id || ''}`}
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold overflow-hidden flex-shrink-0 relative ring-2 ring-[#2563eb]/40 bg-[#2563eb] text-white"
-                        >
-                          {seller?.avatar_url ? (
-                            <Image src={seller.avatar_url} alt="" fill className="object-cover" sizes="40px" />
-                          ) : (
-                            seller?.full_name?.[0]?.toUpperCase() || 'П'
-                          )}
-                        </Link>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <Link
-                              href={`/profile/${seller?.id || ''}`}
-                              className="text-[13.5px] font-bold text-graphite-primary truncate hover:underline"
-                            >
-                              {seller?.full_name || 'Продавец'}
-                            </Link>
-                            <span className="flex-shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-[#eef6ff] text-[#2563eb]">
-                              Товар
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 text-[11px] text-text-secondary truncate mt-0.5">
-                            {seller?.city && (
-                              <span className="flex items-center gap-0.5 truncate">
-                                <FiMapPin size={10} className="flex-shrink-0" />
-                                {seller.city}
-                              </span>
-                            )}
-                            {seller?.city && <span aria-hidden>·</span>}
-                            <span className="flex-shrink-0">
-                              {formatDistanceToNow(new Date(feedItem.created_at), { addSuffix: true, locale: ru })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+        </div>
+      )}
 
-                      <div className="px-4 pb-2">
-                        <h3 className="text-[14px] font-bold text-graphite-primary leading-snug mb-1">
-                          {product.name}
-                        </h3>
-                        <p className="text-[16px] font-bold text-brand-accent">
-                          {Number(product.price).toLocaleString('ru-RU')} ₽
-                        </p>
-                      </div>
-
-                      {cover && (
-                        <Link href={`/products/${product.id}`} className="block px-4 pb-3.5">
-                          <div className="relative h-[200px] rounded-xl overflow-hidden bg-bg-secondary">
-                            <Image src={cover} alt={product.name} fill className="object-cover" sizes="100vw" />
-                          </div>
-                        </Link>
-                      )}
-
-                      <div className="flex items-center gap-2 px-4 pb-3.5">
-                        <Link
-                          href={`/products/${product.id}`}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold bg-brand-accent text-white"
-                        >
-                          <FiShoppingBag size={13} />
-                          Открыть товар
-                        </Link>
-                        {seller?.id && (
-                          <Link
-                            href={`/profile/${seller.id}`}
-                            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold text-text-secondary hover:text-brand-accent"
-                          >
-                            <FiMessageSquare size={13} />
-                            К продавцу
-                          </Link>
-                        )}
-                      </div>
-                    </article>
-                  )
-                }
-
-                const item = feedItem.portfolio
-                if (!item) return null
-                const isSeller = item.master?.role === 'seller'
-                return (
-                <article
-                  key={feedItem.key}
-                  className="bg-white rounded-2xl border border-border-light shadow-card overflow-hidden"
-                >
-                  {/* Шапка карточки: аватар с цветным кольцом по роли, имя, роль, город, время */}
-                  <div className="flex items-center gap-3 px-4 pt-3.5 pb-3">
-                    <Link
-                      href={`/profile/${item.master?.id}`}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold overflow-hidden flex-shrink-0 relative ring-2 ${
-                        isSeller ? 'ring-[#2563eb]/40 bg-[#2563eb]' : 'ring-brand-accent/40 bg-brand-accent'
-                      } text-white`}
-                    >
-                      {item.master?.avatar_url ? (
-                        <Image src={item.master.avatar_url} alt="" fill className="object-cover" sizes="40px" />
-                      ) : (
-                        item.master?.full_name?.[0]?.toUpperCase() || 'M'
-                      )}
-                    </Link>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <Link
-                          href={`/profile/${item.master?.id}`}
-                          className="text-[13.5px] font-bold text-graphite-primary truncate hover:underline"
-                        >
-                          {item.master?.full_name || 'Мастер'}
-                        </Link>
-                        <span
-                          className={`flex-shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
-                            isSeller ? 'bg-[#eef6ff] text-[#2563eb]' : 'bg-brand-accent/10 text-brand-accent'
-                          }`}
-                        >
-                          {isSeller ? 'Продавец' : 'Мастер'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-[11px] text-text-secondary truncate mt-0.5">
-                        {item.master?.city && (
-                          <span className="flex items-center gap-0.5 truncate">
-                            <FiMapPin size={10} className="flex-shrink-0" />
-                            {item.master.city}
-                          </span>
-                        )}
-                        {item.master?.city && <span aria-hidden>·</span>}
-                        <span className="flex-shrink-0">
-                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: ru })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Заголовок и описание — текст важнее фото в этой карточке, читается первым */}
-                  {(item.title || item.description) && (
-                    <div className="px-4 pb-3">
-                      {item.title && (
-                        <h3 className="text-[14px] font-bold text-graphite-primary leading-snug mb-1">{item.title}</h3>
-                      )}
-                      {item.description && (
-                        <p className="text-[13px] text-text-secondary leading-relaxed line-clamp-3">
-                          {item.description}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Медиа — с отступами и скруглением, не во всю ширину карточки */}
-                  {item.images && item.images.length > 0 ? (
-                    <div className="px-4 pb-3.5">
-                      <div className="h-[200px] rounded-xl overflow-hidden bg-bg-secondary">
-                        <PostImageSlider
-                          images={item.images}
-                          alt={item.title}
-                          className="w-full h-full [&_img]:!h-[200px] [&_img]:!object-cover"
-                        />
-                      </div>
-                    </div>
-                  ) : item.videos && item.videos.length > 0 ? (
-                    <div className="px-4 pb-3.5">
-                      <div className="h-[200px] rounded-xl overflow-hidden bg-bg-secondary">
-                        <video src={item.videos[0]} controls className="w-full h-full object-cover" />
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Действия — пилюли вместо голых иконок IG-стиля */}
-                  <div className="flex items-center gap-2 px-4 pb-3.5">
-                    <button
-                      type="button"
-                      onClick={() => handleLike(item.id)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-colors ${
-                        item.liked
-                          ? 'bg-brand-accent/10 border-brand-accent/30 text-brand-accent'
-                          : 'bg-bg-secondary border-border-light text-text-secondary hover:border-brand-accent/30'
-                      }`}
-                    >
-                      <FiHeart size={13} className={item.liked ? 'fill-current' : ''} />
-                      {item.likes_count > 0 ? item.likes_count : 'Нравится'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextOpen = !item.showComments
-                        setCommentsOpen(item.id, nextOpen)
-                        if (nextOpen) fetchAllComments(item.id)
-                      }}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-colors ${
-                        item.showComments
-                          ? 'bg-graphite-primary border-graphite-primary text-white'
-                          : 'bg-bg-secondary border-border-light text-text-secondary hover:border-graphite-primary/30'
-                      }`}
-                    >
-                      <FiMessageCircle size={13} />
-                      {(item.comments_count ?? 0) > 0 ? item.comments_count : 'Комментарии'}
-                    </button>
-                    <Link
-                      href={`/profile/${item.master?.id}`}
-                      className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold text-text-secondary hover:text-brand-accent"
-                    >
-                      <FiMessageSquare size={13} />
-                      Написать
-                    </Link>
-                  </div>
-
-                  {/* Комментарии — раскрываются в отдельном блоке снизу карточки */}
-                  {item.showComments && (
-                    <div className="border-t border-border-light bg-bg-secondary/60 px-4 py-3">
-                      {(item.comments ?? []).length === 0 ? (
-                        <p className="text-[12px] text-text-secondary mb-2">Комментариев пока нет</p>
-                      ) : (
-                        <ul className="flex flex-col gap-2 mb-2.5">
-                          {(item.comments ?? []).map((c) => (
-                            <li key={c.id} className="flex items-start gap-2">
-                              <span className="w-6 h-6 rounded-full bg-graphite-tertiary text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                                {c.user?.full_name?.[0]?.toUpperCase() || '?'}
-                              </span>
-                              <span className="text-[12px] text-graphite-primary leading-snug">
-                                <span className="font-semibold mr-1">{c.user?.full_name || 'Пользователь'}</span>
-                                {c.content}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={commentTexts[item.id] || ''}
-                          onChange={(e) => setCommentTexts({ ...commentTexts, [item.id]: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSubmitComment(item.id)
-                          }}
-                          placeholder="Написать комментарий…"
-                          className="flex-1 bg-white border border-border-light rounded-full px-3.5 py-2 text-[12px] outline-none focus:border-brand-accent/40 min-w-0"
-                        />
-                        <button
-                          type="button"
-                          disabled={!commentTexts[item.id]?.trim() || submittingComments[item.id]}
-                          onClick={() => handleSubmitComment(item.id)}
-                          className="flex-shrink-0 bg-brand-accent text-white text-[11px] font-bold px-3.5 py-2 rounded-full disabled:opacity-40"
-                        >
-                          {submittingComments[item.id] ? '…' : 'Отправить'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </article>
-              )
-            })
-            )}
-            <div ref={loadMoreSentinelRef} className="h-2 w-full" aria-hidden />
-            {loadingMore && <div className="text-center text-xs text-text-secondary py-2">Загрузка…</div>}
-          </>
-        )}
-      </div>
+      {filteredItems.length === 0 ? (
+        <div className="text-center py-16 px-6">
+          <p className="text-[15px] font-semibold text-[#262626] mb-1">
+            {feedMode === 'following' ? 'В подписках пока пусто' : 'Пока нет публикаций'}
+          </p>
+          <p className="text-[13px] text-[#8e8e8e] mb-4">
+            {feedMode === 'following'
+              ? 'Подпишитесь на мастеров и продавцов — их посты появятся здесь'
+              : 'Работы мастеров и товары продавцов появятся в сетке'}
+          </p>
+          {feedMode === 'following' && (
+            <div className="flex flex-col gap-2 max-w-[220px] mx-auto">
+              <Link href="/search" className="bg-[#e63946] text-white text-[13px] font-semibold py-2 rounded-lg">
+                Найти мастеров
+              </Link>
+              <button
+                type="button"
+                onClick={() => setFeedMode('explore')}
+                className="text-[13px] font-semibold text-[#0095f6]"
+              >
+                Смотреть рекомендации
+              </button>
+            </div>
+          )}
+        </div>
+      ) : showGrid ? (
+        <>
+          <InstagramGrid items={gridItems} onItemClick={(item) => openFeedFromGrid(item)} />
+          <div ref={loadMoreSentinelRef} className="h-8 w-full" aria-hidden />
+          {loadingMore && <p className="text-center text-xs text-[#8e8e8e] py-3">Загрузка…</p>}
+        </>
+      ) : showFeedList ? (
+        renderFeedList()
+      ) : null}
     </div>
-
-    {selectedExploreIndex !== null && explorePortfolioItems.length > 0 && (
-      <PortfolioGallery
-        items={explorePortfolioItems}
-        initialIndex={selectedExploreIndex}
-        onClose={() => {
-          setSelectedExploreIndex(null)
-          setExplorePortfolioItems([])
-        }}
-        hasMore={hasMore}
-        onNearEnd={() => {
-          if (hasMore && !loadingMore) loadMore()
-        }}
-      />
-    )}
-    </>
   )
 }
-
