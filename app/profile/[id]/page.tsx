@@ -35,11 +35,6 @@ import SellerProductsSection from '@/components/profile/SellerProductsSection'
 const StoreLocationMapModal = dynamic(() => import('@/components/StoreLocationMapModal'), { ssr: false })
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
 
-// Dynamic import для создания истории - загружается только при открытии
-const CreateStory = dynamic(() => import('@/components/CreateStory'), {
-  ssr: false,
-})
-
 import { Story } from '@/lib/supabase'
 
 export default function ProfilePage() {
@@ -943,12 +938,14 @@ export default function ProfilePage() {
                 backHref={returnTo || null}
               />
 
-              {(profile.role === 'master' || profile.role === 'seller') && profileStories.length > 0 && (
+              {(profile.role === 'master' || profile.role === 'seller') &&
+                (profileStories.length > 0 || isOwnProfile) && (
                 <div className="bg-white px-3.5 py-3 mt-2">
                   <StoriesCircle
                     stories={profileStories}
                     currentUser={currentUser}
                     isOwnProfile={isOwnProfile}
+                    showCreateButton={isOwnProfile}
                     onStoryCreated={() => {
                       const pid = Array.isArray(params.id) ? params.id[0] : params.id
                       if (pid) fetchProfileStories(pid)

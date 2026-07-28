@@ -13,6 +13,7 @@ import type { AdBanner } from '@/lib/supabase'
 import type { MasterCategoryWithCount } from '@/lib/server-data'
 import { FiSearch, FiStar, FiArrowRight, FiUser, FiShoppingBag, FiTag, FiX } from 'react-icons/fi'
 import { getCategoryEmoji } from '@/lib/categoryEmoji'
+import StoriesCircle from '@/components/StoriesCircle'
 
 type HomeSuggestion = {
   id: string
@@ -421,13 +422,8 @@ export default function HomeClient({
     router.push(q ? `/search?q=${encodeURIComponent(q)}` : '/search')
   }
 
-  const storiesByUser = useMemo(() => {
-    const map = new Map<string, { user: User; story: Story }>()
-    stories.forEach((s) => {
-      if (s.user && !map.has(s.user.id)) map.set(s.user.id, { user: s.user, story: s })
-    })
-    return Array.from(map.values())
-  }, [stories])
+  const canCreateStory =
+    !!user && (user.role === 'master' || user.role === 'seller')
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full shadow-sm pb-24">
@@ -551,57 +547,23 @@ export default function HomeClient({
       {DIVIDER}
 
       {/* Stories */}
-      {storiesByUser.length > 0 && (
-        <>
-          <div className="flex gap-3 overflow-x-auto px-4 py-2.5 scrollbar-hide bg-white">
-            {user && (
-              <button
-                type="button"
-                onClick={() => router.push('/feed')}
-                className="flex flex-col items-center gap-1 flex-shrink-0"
-              >
-                <div className="w-[52px] h-[52px] rounded-full border-2 border-brand-accent p-0.5 flex items-center justify-center">
-                  <div className="w-full h-full rounded-full bg-brand-accent text-white text-xl flex items-center justify-center">
-                    +
-                  </div>
-                </div>
-                <span className="text-[9px] text-[#888]">Моё</span>
-              </button>
-            )}
-            {storiesByUser.map(({ user: u, story }) => {
-              const initials = u.full_name
-                ?.split(' ')
-                .map((w) => w[0])
-                .join('')
-                .slice(0, 2) || '?'
-              const seen = story.viewed_by_user
-              return (
-                <GuestAwareProfileLink
-                  key={u.id}
-                  profileId={u.id}
-                  className="flex flex-col items-center gap-1 flex-shrink-0"
-                >
-                  <div
-                    className={`w-[52px] h-[52px] rounded-full p-0.5 border-2 ${
-                      seen ? 'border-[#ddd]' : 'border-brand-accent'
-                    }`}
-                  >
-                    <div className="w-full h-full rounded-full bg-[#f0f0f0] overflow-hidden flex items-center justify-center text-[11px] font-bold text-[#999]">
-                      {u.avatar_url ? (
-                        <Image src={u.avatar_url} alt="" width={48} height={48} className="object-cover w-full h-full" />
-                      ) : (
-                        initials
-                      )}
-                    </div>
-                  </div>
-                  <span className="text-[9px] text-[#888] max-w-[52px] truncate">
-                    {u.full_name?.split(' ')[0]}
-                  </span>
-                </GuestAwareProfileLink>
-              )
-            })}
-          </div>
-        </>
+      {(stories.length > 0 || canCreateStory) && (
+        <div className="bg-white px-3 py-2.5 border-b border-[#efefef]">
+          <StoriesCircle
+            stories={stories}
+            currentUser={user}
+            showCreateButton
+            onStoryCreated={() => {
+              const storiesUrl = user
+                ? `/api/stories?page=home&currentUserId=${user.id}`
+                : '/api/stories?page=home'
+              fetch(storiesUrl)
+                .then((r) => (r.ok ? r.json() : { stories: [] }))
+                .then((d) => setStories((d.stories || []).slice(0, 12)))
+                .catch(() => {})
+            }}
+          />
+        </div>
       )}
 
       <HomePageBanner initialBanners={initialBanners} />

@@ -13,6 +13,7 @@ import { FiSearch, FiSliders, FiX, FiPackage } from 'react-icons/fi'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import { sanitizeProductsForGuest } from '@/lib/guest-access'
 import { Story } from '@/lib/supabase'
+import StoriesCircle from '@/components/StoriesCircle'
 import dynamic from 'next/dynamic'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs } from '@/lib/specialization-product-mapping'
 import { ProductsScrollerSection } from '@/components/scrollers/ProductsScrollerSection'
@@ -234,6 +235,9 @@ function ProductsContent() {
   // Приоритет: категории для фильтра и список товаров (в другом useEffect). Истории — с задержкой.
   useEffect(() => {
     fetchCategories()
+  }, [])
+
+  useEffect(() => {
     const id = typeof requestIdleCallback !== 'undefined'
       ? requestIdleCallback(() => fetchStories(), { timeout: 1500 })
       : setTimeout(fetchStories, 1500)
@@ -241,7 +245,7 @@ function ProductsContent() {
       if (typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(id as number)
       else clearTimeout(id as ReturnType<typeof setTimeout>)
     }
-  }, [])
+  }, [user?.id])
 
   // Город применяется только при закрытии модалки — во время ввода запросы не уходят
   const applyCityAndCloseFilters = () => {
@@ -562,6 +566,18 @@ function ProductsContent() {
       </div>
 
       <CompactPageBanner page="products" buttonLabel="Разместить" />
+
+      {(stories.length > 0 ||
+        (!!user && (user.role === 'master' || user.role === 'seller'))) && (
+        <div className="bg-white border-b border-[#efefef] px-3 py-2.5">
+          <StoriesCircle
+            stories={stories}
+            currentUser={user}
+            showCreateButton
+            onStoryCreated={fetchStories}
+          />
+        </div>
+      )}
 
       <div className="flex items-center gap-2 px-3.5 py-2">
         {nearbyCenter && (

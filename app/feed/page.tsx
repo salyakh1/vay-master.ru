@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -598,15 +598,29 @@ export default function FeedPage() {
         </div>
       )}
 
-      {showGrid && stories.length > 0 && (
+      {showGrid &&
+        (stories.length > 0 ||
+          (!!user && (user.role === 'master' || user.role === 'seller'))) && (
         <div className="bg-white border-b border-[#efefef] px-3 py-2.5 overflow-x-auto">
-          <StoriesCircle stories={stories} currentUser={user} isOwnProfile={false} onStoryCreated={fetchStories} />
+          <StoriesCircle
+            stories={stories}
+            currentUser={user}
+            showCreateButton
+            onStoryCreated={fetchStories}
+          />
         </div>
       )}
 
-      {feedMode === 'following' && stories.length > 0 && (
+      {feedMode === 'following' &&
+        (stories.length > 0 ||
+          (!!user && (user.role === 'master' || user.role === 'seller'))) && (
         <div className="bg-white border-b border-[#efefef] px-3 py-2.5 overflow-x-auto">
-          <StoriesCircle stories={stories} currentUser={user} isOwnProfile={false} onStoryCreated={fetchStories} />
+          <StoriesCircle
+            stories={stories}
+            currentUser={user}
+            showCreateButton
+            onStoryCreated={fetchStories}
+          />
         </div>
       )}
 

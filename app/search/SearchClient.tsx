@@ -16,6 +16,7 @@ import { fetchMastersPage, LIST_PAGE_SIZE, type MasterScrollerItem } from '@/lib
 import { useUserLocation } from '@/hooks/useUserLocation'
 import { Story } from '@/lib/supabase'
 import type { AdBanner } from '@/lib/supabase'
+import StoriesCircle from '@/components/StoriesCircle'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs, getProductCategoriesForCategorySlugs } from '@/lib/specialization-product-mapping'
 import { getCategoryEmoji } from '@/lib/categoryEmoji'
 
@@ -361,7 +362,7 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   useEffect(() => {
     const t = setTimeout(() => fetchStories(), 800)
     return () => clearTimeout(t)
-  }, [])
+  }, [user?.id])
 
   const fetchStories = async () => {
     try {
@@ -559,6 +560,18 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
       </div>
 
       <CompactPageBanner page="search" initialBanners={initialBanners} />
+
+      {(stories.length > 0 ||
+        (!!user && (user.role === 'master' || user.role === 'seller'))) && (
+        <div className="bg-white border-b border-[#efefef] px-3 py-2.5">
+          <StoriesCircle
+            stories={stories}
+            currentUser={user}
+            showCreateButton
+            onStoryCreated={fetchStories}
+          />
+        </div>
+      )}
 
       {/* Stat bar */}
       <div className="flex items-center gap-2 px-3.5 py-2">

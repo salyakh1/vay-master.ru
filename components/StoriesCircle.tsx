@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { Story, User } from '@/lib/supabase'
 import { FiPlus } from 'react-icons/fi'
 
-// Dynamic imports для просмотра и создания историй - загружаются только при открытии
 const StoryViewer = dynamic(() => import('./StoryViewer'), {
   ssr: false,
 })
@@ -18,7 +17,10 @@ const CreateStory = dynamic(() => import('./CreateStory'), {
 interface StoriesCircleProps {
   stories: Story[]
   currentUser?: User | null
-  isOwnProfile?: boolean // Для отображения кнопки создания истории
+  /** Свой профиль — кнопка «+» (совместимость) */
+  isOwnProfile?: boolean
+  /** Явно показать «+» в начале ряда (лента, товары, мастера) */
+  showCreateButton?: boolean
   onStoryCreated?: () => void
 }
 
@@ -26,24 +28,28 @@ export default function StoriesCircle({
   stories,
   currentUser,
   isOwnProfile = false,
+  showCreateButton,
   onStoryCreated,
 }: StoriesCircleProps) {
   const [selectedStoryIndex, setSelectedStoryIndex] = useState<number | null>(null)
   const [showCreateStory, setShowCreateStory] = useState(false)
 
-  // Группируем истории по пользователям
+  const canCreate =
+    (showCreateButton ?? isOwnProfile) &&
+    !!currentUser &&
+    (currentUser.role === 'master' || currentUser.role === 'seller')
+
   const storiesByUser = new Map<string, { user: User; stories: Story[] }>()
-  
+
   stories.forEach((story) => {
-    if (story.user) {
-      if (!storiesByUser.has(story.user.id)) {
-        storiesByUser.set(story.user.id, {
-          user: story.user,
-          stories: [],
-        })
-      }
-      storiesByUser.get(story.user.id)!.stories.push(story)
+    if (!story.user) return
+    if (!storiesByUser.has(story.user.id)) {
+      storiesByUser.set(story.user.id, {
+        user: story.user,
+        stories: [],
+      })
     }
+    storiesByUser.get(story.user.id)!.stories.push(story)
   })
 
   const storiesArray = Array.from(storiesByUser.values())
@@ -62,54 +68,66 @@ export default function StoriesCircle({
 
   const handleStoryCreated = () => {
     setShowCreateStory(false)
-    if (onStoryCreated) {
-      onStoryCreated()
-    }
+    onStoryCreated?.()
   }
 
-  if (storiesArray.length === 0 && !isOwnProfile) {
+  if (storiesArray.length === 0 && !canCreate) {
     return null
   }
 
   return (
     <>
       <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
-        {/* Кнопка создания истории (только для своего профиля) */}
-        {isOwnProfile && (
+        {canCreate && (
           <button
+            type="button"
             onClick={handleCreateStory}
             className="flex-shrink-0 flex flex-col items-center gap-1.5"
           >
             <div className="relative w-16 h-16 rounded-full border-2 border-dashed border-border-light flex items-center justify-center bg-bg-secondary hover:bg-bg-secondary/80 transition-colors">
-              <FiPlus size={24} className="text-text-secondary" />
+              {currentUser?.avatar_url ? (
+                <>
+                  <Image
+                    src={currentUser.avatar_url}
+                    alt=""
+                    width={64}
+                    height={64}
+                    className="absolute inset-0 w-full h-full rounded-full object-cover opacity-40"
+                    unoptimized={!String(currentUser.avatar_url).includes('supabase')}
+                  />
+                  <span className="relative z-10 w-6 h-6 rounded-full bg-brand-accent text-white flex items-center justify-center">
+                    <FiPlus size={14} />
+                  </span>
+                </>
+              ) : (
+                <FiPlus size={24} className="text-text-secondary" />
+              )}
             </div>
-            <span className="text-xs text-text-secondary">Создать</span>
+            <span className="text-xs text-text-secondary">Ваша</span>
           </button>
         )}
 
-        {/* Кружочки историй */}
         {storiesArray.map((item, index) => {
-          const hasUnviewed = item.stories.some(s => !s.viewed_by_user)
+          const hasUnviewed = item.stories.some((s) => !s.viewed_by_user)
           const user = item.user
-          
-          // Берем самую свежую историю для превью
+
           const latestStory = item.stories
-            ? [...item.stories].sort((a, b) => 
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            ? [...item.stories].sort(
+                (a, b) =>
+                  new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
               )[0]
             : null
-          
-          // Берем первое фото/видео из истории для превью
+
           const previewMedia = latestStory?.media?.[0] || null
 
           return (
             <button
               key={user.id}
+              type="button"
               onClick={() => handleStoryClick(index)}
               className="flex-shrink-0 flex flex-col items-center gap-1.5"
             >
               <div className="relative">
-                {/* Кружочек с превью из истории или аватаром */}
                 <div
                   className={`w-16 h-16 rounded-full p-0.5 ${
                     hasUnviewed
@@ -143,9 +161,8 @@ export default function StoriesCircle({
                     )}
                   </div>
                 </div>
-                {/* Индикатор новых историй */}
                 {hasUnviewed && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-brand-accent rounded-full border-2 border-bg-primary"></div>
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-brand-accent rounded-full border-2 border-bg-primary" />
                 )}
               </div>
               <span className="text-xs text-text-secondary truncate max-w-[64px]">
@@ -156,7 +173,6 @@ export default function StoriesCircle({
         })}
       </div>
 
-      {/* Полноэкранный просмотр историй */}
       {selectedStoryIndex !== null && (
         <StoryViewer
           stories={storiesArray}
@@ -166,7 +182,6 @@ export default function StoriesCircle({
         />
       )}
 
-      {/* Модальное окно создания истории */}
       {showCreateStory && currentUser && (
         <CreateStory
           userId={currentUser.id}
