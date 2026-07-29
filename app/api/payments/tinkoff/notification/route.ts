@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { tinkoffVerifyNotificationToken } from '@/lib/tinkoff'
 import { extendProByDays } from '@/lib/proSubscription'
 import { notifyUser } from '@/lib/notify'
+import { validateOrderFields } from '@/lib/order-validation'
 
 const supabaseService = () =>
   createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -10,6 +11,40 @@ const supabaseService = () =>
   })
 
 export const dynamic = 'force-dynamic'
+
+/** Атомарный claim: только один webhook-воркер проходит дальше. */
+async function claimPaymentSession(admin: ReturnType<typeof supabaseService>, orderId: string) {
+  const { data, error } = await admin
+    .from('payment_sessions')
+    .update({
+      status: 'processing',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orderId)
+    .eq('status', 'pending')
+    .select('*')
+    .maybeSingle()
+
+  if (error) {
+    console.error('Tinkoff notification: claim failed', error)
+    return { claimed: false as const, session: null, reason: 'error' as const }
+  }
+  if (data) {
+    return { claimed: true as const, session: data, reason: 'claimed' as const }
+  }
+
+  const { data: current } = await admin
+    .from('payment_sessions')
+    .select('id, status, created_order_id')
+    .eq('id', orderId)
+    .maybeSingle()
+
+  if (current?.status === 'paid' || current?.status === 'processing') {
+    return { claimed: false as const, session: null, reason: 'already_handled' as const }
+  }
+
+  return { claimed: false as const, session: null, reason: 'unavailable' as const }
+}
 
 /** Webhook Tinkoff (уведомление об оплате) */
 export async function POST(request: Request) {
@@ -41,22 +76,14 @@ export async function POST(request: Request) {
   }
 
   const admin = supabaseService()
+  const claim = await claimPaymentSession(admin, orderId)
 
-  const { data: session, error: sErr } = await admin
-    .from('payment_sessions')
-    .select('*')
-    .eq('id', orderId)
-    .maybeSingle()
-
-  if (sErr || !session) {
-    console.warn('Tinkoff notification: session not found', orderId)
+  if (!claim.claimed) {
+    // Повторная доставка / параллельный webhook — не создаём дубликат
     return NextResponse.json({ Success: true })
   }
 
-  if (session.status === 'paid') {
-    return NextResponse.json({ Success: true })
-  }
-
+  const session = claim.session
   const kind = (session as { kind?: string }).kind || 'order_publication'
 
   if (kind === 'pro_subscription') {
@@ -68,6 +95,11 @@ export async function POST(request: Request) {
       proUntil = extended.pro_until
     } catch (e) {
       console.error('Tinkoff notification: extend PRO', e)
+      await admin
+        .from('payment_sessions')
+        .update({ status: 'pending', updated_at: new Date().toISOString() })
+        .eq('id', orderId)
+        .eq('status', 'processing')
       return NextResponse.json({ Success: false, Message: 'PRO update failed' }, { status: 500 })
     }
     await admin
@@ -100,7 +132,8 @@ export async function POST(request: Request) {
     imageUrls?: string[]
   }
 
-  if (!payload?.title || !payload?.description || !payload?.category) {
+  const validated = validateOrderFields(payload)
+  if (!validated.ok) {
     await admin
       .from('payment_sessions')
       .update({ status: 'failed', updated_at: new Date().toISOString() })
@@ -110,9 +143,9 @@ export async function POST(request: Request) {
 
   const orderData: Record<string, unknown> = {
     client_id: session.user_id,
-    title: payload.title.trim(),
-    description: payload.description.trim(),
-    category: payload.category.trim(),
+    title: validated.title,
+    description: validated.description,
+    category: validated.category,
     location: payload.location?.address?.trim() || '',
     status: 'open',
     images: Array.isArray(payload.imageUrls) ? payload.imageUrls : [],
@@ -128,6 +161,12 @@ export async function POST(request: Request) {
 
   if (oErr || !newOrder) {
     console.error('Tinkoff notification: order insert', oErr)
+    // Откат claim — Tinkoff сможет ретраить
+    await admin
+      .from('payment_sessions')
+      .update({ status: 'pending', updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .eq('status', 'processing')
     return NextResponse.json({ Success: false, Message: String(oErr?.message || 'insert') }, { status: 500 })
   }
 
@@ -140,7 +179,7 @@ export async function POST(request: Request) {
     })
     .eq('id', orderId)
 
-  const title = String(payload.title || 'Заказ')
+  const title = validated.title
   await notifyUser(admin, {
     userId: session.user_id,
     chatText: `Заказ опубликован ✅\n\n«${title}» уже видят мастера. Следите за откликами во вкладке «Отклики» в чатах.`,

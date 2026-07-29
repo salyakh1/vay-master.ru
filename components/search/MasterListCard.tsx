@@ -5,6 +5,7 @@ import { FiPhone } from 'react-icons/fi'
 import { useAuth } from '@/app/providers'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import type { MasterScrollerItem } from '@/lib/scrollerApi'
+import { getInitials, getMasterAvatarAlt, getMasterSpecs } from '@/lib/master-display'
 
 const AVATAR_COLORS = ['#c0392b', '#555', '#8B4513', '#1d5fa6', '#22a85e', '#6c3483']
 
@@ -32,22 +33,8 @@ export function MasterListCard({
 }) {
   const { user } = useAuth()
   const color = AVATAR_COLORS[colorIndex % AVATAR_COLORS.length]
-  const initials =
-    master.full_name
-      ?.split(' ')
-      .map((w) => w[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() ?? '??'
-
-  const specs = Array.isArray(master.profile_subcategories)
-    ? master.profile_subcategories
-        .map((item: { subcategory?: { name?: string } }) => item.subcategory?.name)
-        .filter(Boolean)
-        .slice(0, 2)
-        .join(' · ')
-    : master.specialization || master.description?.slice(0, 40) || 'Мастер'
-
+  const initials = getInitials(master.full_name, '??')
+  const specs = getMasterSpecs(master)
   const rating = master.master_rating ?? 0
   const isPro = master.is_pro || (master.pro_until && new Date(master.pro_until) > new Date())
   const showPhone = !!user && !!master.phone
@@ -61,7 +48,7 @@ export function MasterListCard({
         {master.avatar_url ? (
           <Image
             src={master.avatar_url}
-            alt={master.full_name ?? ''}
+            alt={getMasterAvatarAlt(master.full_name)}
             width={48}
             height={48}
             className="rounded-full object-cover w-12 h-12"

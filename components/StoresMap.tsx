@@ -8,6 +8,7 @@ import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import { supabase, User, Product } from '@/lib/supabase'
 import { FiMapPin, FiShoppingBag, FiX, FiNavigation, FiFilter } from 'react-icons/fi'
 import { configureLeafletIcons, leaflet as L } from '@/lib/leaflet'
+import { haversineKm } from '@/lib/geo'
 import 'leaflet/dist/leaflet.css'
 
 const DEFAULT_CENTER: [number, number] = [55.751244, 37.618423] // Москва
@@ -113,19 +114,8 @@ export default function StoresMap({ masterLocation, onSellerClick, className = '
     }
   }
 
-  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-    const R = 6371 // Радиус Земли в км
-    const dLat = ((lat2 - lat1) * Math.PI) / 180
-    const dLng = ((lng2 - lng1) * Math.PI) / 180
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    return R * c
-  }
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number =>
+    haversineKm(lat1, lng1, lat2, lng2)
 
   const fetchSellerProducts = async (sellerId: string) => {
     if (sellerProducts[sellerId] || loadingProducts[sellerId]) return

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS public.payment_sessions (
   kind TEXT NOT NULL DEFAULT 'order_publication',
   payload JSONB NOT NULL,
   amount_kopecks INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed', 'expired')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'paid', 'failed', 'expired')),
   tinkoff_payment_id TEXT,
   created_order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc'::text, NOW()),

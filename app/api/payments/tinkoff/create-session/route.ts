@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getPaymentOrderSettings } from '@/lib/payment-settings-server'
+import { validateOrderFields } from '@/lib/order-validation'
 
 const supabaseAnon = () =>
   createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -19,6 +20,26 @@ export type OrderPublicationPayload = {
   location: { city: string; address: string }
   budget?: number | null
   imageUrls: string[]
+}
+
+type SessionPayload = {
+  title?: string
+  description?: string
+  category?: string
+  location?: { city?: string; address?: string }
+  budget?: number | null
+  imageUrls?: string[]
+}
+
+function sameOrderDraft(a: SessionPayload, b: SessionPayload): boolean {
+  return (
+    a.title === b.title &&
+    a.description === b.description &&
+    a.category === b.category &&
+    (a.location?.city || '') === (b.location?.city || '') &&
+    (a.location?.address || '') === (b.location?.address || '') &&
+    (a.budget ?? null) === (b.budget ?? null)
+  )
 }
 
 export async function POST(request: Request) {
@@ -43,8 +64,9 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as OrderPublicationPayload
-    if (!body.title?.trim() || !body.description?.trim() || !body.category?.trim()) {
-      return NextResponse.json({ error: 'Заполните обязательные поля заказа' }, { status: 400 })
+    const validated = validateOrderFields(body)
+    if (!validated.ok) {
+      return NextResponse.json({ error: validated.error }, { status: 400 })
     }
     if (!body.location?.city?.trim() || !body.location?.address?.trim()) {
       return NextResponse.json({ error: 'Укажите город и адрес' }, { status: 400 })
@@ -56,9 +78,9 @@ export async function POST(request: Request) {
     }
 
     const payload = {
-      title: body.title.trim(),
-      description: body.description.trim(),
-      category: body.category.trim(),
+      title: validated.title,
+      description: validated.description,
+      category: validated.category,
       location: {
         city: body.location.city.trim(),
         address: body.location.address.trim(),
@@ -68,6 +90,26 @@ export async function POST(request: Request) {
     }
 
     const admin = supabaseService()
+
+    // Идемпотентность: переиспользуем свежую pending-сессию с тем же черновиком
+    const since = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+    const { data: pendingRows } = await admin
+      .from('payment_sessions')
+      .select('id, payload, created_at')
+      .eq('user_id', user.id)
+      .eq('kind', 'order_publication')
+      .eq('status', 'pending')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    const reuse = (pendingRows || []).find((row) =>
+      sameOrderDraft((row.payload || {}) as SessionPayload, payload)
+    )
+    if (reuse) {
+      return NextResponse.json({ sessionId: reuse.id })
+    }
+
     const { data: row, error: insError } = await admin
       .from('payment_sessions')
       .insert({

@@ -9,8 +9,13 @@ import { FiArrowLeft, FiImage, FiX } from 'react-icons/fi'
 import Link from 'next/link'
 import OrderPaymentModal from '@/components/OrderPaymentModal'
 import OrderLocationPicker from '@/components/OrderLocationPicker'
+import {
+  MIN_ORDER_DESCRIPTION_LENGTH,
+  MIN_ORDER_TITLE_LENGTH,
+  validateOrderFields,
+} from '@/lib/order-validation'
 
-const MIN_DESCRIPTION_LENGTH = 30
+const MIN_DESCRIPTION_LENGTH = MIN_ORDER_DESCRIPTION_LENGTH
 
 const TITLE_EXAMPLES = [
   'Ремонт кухни под ключ',
@@ -223,13 +228,9 @@ function NewOrderForm() {
     e.preventDefault()
     if (!user) return
 
-    if (!title.trim() || !description.trim() || !category) {
-      alert('Заполните все обязательные поля')
-      return
-    }
-
-    if (description.trim().length < MIN_DESCRIPTION_LENGTH) {
-      alert(`Описание слишком короткое. Минимум ${MIN_DESCRIPTION_LENGTH} символов — опишите задачу подробнее.`)
+    const validated = validateOrderFields({ title, description, category })
+    if (!validated.ok) {
+      alert(validated.error)
       return
     }
 
@@ -348,7 +349,7 @@ function NewOrderForm() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                minLength={5}
+                minLength={MIN_ORDER_TITLE_LENGTH}
                 className="input"
                 placeholder="Например: Ремонт кухни"
               />
