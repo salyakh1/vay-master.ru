@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
+import { hasCompletedDeal } from '@/lib/review-eligibility'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,6 +12,7 @@ const supabaseAdmin = createClient(
 export const dynamic = 'force-dynamic'
 
 // GET - Получить отзывы (о мастере или товаре)
+// ?canReview=1&type=&targetId= + Authorization → дополнительно { canReview }
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -18,9 +20,32 @@ export async function GET(request: NextRequest) {
     const targetId = searchParams.get('targetId')
     const limit = parseInt(searchParams.get('limit') || '10')
     const offset = parseInt(searchParams.get('offset') || '0')
+    const wantCanReview = searchParams.get('canReview') === '1'
 
     if (!targetType || !targetId) {
       return NextResponse.json({ error: 'type and targetId are required' }, { status: 400 })
+    }
+
+    let canReview: boolean | undefined
+    if (wantCanReview) {
+      const authHeader = request.headers.get('authorization')
+      if (authHeader) {
+        const token = authHeader.replace('Bearer ', '')
+        const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+        if (user) {
+          canReview = await hasCompletedDeal({
+            admin: supabaseAdmin,
+            reviewerId: user.id,
+            targetType: targetType as 'master' | 'seller' | 'product',
+            targetId,
+            sellerId: searchParams.get('sellerId'),
+          })
+        } else {
+          canReview = false
+        }
+      } else {
+        canReview = false
+      }
     }
 
     if (targetType === 'master') {
@@ -64,7 +89,11 @@ export async function GET(request: NextRequest) {
         replies: repliesMap.get(review.id) || []
       })) || []
 
-      return NextResponse.json({ reviews: reviewsWithReplies, count: reviewsWithReplies.length })
+      return NextResponse.json({
+        reviews: reviewsWithReplies,
+        count: reviewsWithReplies.length,
+        ...(wantCanReview ? { canReview: !!canReview } : {}),
+      })
     } else if (targetType === 'seller') {
       // Прямые отзывы о продавце (аналогично master_reviews)
       const { data, error } = await supabase
@@ -107,7 +136,11 @@ export async function GET(request: NextRequest) {
         replies: repliesMap.get(review.id) || []
       })) || []
 
-      return NextResponse.json({ reviews: reviewsWithReplies, count: reviewsWithReplies.length })
+      return NextResponse.json({
+        reviews: reviewsWithReplies,
+        count: reviewsWithReplies.length,
+        ...(wantCanReview ? { canReview: !!canReview } : {}),
+      })
     } else if (targetType === 'product') {
       const { data, error } = await supabase
         .from('product_reviews')
@@ -150,7 +183,11 @@ export async function GET(request: NextRequest) {
         replies: repliesMap.get(review.id) || []
       })) || []
 
-      return NextResponse.json({ reviews: reviewsWithReplies, count: reviewsWithReplies.length })
+      return NextResponse.json({
+        reviews: reviewsWithReplies,
+        count: reviewsWithReplies.length,
+        ...(wantCanReview ? { canReview: !!canReview } : {}),
+      })
     }
 
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
@@ -180,6 +217,24 @@ export async function POST(request: NextRequest) {
 
     if (!targetType || !targetId || !rating || rating < 1 || rating > 5) {
       return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 })
+    }
+
+    const allowed = await hasCompletedDeal({
+      admin: supabaseAdmin,
+      reviewerId: user.id,
+      targetType,
+      targetId,
+      sellerId,
+    })
+    if (!allowed) {
+      return NextResponse.json(
+        {
+          error:
+            'Отзыв можно оставить только после завершённого заказа с этим исполнителем',
+          code: 'COMPLETED_DEAL_REQUIRED',
+        },
+        { status: 403 }
+      )
     }
 
     if (targetType === 'master') {

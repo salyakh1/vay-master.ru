@@ -1,11 +1,7 @@
 -- ============================================
 -- Функция для атомарного принятия отклика
+-- (синхронизировано с backend_security_critical.sql)
 -- ============================================
--- Эта функция выполняет все операции в одной транзакции:
--- 1. Обновляет статус отклика на 'accepted'
--- 2. Отклоняет все остальные отклики
--- 3. Обновляет заказ (статус и selected_master_id)
--- 4. Защищает от race conditions
 
 CREATE OR REPLACE FUNCTION accept_order_response(
   p_response_id UUID,
@@ -17,25 +13,34 @@ DECLARE
   v_order_status TEXT;
   v_response_status TEXT;
   v_selected_master_id UUID;
+  v_client_id UUID;
   v_updated_count INTEGER;
+  v_uid UUID;
 BEGIN
-  -- Блокируем строку заказа для обновления (защита от race condition)
-  SELECT status, selected_master_id INTO v_order_status, v_selected_master_id
+  v_uid := auth.uid();
+
+  SELECT status, selected_master_id, client_id
+  INTO v_order_status, v_selected_master_id, v_client_id
   FROM public.orders
   WHERE id = p_order_id
   FOR UPDATE;
 
-  -- Проверяем, что заказ еще открыт
+  IF NOT FOUND OR v_client_id IS NULL THEN
+    RAISE EXCEPTION 'Заказ не найден';
+  END IF;
+
+  IF v_uid IS NOT NULL AND v_uid <> v_client_id THEN
+    RAISE EXCEPTION 'Только владелец заказа может принимать отклики';
+  END IF;
+
   IF v_order_status NOT IN ('open', 'new') THEN
     RAISE EXCEPTION 'Заказ уже не принимает отклики (статус: %)', v_order_status;
   END IF;
 
-  -- Проверяем, что мастер еще не выбран
   IF v_selected_master_id IS NOT NULL THEN
     RAISE EXCEPTION 'Исполнитель уже выбран для этого заказа';
   END IF;
 
-  -- Проверяем статус отклика
   SELECT status INTO v_response_status
   FROM public.order_responses
   WHERE id = p_response_id;
@@ -44,7 +49,6 @@ BEGIN
     RAISE EXCEPTION 'Отклик уже обработан (статус: %)', v_response_status;
   END IF;
 
-  -- Обновляем отклик на 'accepted'
   UPDATE public.order_responses
   SET status = 'accepted'
   WHERE id = p_response_id
@@ -57,22 +61,19 @@ BEGIN
     RAISE EXCEPTION 'Не удалось обновить отклик';
   END IF;
 
-  -- Отклоняем все остальные отклики на этот заказ
   UPDATE public.order_responses
   SET status = 'rejected'
   WHERE order_id = p_order_id
     AND id != p_response_id
     AND status = 'pending';
 
-  -- Обновляем заказ
   UPDATE public.orders
-  SET 
+  SET
     status = 'in_progress',
     selected_master_id = p_master_id,
     updated_at = NOW()
   WHERE id = p_order_id;
 
-  -- Возвращаем результат
   RETURN json_build_object(
     'success', true,
     'response_id', p_response_id,
@@ -80,9 +81,10 @@ BEGIN
     'master_id', p_master_id
   );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
 
--- Даем права на выполнение функции
-GRANT EXECUTE ON FUNCTION accept_order_response(UUID, UUID, UUID) TO authenticated;
+REVOKE ALL ON FUNCTION accept_order_response(UUID, UUID, UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION accept_order_response(UUID, UUID, UUID) FROM authenticated;
+REVOKE ALL ON FUNCTION accept_order_response(UUID, UUID, UUID) FROM anon;
 GRANT EXECUTE ON FUNCTION accept_order_response(UUID, UUID, UUID) TO service_role;
-

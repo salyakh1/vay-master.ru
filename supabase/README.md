@@ -11,7 +11,8 @@
 7. `portfolio_likes_comments_schema.sql` — портфолио
 8. `payment_sessions.sql` + `payment_settings_seed.sql` — оплата
 9. `payment_sessions_add_processing_status.sql` — статус `processing` для атомарного webhook (если таблица уже была создана без него)
-10. Остальные файлы `add_*`, `fix_*`, `*_migration.sql` — по необходимости после проверки дубликатов
+10. `backend_security_critical.sql` — защита is_pro, accept_order_response ownership, CHECK заказов, GIN-индексы, unique tinkoff_payment_id
+11. Остальные файлы `add_*`, `fix_*`, `*_migration.sql` — по необходимости после проверки дубликатов
 
 ## Новые миграции
 

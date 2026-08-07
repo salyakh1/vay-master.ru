@@ -20,13 +20,13 @@ export function AdminStatCard({
 }) {
   const trendCls =
     trendVariant === 'up'
-      ? 'bg-[#edfff5] text-[#22a85e]'
+      ? 'bg-admin-successBg text-admin-success'
       : trendVariant === 'down'
-        ? 'bg-[#fdf0f0] text-brand-accent'
-        : 'bg-[#f2f2f7] text-[#8e8e93]'
+        ? 'bg-admin-soft text-brand-accent'
+        : 'bg-admin-bg text-admin-muted'
 
   return (
-    <div className="bg-white rounded-[14px] border border-[#e5e5ea] p-3.5">
+    <div className="bg-admin-surface rounded-[14px] border border-admin-border p-3.5">
       <div className="flex items-center justify-between mb-2.5">
         <div
           className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center text-base"
@@ -36,8 +36,8 @@ export function AdminStatCard({
         </div>
         {trend && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${trendCls}`}>{trend}</span>}
       </div>
-      <div className="text-2xl font-black text-[#1c1c1e] tracking-tight mb-0.5">{value}</div>
-      <div className="text-[11px] text-[#8e8e93] font-medium">{label}</div>
+      <div className="text-2xl font-black text-admin-ink tracking-tight mb-0.5">{value}</div>
+      <div className="text-[11px] text-admin-muted font-medium">{label}</div>
     </div>
   )
 }
@@ -56,10 +56,10 @@ export function AdminPanel({
   hideHeader?: boolean
 }) {
   return (
-    <div className="bg-white rounded-[14px] border border-[#e5e5ea] overflow-hidden">
+    <div className="bg-admin-surface rounded-[14px] border border-admin-border overflow-hidden">
       {!hideHeader && title && (
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#e5e5ea]">
-          <span className="text-[13px] font-bold text-[#1c1c1e]">{title}</span>
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-admin-border">
+          <span className="text-[13px] font-bold text-admin-ink">{title}</span>
           {linkHref && (
             <Link href={linkHref} className="text-[11px] font-semibold text-brand-accent">
               {linkLabel}
@@ -73,7 +73,7 @@ export function AdminPanel({
 }
 
 export function AdminSectionTitle({ children }: { children: ReactNode }) {
-  return <h2 className="text-[13px] font-bold text-[#1c1c1e] mb-2.5">{children}</h2>
+  return <h2 className="text-[13px] font-bold text-admin-ink mb-2.5">{children}</h2>
 }
 
 export function AdminQuickAction({
@@ -90,12 +90,12 @@ export function AdminQuickAction({
   onClick?: () => void
 }) {
   const cls =
-    'bg-white border border-[#e5e5ea] rounded-xl p-3.5 text-center transition-colors hover:border-brand-accent hover:bg-[#fdf0f0] active:scale-[0.98] block w-full'
+    'bg-admin-surface border border-admin-border rounded-xl p-3.5 text-center transition-colors hover:border-brand-accent hover:bg-admin-soft active:scale-[0.98] block w-full'
 
   const inner = (
     <>
       <div className="text-[22px] mb-1.5">{icon}</div>
-      <div className="text-[11px] font-semibold text-[#1c1c1e]">{label}</div>
+      <div className="text-[11px] font-semibold text-admin-ink">{label}</div>
       {count && <div className="text-[9px] text-brand-accent font-bold mt-0.5">{count}</div>}
     </>
   )
@@ -109,9 +109,9 @@ export function AdminQuickAction({
 }
 
 const ROLE_BADGE: Record<string, string> = {
-  master: 'bg-[#fdf0f0] text-brand-accent',
-  seller: 'bg-[#eaf1fb] text-[#1d5fa6]',
-  client: 'bg-[#edfff5] text-[#22a85e]',
+  master: 'bg-admin-soft text-brand-accent',
+  seller: 'bg-admin-infoBg text-admin-info',
+  client: 'bg-admin-successBg text-admin-success',
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -122,7 +122,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 export function AdminRoleBadge({ role }: { role: string }) {
   return (
-    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${ROLE_BADGE[role] ?? 'bg-[#f2f2f7] text-[#8e8e93]'}`}>
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${ROLE_BADGE[role] ?? 'bg-admin-bg text-admin-muted'}`}>
       {ROLE_LABEL[role] ?? role}
     </span>
   )
@@ -137,12 +137,12 @@ export function AdminStatusBadge({
 }) {
   const cls =
     variant === 'active'
-      ? 'bg-[#edfff5] text-[#22a85e]'
+      ? 'bg-admin-successBg text-admin-success'
       : variant === 'banned'
-        ? 'bg-[#f2f2f7] text-[#8e8e93]'
+        ? 'bg-admin-bg text-admin-muted'
         : variant === 'dispute'
-          ? 'bg-[#fff8e6] text-[#cc8800]'
-          : 'bg-[#fff8e6] text-[#cc8800]'
+          ? 'bg-admin-warnBg text-admin-warn'
+          : 'bg-admin-warnBg text-admin-warn'
 
   return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${cls}`}>{label}</span>
 }
@@ -159,16 +159,22 @@ export function AdminAvatar({
   const colors = ['#c0392b', '#1d5fa6', '#22a85e', '#6c3483', '#555', '#8B4513']
   const initials =
     name
-      ?.split(' ')
+      ?.split(/\s+/)
+      .filter(Boolean)
       .map((w) => w[0])
       .join('')
       .slice(0, 2)
-      .toUpperCase() ?? '??'
+      .toUpperCase() || '?'
 
   return (
     <div
-      className="rounded-full flex items-center justify-center text-white font-bold shrink-0"
-      style={{ width: size, height: size, background: colors[colorIndex % colors.length], fontSize: size * 0.36 }}
+      className="rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.35,
+        background: colors[colorIndex % colors.length],
+      }}
     >
       {initials}
     </div>

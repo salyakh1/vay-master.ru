@@ -25,16 +25,28 @@ import { getProductCategoryEmoji } from '@/lib/categoryEmoji'
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
 const RadiusPickerModal = dynamic(() => import('@/components/RadiusPickerModal'), { ssr: false })
 
-function ProductsContent() {
+type ProductsContentProps = {
+  initialProducts?: Product[] | null
+  initialTotal?: number
+  initialBanners?: import('@/lib/supabase').AdBanner[] | null
+}
+
+function ProductsContent({
+  initialProducts = null,
+  initialTotal = 0,
+  initialBanners = null,
+}: ProductsContentProps) {
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+  const [products, setProducts] = useState<Product[]>(() => initialProducts || [])
+  const [loading, setLoading] = useState(() => !(initialProducts && initialProducts.length > 0))
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
+  const [totalCount, setTotalCount] = useState(() => initialTotal || initialProducts?.length || 0)
+  const ssrHydratedRef = useRef(!!(initialProducts && initialProducts.length > 0))
   const [productSuggestions, setProductSuggestions] = useState<Array<{ id: string; name: string; type: string; category_name?: string | null }>>([])
   const [showProductSuggestions, setShowProductSuggestions] = useState(false)
   const [loadingProductSuggestions, setLoadingProductSuggestions] = useState(false)
@@ -52,7 +64,6 @@ function ProductsContent() {
   const [showFilters, setShowFilters] = useState(false)
   const [filterStep, setFilterStep] = useState<'categories' | 'subcategories'>('categories')
   const [sortMode, setSortMode] = useState<'newest' | 'price_asc' | 'price_desc'>('newest')
-  const [totalCount, setTotalCount] = useState(0)
   const [categoryImageFailed, setCategoryImageFailed] = useState<Set<string>>(new Set())
   const [showAuthModal, setShowAuthModal] = useState(false)
 
@@ -307,6 +318,11 @@ function ProductsContent() {
   // Загружаем товары только когда модалка фильтра закрыта (чтобы выбор каталогов не обновлял страницу)
   useEffect(() => {
     if (showFilters) return
+    // SSR уже отдал первую страницу — не дублируем сразу при монтировании
+    if (ssrHydratedRef.current) {
+      ssrHydratedRef.current = false
+      return
+    }
     setPage(1)
     setProducts([])
     setHasMore(true)
@@ -565,7 +581,7 @@ function ProductsContent() {
         </div>
       </div>
 
-      <CompactPageBanner page="products" buttonLabel="Разместить" />
+      <CompactPageBanner page="products" buttonLabel="Разместить" initialBanners={initialBanners} />
 
       {(stories.length > 0 ||
         (!!user && (user.role === 'master' || user.role === 'seller'))) && (
@@ -916,10 +932,10 @@ function ProductsContent() {
   )
 }
 
-export default function ProductsClient() {
+export default function ProductsClient(props: ProductsContentProps = {}) {
   return (
     <Suspense fallback={<ProductsLoading />}>
-      <ProductsContent />
+      <ProductsContent {...props} />
     </Suspense>
   )
 }

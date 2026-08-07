@@ -1,10 +1,11 @@
-'use client'
+﻿'use client'
 
 import { useState, Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase, UserRole } from '@/lib/supabase'
 import Link from 'next/link'
 import AuthBrandHero from '@/components/auth/AuthBrandHero'
+import { localizeAuthError } from '@/components/auth/localizeAuthError'
 
 const VALID_ROLES: UserRole[] = ['master', 'seller', 'client']
 
@@ -40,7 +41,7 @@ function RegisterForm() {
 
     if (!role) {
       setRoleTouched(true)
-      setError('Пожалуйста, выберите роль')
+      setError('РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ СЂРѕР»СЊ')
       setLoading(false)
       return
     }
@@ -128,7 +129,7 @@ function RegisterForm() {
         }
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Ошибка при регистрации')
+      setError(localizeAuthError(err))
     } finally {
       setLoading(false)
     }
@@ -136,17 +137,17 @@ function RegisterForm() {
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full flex flex-col">
-      <AuthBrandHero subtitle="Создайте аккаунт за минуту — бесплатно. Мастера, продавцы и клиенты в одной экосистеме." />
+      <AuthBrandHero subtitle="РЎРѕР·РґР°Р№С‚Рµ Р°РєРєР°СѓРЅС‚ Р·Р° РјРёРЅСѓС‚Сѓ вЂ” Р±РµСЃРїР»Р°С‚РЅРѕ. РњР°СЃС‚РµСЂР°, РїСЂРѕРґР°РІС†С‹ Рё РєР»РёРµРЅС‚С‹ РІ РѕРґРЅРѕР№ СЌРєРѕСЃРёСЃС‚РµРјРµ." />
 
       <div className="flex-1 px-4 -mt-6 relative z-10 pb-10">
         <div className="bg-white rounded-2xl border border-[#e5e5ea] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
-          <h2 className="text-lg font-bold text-[#1c1c1e] mb-1 text-center">Регистрация</h2>
-          <p className="text-center text-xs text-[#8e8e93] mb-5">Выберите роль и заполните данные</p>
+          <h2 className="text-lg font-bold text-[#1c1c1e] mb-1 text-center">Р РµРіРёСЃС‚СЂР°С†РёСЏ</h2>
+          <p className="text-center text-xs text-text-secondary mb-5">Р’С‹Р±РµСЂРёС‚Рµ СЂРѕР»СЊ Рё Р·Р°РїРѕР»РЅРёС‚Рµ РґР°РЅРЅС‹Рµ</p>
 
           <form onSubmit={handleRegister} className="space-y-3.5">
             <div>
-              <label htmlFor="reg-name" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
-                ФИО *
+              <label htmlFor="reg-name" className="block text-xs font-semibold text-text-secondary mb-1.5">
+                Р¤РРћ *
               </label>
               <input
                 id="reg-name"
@@ -155,13 +156,13 @@ function RegisterForm() {
                 onChange={(e) => setFullName(e.target.value)}
                 required
                 className="input w-full"
-                placeholder="Иван Иванов"
+                placeholder="РРІР°РЅ РРІР°РЅРѕРІ"
                 autoComplete="name"
               />
             </div>
 
             <div>
-              <label htmlFor="reg-email" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
+              <label htmlFor="reg-email" className="block text-xs font-semibold text-text-secondary mb-1.5">
                 Email *
               </label>
               <input
@@ -177,8 +178,8 @@ function RegisterForm() {
             </div>
 
             <div>
-              <label htmlFor="reg-password" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
-                Пароль *
+              <label htmlFor="reg-password" className="block text-xs font-semibold text-text-secondary mb-1.5">
+                РџР°СЂРѕР»СЊ *
               </label>
               <input
                 id="reg-password"
@@ -188,15 +189,15 @@ function RegisterForm() {
                 required
                 minLength={6}
                 className="input w-full"
-                placeholder="Минимум 6 символов"
+                placeholder="РњРёРЅРёРјСѓРј 6 СЃРёРјРІРѕР»РѕРІ"
                 autoComplete="new-password"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="reg-phone" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
-                  Телефон
+                <label htmlFor="reg-phone" className="block text-xs font-semibold text-text-secondary mb-1.5">
+                  РўРµР»РµС„РѕРЅ
                 </label>
                 <input
                   id="reg-phone"
@@ -209,8 +210,8 @@ function RegisterForm() {
                 />
               </div>
               <div>
-                <label htmlFor="reg-city" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
-                  Город
+                <label htmlFor="reg-city" className="block text-xs font-semibold text-text-secondary mb-1.5">
+                  Р“РѕСЂРѕРґ
                 </label>
                 <input
                   id="reg-city"
@@ -218,7 +219,7 @@ function RegisterForm() {
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="input w-full"
-                  placeholder="Москва"
+                  placeholder="РњРѕСЃРєРІР°"
                   autoComplete="address-level2"
                 />
               </div>
@@ -226,14 +227,14 @@ function RegisterForm() {
 
             <div className="pt-1">
               <div className="flex items-center justify-between gap-3 mb-2">
-                <label className="block text-xs font-semibold text-[#8e8e93]">Выберите роль *</label>
+                <label className="block text-xs font-semibold text-text-secondary">Р’С‹Р±РµСЂРёС‚Рµ СЂРѕР»СЊ *</label>
                 {roleTouched && !role && (
-                  <span className="text-[11px] font-semibold text-brand-accent">Роль не выбрана</span>
+                  <span className="text-[11px] font-semibold text-brand-accent">Р РѕР»СЊ РЅРµ РІС‹Р±СЂР°РЅР°</span>
                 )}
               </div>
               <div
                 role="radiogroup"
-                aria-label="Роль пользователя"
+                aria-label="Р РѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"
                 aria-invalid={roleTouched && !role ? 'true' : 'false'}
                 className={[
                   'grid grid-cols-3 gap-2',
@@ -242,9 +243,9 @@ function RegisterForm() {
               >
                 {(
                   [
-                    { id: 'role-master', value: 'master' as const, label: 'Мастер', icon: '🔨' },
-                    { id: 'role-seller', value: 'seller' as const, label: 'Продавец', icon: '🛒' },
-                    { id: 'role-client', value: 'client' as const, label: 'Клиент', icon: '👤' },
+                    { id: 'role-master', value: 'master' as const, label: 'РњР°СЃС‚РµСЂ', icon: 'рџ”Ё' },
+                    { id: 'role-seller', value: 'seller' as const, label: 'РџСЂРѕРґР°РІРµС†', icon: 'рџ›’' },
+                    { id: 'role-client', value: 'client' as const, label: 'РљР»РёРµРЅС‚', icon: 'рџ‘¤' },
                   ] as const
                 ).map((item) => {
                   const selected = role === item.value
@@ -297,21 +298,21 @@ function RegisterForm() {
               disabled={loading}
               className="w-full btn btn-primary py-3.5 font-bold text-[15px]"
             >
-              {loading ? 'Регистрация…' : 'Создать аккаунт'}
+              {loading ? 'Р РµРіРёСЃС‚СЂР°С†РёСЏвЂ¦' : 'РЎРѕР·РґР°С‚СЊ Р°РєРєР°СѓРЅС‚'}
             </button>
           </form>
 
           <p className="mt-5 text-center text-sm text-[#8e8e93]">
-            Уже есть аккаунт?{' '}
+            РЈР¶Рµ РµСЃС‚СЊ Р°РєРєР°СѓРЅС‚?{' '}
             <Link href="/auth/login" className="text-brand-accent font-semibold hover:underline">
-              Войти
+              Р’РѕР№С‚Рё
             </Link>
           </p>
         </div>
 
         <p className="text-center mt-6">
           <Link href="/" className="text-sm text-[#8e8e93] hover:text-[#1c1c1e] transition-colors">
-            ← На главную
+            в†ђ РќР° РіР»Р°РІРЅСѓСЋ
           </Link>
         </p>
       </div>

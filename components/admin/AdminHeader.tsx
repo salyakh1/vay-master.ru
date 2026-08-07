@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -22,7 +22,7 @@ export default function AdminHeader({ onMenuClick, complaintsNew = 0 }: AdminHea
 
   const subtitle =
     pathname === '/admin'
-      ? `Обзор платформы на ${format(new Date(), 'd MMMM yyyy', { locale: ru })}`
+      ? `РћР±Р·РѕСЂ РїР»Р°С‚С„РѕСЂРјС‹ РЅР° ${format(new Date(), 'd MMMM yyyy', { locale: ru })}`
       : meta.subtitle
 
   const handleLogout = async () => {
@@ -31,37 +31,37 @@ export default function AdminHeader({ onMenuClick, complaintsNew = 0 }: AdminHea
   }
 
   return (
-    <header className="bg-white border-b border-[#e5e5ea] px-4 md:px-6 py-3.5 flex items-center justify-between gap-3 sticky top-0 z-30">
+    <header className="bg-white border-b border-admin-border px-4 md:px-6 py-3.5 flex items-center justify-between gap-3 sticky top-0 z-30">
       <div className="flex items-center gap-3 min-w-0">
         <button
           type="button"
           onClick={onMenuClick}
-          className="lg:hidden w-8 h-8 rounded-lg bg-[#f2f2f7] border border-[#e5e5ea] flex items-center justify-center text-[#1c1c1e] shrink-0"
-          aria-label="Меню"
+          className="lg:hidden w-8 h-8 rounded-lg bg-admin-bg border border-admin-border flex items-center justify-center text-admin-ink shrink-0"
+          aria-label="РњРµРЅСЋ"
         >
           <FiMenu size={16} />
         </button>
         <div className="min-w-0">
-          <h1 className="text-lg font-extrabold text-[#1c1c1e] truncate">{meta.title}</h1>
-          {subtitle && <p className="text-[11px] text-[#8e8e93] mt-0.5 truncate">{subtitle}</p>}
+          <h1 className="text-lg font-extrabold text-admin-ink truncate">{meta.title}</h1>
+          {subtitle && <p className="text-[11px] text-admin-muted mt-0.5 truncate">{subtitle}</p>}
         </div>
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
         <Link
           href="/admin/users"
-          className="hidden sm:flex items-center gap-1.5 bg-[#f2f2f7] border border-[#e5e5ea] rounded-[10px] px-3 py-1.5 text-[11px] text-[#8e8e93] w-[180px]"
+          className="hidden sm:flex items-center gap-1.5 bg-admin-bg border border-admin-border rounded-[10px] px-3 py-1.5 text-[11px] text-admin-muted w-[180px]"
         >
           <FiSearch size={12} className="text-brand-accent shrink-0" />
-          <span className="truncate">Поиск пользователя...</span>
+          <span className="truncate">РџРѕРёСЃРє РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ...</span>
         </Link>
 
         <Link
           href="/admin/complaints"
-          className="relative w-8 h-8 rounded-lg bg-[#f2f2f7] border border-[#e5e5ea] flex items-center justify-center text-base"
-          aria-label="Уведомления"
+          className="relative w-8 h-8 rounded-lg bg-admin-bg border border-admin-border flex items-center justify-center text-base"
+          aria-label="РЈРІРµРґРѕРјР»РµРЅРёСЏ"
         >
-          <FiBell size={15} className="text-[#1c1c1e]" />
+          <FiBell size={15} className="text-admin-ink" />
           {complaintsNew > 0 && (
             <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-brand-accent rounded-full border border-white" />
           )}
@@ -81,15 +81,15 @@ export default function AdminHeader({ onMenuClick, complaintsNew = 0 }: AdminHea
             href="/admin/banners"
             className="hidden md:inline-flex bg-brand-accent text-white text-[11px] font-bold px-3.5 py-2 rounded-lg whitespace-nowrap"
           >
-            + Создать баннер
+            + РЎРѕР·РґР°С‚СЊ Р±Р°РЅРЅРµСЂ
           </Link>
         )}
 
         <button
           type="button"
           onClick={handleLogout}
-          className="hidden md:flex items-center gap-1.5 text-[11px] text-[#8e8e93] hover:text-[#1c1c1e] font-medium px-2"
-          title={user?.email ?? 'Выйти'}
+          className="hidden md:flex items-center gap-1.5 text-[11px] text-admin-muted hover:text-admin-ink font-medium px-2"
+          title={user?.email ?? 'Р’С‹Р№С‚Рё'}
         >
           <FiLogOut size={14} />
         </button>
@@ -97,3 +97,4 @@ export default function AdminHeader({ onMenuClick, complaintsNew = 0 }: AdminHea
     </header>
   )
 }
+

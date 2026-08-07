@@ -49,6 +49,26 @@ module.exports = {
           light: '#E5E7EB',         // Светлая граница
           hover: '#9CA3AF',          // Hover граница
         },
+
+        // ============================================
+        // ADMIN: отдельная iOS-подобная палитра (осознанно)
+        // Раньше хексами по файлам — теперь токены admin.*
+        // ============================================
+        admin: {
+          bg: '#f2f2f7',
+          surface: '#ffffff',
+          border: '#e5e5ea',
+          muted: '#8e8e93',
+          hairline: '#c7c7cc',
+          ink: '#1c1c1e',
+          soft: '#fdf0f0',
+          success: '#22a85e',
+          successBg: '#edfff5',
+          info: '#1d5fa6',
+          infoBg: '#eaf1fb',
+          warn: '#cc8800',
+          warnBg: '#fff8e6',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'Manrope', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],

@@ -39,6 +39,7 @@ export default function ProductPage() {
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [editingReview, setEditingReview] = useState<any>(null)
   const [replyingToReview, setReplyingToReview] = useState<string | null>(null)
+  const [canReview, setCanReview] = useState(false)
 
   useEffect(() => {
     if (params.id) {
@@ -46,6 +47,41 @@ export default function ProductPage() {
       fetchProductReviews()
     }
   }, [params.id])
+
+  useEffect(() => {
+    const sellerId =
+      (product as any)?.seller_id ||
+      (product as any)?.seller?.id ||
+      null
+    const own = !!(user && sellerId && user.id === sellerId)
+    if (!user || !product || own) {
+      setCanReview(false)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        if (!token) {
+          if (!cancelled) setCanReview(false)
+          return
+        }
+        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const res = await fetch(
+          `/api/reviews/eligibility?type=product&targetId=${encodeURIComponent(String(productId))}&sellerId=${encodeURIComponent(String(sellerId || ''))}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        const data = await res.json().catch(() => ({ canReview: false }))
+        if (!cancelled) setCanReview(!!data.canReview)
+      } catch {
+        if (!cancelled) setCanReview(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id, product, params.id])
 
   const fetchProductReviews = async () => {
     if (!params.id) return
@@ -513,7 +549,7 @@ export default function ProductPage() {
           <p className="text-[11px] font-medium text-[#9ca3af] uppercase">
             Отзывы{product.reviews_count ? ` · ${product.reviews_count}` : productReviews.length ? ` · ${productReviews.length}` : ''}
           </p>
-          {user && !isOwner && (
+          {user && !isOwner && canReview && (
             <button
               type="button"
               onClick={() => {
@@ -524,6 +560,9 @@ export default function ProductPage() {
             >
               Оставить
             </button>
+          )}
+          {user && !isOwner && !canReview && (
+            <span className="text-[10px] text-text-secondary">После завершённого заказа</span>
           )}
         </div>
 
@@ -543,7 +582,7 @@ export default function ProductPage() {
           <p className="text-[11px] text-[#9ca3af] mb-3">Пока нет отзывов</p>
         )}
 
-        {showReviewForm && user && !isOwner && (
+        {showReviewForm && user && !isOwner && canReview && (
           <div className="mb-4">
             <ReviewForm
               targetId={Array.isArray(params.id) ? params.id[0] : params.id}

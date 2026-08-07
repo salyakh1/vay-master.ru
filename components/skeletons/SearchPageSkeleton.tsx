@@ -1,4 +1,4 @@
-import { MasterListCardSkeleton } from '@/components/search/MasterListCard'
+import { MasterListCardSkeleton } from '@/components/MasterListCard'
 
 export default function SearchPageSkeleton() {
   return (

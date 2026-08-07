@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireAdmin } from '@/app/api/admin/_shared'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 // ID системного пользователя "Администрация VayMaster"
 // Установите это значение в .env.local или используйте значение по умолчанию
 const ADMIN_SYSTEM_USER_ID = process.env.ADMIN_SYSTEM_USER_ID || '970f2f4c-b3e2-4b7f-af7b-45a45e50356c'
 
+// TODO(CURSOR_01 #11): массовая рассылка рискует таймаутом serverless-функции —
+// вынести в фоновую очередь (промпт 3 / инфраструктура). Сейчас — CAP получателей.
+
 export async function POST(request: NextRequest) {
   try {
+    const gate = await requireAdmin(request)
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status })
+    }
+
     const body = await request.json()
     const { message, type, role, user_ids } = body
 
@@ -18,56 +26,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'message и type обязательны' }, { status: 400 })
     }
 
-    // Получаем токен из заголовков
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    const supabaseClient = createClient(supabaseUrl!, supabaseAnonKey!, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    })
-
-    // Проверяем, что пользователь - администратор
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
-    }
-
-    // Проверяем права администратора
-    const { data: adminRole, error: adminRoleError } = await supabaseClient
-      .from('admin_roles')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .in('role', ['super_admin', 'moderator'])
-      .maybeSingle()
-
-    if (adminRoleError) {
-      console.error('Error checking admin role:', adminRoleError)
-      return NextResponse.json({ 
-        error: `Ошибка при проверке прав администратора: ${adminRoleError.message}` 
-      }, { status: 500 })
-    }
-
-    if (!adminRole) {
-      console.error('Admin role not found for user:', user.id, user.email)
-      return NextResponse.json({ 
-        error: 'Доступ запрещен. У вас нет прав администратора для выполнения этой операции.' 
-      }, { status: 403 })
-    }
-
-    console.log('Admin role verified:', adminRole.role, 'for user:', user.id)
+    console.log('Admin role verified for user:', gate.adminId)
 
     // Получаем список получателей (с лимитом во избежание getAll)
     const RECIPIENTS_CAP_ALL = 2000
     const RECIPIENTS_CAP_ROLE = 500
     let recipientIds: string[] = []
+
+    const supabaseClient = createClient(supabaseUrl!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      global: {
+        headers: {
+          Authorization: request.headers.get('authorization') || '',
+        },
+      },
+    })
 
     if (type === 'all') {
       const { data: batch } = await supabaseClient

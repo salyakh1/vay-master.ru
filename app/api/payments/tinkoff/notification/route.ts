@@ -4,6 +4,7 @@ import { tinkoffVerifyNotificationToken } from '@/lib/tinkoff'
 import { extendProByDays } from '@/lib/proSubscription'
 import { notifyUser } from '@/lib/notify'
 import { validateOrderFields } from '@/lib/order-validation'
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const supabaseService = () =>
   createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -48,6 +49,9 @@ async function claimPaymentSession(admin: ReturnType<typeof supabaseService>, or
 
 /** Webhook Tinkoff (уведомление об оплате) */
 export async function POST(request: Request) {
+  const limited = rateLimit(`tinkoff-notify:${getClientIp(request)}`, 120, 60_000)
+  if (!limited.success) return rateLimitResponse()
+
   const password = process.env.TINKOFF_PASSWORD
   if (!password) {
     return NextResponse.json({ TerminalKey: '', Success: false, Message: 'No password' }, { status: 500 })

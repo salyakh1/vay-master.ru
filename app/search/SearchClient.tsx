@@ -10,7 +10,7 @@ import CompactPageBanner from '@/components/CompactPageBanner'
 import { FiSearch, FiSliders, FiBriefcase, FiArrowLeft, FiMapPin } from 'react-icons/fi'
 import { MastersScrollerSection } from '@/components/scrollers/MastersScrollerSection'
 import { ProductsScrollerSection } from '@/components/scrollers/ProductsScrollerSection'
-import { MasterListCard, MasterListCardSkeleton } from '@/components/search/MasterListCard'
+import { MasterListCard, MasterListCardSkeleton } from '@/components/MasterListCard'
 import dynamic from 'next/dynamic'
 import { fetchMastersPage, LIST_PAGE_SIZE, type MasterScrollerItem } from '@/lib/scrollerApi'
 import { useUserLocation } from '@/hooks/useUserLocation'
@@ -45,9 +45,16 @@ function pickCityLabel(result: CitySuggestion): string {
 export interface SearchContentProps {
   /** Баннеры с сервера для быстрого LCP (SSR). */
   initialBanners?: AdBanner[] | null
+  /** Первая страница мастеров с сервера — чтобы HTML не был пустым. */
+  initialMasters?: MasterScrollerItem[] | null
+  initialTotal?: number
 }
 
-function SearchContent({ initialBanners = null }: SearchContentProps) {
+function SearchContent({
+  initialBanners = null,
+  initialMasters = null,
+  initialTotal = 0,
+}: SearchContentProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
@@ -62,13 +69,14 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
   const { lat, lng, radiusKm, city: userLocCity, locationReady, setRadiusKm } = useUserLocation()
   const [showRadiusModal, setShowRadiusModal] = useState(false)
-  const [listMasters, setListMasters] = useState<MasterScrollerItem[]>([])
+  const [listMasters, setListMasters] = useState<MasterScrollerItem[]>(() => initialMasters || [])
   const [listPage, setListPage] = useState(1)
-  const [listTotal, setListTotal] = useState(0)
-  const [listLoading, setListLoading] = useState(true)
+  const [listTotal, setListTotal] = useState(() => initialTotal || initialMasters?.length || 0)
+  const [listLoading, setListLoading] = useState(() => !(initialMasters && initialMasters.length > 0))
   const [listLoadingMore, setListLoadingMore] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
-  const [readyToSearch, setReadyToSearch] = useState(false)
+  const [readyToSearch, setReadyToSearch] = useState(() => !!(initialMasters && initialMasters.length > 0))
+  const ssrHydratedRef = useRef(!!(initialMasters && initialMasters.length > 0))
   const [cityFilter, setCityFilter] = useState<string>('')
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([])
   const [showCitySuggestions, setShowCitySuggestions] = useState(false)
@@ -106,6 +114,11 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   // Коротко ждём геолокацию, чтобы сразу отсортировать по расстоянию (без двойной загрузки)
   useEffect(() => {
     if (locationReady) {
+      setReadyToSearch(true)
+      return
+    }
+    // Если уже есть SSR-данные — не блокируем экран ожиданием гео
+    if (ssrHydratedRef.current) {
       setReadyToSearch(true)
       return
     }
@@ -356,8 +369,13 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
 
   useEffect(() => {
     if (showFiltersModal || !readyToSearch) return
+    // Первая отрисовка уже с SSR — не дёргаем API, пока нет координат/смены фильтров
+    if (ssrHydratedRef.current && !hasCoords) {
+      ssrHydratedRef.current = false
+      return
+    }
     void loadList(1, true)
-  }, [showFiltersModal, readyToSearch, loadList])
+  }, [showFiltersModal, readyToSearch, loadList, hasCoords])
 
   useEffect(() => {
     const t = setTimeout(() => fetchStories(), 800)
@@ -960,10 +978,18 @@ function SearchContent({ initialBanners = null }: SearchContentProps) {
   )
 }
 
-export default function SearchClient() {
+export default function SearchClient({
+  initialBanners = null,
+  initialMasters = null,
+  initialTotal = 0,
+}: SearchContentProps) {
   return (
     <Suspense fallback={<SearchLoading />}>
-      <SearchContent />
+      <SearchContent
+        initialBanners={initialBanners}
+        initialMasters={initialMasters}
+        initialTotal={initialTotal}
+      />
     </Suspense>
   )
 }

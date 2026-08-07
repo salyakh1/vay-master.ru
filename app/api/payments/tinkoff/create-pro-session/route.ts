@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getProPaymentSettings } from '@/lib/payment-settings-server'
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const supabaseAnon = () =>
   createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -13,6 +14,9 @@ const supabaseService = () =>
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
+  const { success } = rateLimit(`tinkoff-pro:${getClientIp(request)}`, 10, 60_000)
+  if (!success) return rateLimitResponse()
+
   try {
     const authHeader = request.headers.get('authorization')
     const jwt = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null

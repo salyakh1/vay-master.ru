@@ -87,76 +87,57 @@ export default function ReviewForm({
 
     setSaving(true)
     try {
-      const reviewData: any = {
-        reviewer_id: currentUserId,
-        rating,
-        comment: comment.trim() || null,
-        images: images.length > 0 ? images : null,
-      }
-
-      if (targetType === 'master') {
-        reviewData.master_id = targetId
-
-        if (existingReview) {
-          const { error } = await supabase
-            .from('master_reviews')
-            .update(reviewData)
-            .eq('id', existingReview.id)
-          
-          if (error) throw error
-        } else {
-          const { error } = await supabase
-            .from('master_reviews')
-            .insert(reviewData)
-          
-          if (error) throw error
+      if (existingReview) {
+        const reviewData: Record<string, unknown> = {
+          rating,
+          comment: comment.trim() || null,
+          images: images.length > 0 ? images : null,
         }
-      } else if (targetType === 'seller') {
-        reviewData.seller_id = targetId
+        const table =
+          targetType === 'master'
+            ? 'master_reviews'
+            : targetType === 'seller'
+              ? 'seller_reviews'
+              : 'product_reviews'
+        const { error } = await supabase.from(table).update(reviewData).eq('id', existingReview.id)
+        if (error) throw error
+      } else {
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        if (!token) throw new Error('Не авторизован')
 
-        if (existingReview) {
-          const { error } = await supabase
-            .from('seller_reviews')
-            .update(reviewData)
-            .eq('id', existingReview.id)
-          
-          if (error) throw error
-        } else {
-          const { error } = await supabase
-            .from('seller_reviews')
-            .insert(reviewData)
-          
-          if (error) throw error
-        }
-      } else if (targetType === 'product') {
-        reviewData.product_id = targetId
-        reviewData.seller_id = sellerId
-
-        if (existingReview) {
-          const { error } = await supabase
-            .from('product_reviews')
-            .update(reviewData)
-            .eq('id', existingReview.id)
-          
-          if (error) throw error
-        } else {
-          const { error } = await supabase
-            .from('product_reviews')
-            .insert(reviewData)
-          
-          if (error) throw error
+        const res = await fetch('/api/reviews', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            targetType,
+            targetId,
+            sellerId,
+            rating,
+            comment: comment.trim() || null,
+            images: images.length > 0 ? images : null,
+          }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw Object.assign(new Error(body.error || 'Ошибка при сохранении отзыва'), {
+            code: body.code,
+          })
         }
       }
 
-      if (onSuccess) {
-        onSuccess()
-      }
+      onSuccess?.()
     } catch (error: any) {
       console.error('Error saving review:', error)
       if (error.code === '23505') {
         alert('Вы уже оставили отзыв. Можно редактировать существующий.')
+      } else if (error.code === 'COMPLETED_DEAL_REQUIRED') {
+        alert(error.message || 'Отзыв можно оставить только после завершённого заказа')
       } else {
-        alert('Ошибка при сохранении отзыва')
+        alert(error.message || 'Ошибка при сохранении отзыва')
       }
     } finally {
       setSaving(false)

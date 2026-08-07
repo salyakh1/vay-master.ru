@@ -73,6 +73,7 @@ export default function ProfilePage() {
   const [quickReviewText, setQuickReviewText] = useState('')
   const [sendingQuickReview, setSendingQuickReview] = useState(false)
   const [existingUserReview, setExistingUserReview] = useState<any>(null)
+  const [canReview, setCanReview] = useState(false)
   const [profileStories, setProfileStories] = useState<Story[]>([])
   
   // Render-on-Demand: состояния для отслеживания загрузки данных по секциям
@@ -111,6 +112,38 @@ export default function ProfilePage() {
     fetchProfile()
     checkFollowing()
   }, [params.id, currentUser])
+
+  // canReview: кнопка отзыва только после завершённой сделки (API part 1)
+  useEffect(() => {
+    const own = !!(currentUser && profile && currentUser.id === profile.id)
+    if (!currentUser || !profile || own) {
+      setCanReview(false)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token
+        if (!token) {
+          if (!cancelled) setCanReview(false)
+          return
+        }
+        const type = profile.role === 'seller' ? 'seller' : 'master'
+        const res = await fetch(
+          `/api/reviews/eligibility?type=${type}&targetId=${encodeURIComponent(profile.id)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        const data = await res.json().catch(() => ({ canReview: false }))
+        if (!cancelled) setCanReview(!!data.canReview)
+      } catch {
+        if (!cancelled) setCanReview(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [currentUser?.id, profile?.id, profile?.role])
 
   // Render-on-Demand: Intersection Observer для секции портфолио (только для мастеров)
   useEffect(() => {
@@ -1114,8 +1147,16 @@ export default function ProfilePage() {
                               )}
                             </div>
 
-                            {/* Поле для быстрого создания/редактирования отзыва (внизу, как в чате) - двухэтапный процесс */}
-                            {currentUser && profile && currentUser.id !== profile.id && !existingUserReview && (
+                            {currentUser && profile && currentUser.id !== profile.id && !canReview && !existingUserReview && (
+                              <div className="border-t border-border-light/40 bg-bg-primary px-4 py-3">
+                                <p className="text-xs text-text-secondary text-center">
+                                  Отзыв можно оставить после завершённого заказа с этим мастером
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Поле для быстрого создания/редактирования отзыва — только после сделки или свой отзыв */}
+                            {currentUser && profile && currentUser.id !== profile.id && (canReview || existingUserReview) && (
                               <div className="border-t border-border-color/40 bg-bg-primary px-4 py-3">
                                 {/* Этап 1: Выбор рейтинга (показывается сначала) */}
                                 {quickReviewRating === 0 && (
@@ -1181,22 +1222,33 @@ export default function ProfilePage() {
 
                                           if (error) throw error
                                         } else {
-                                          // Создаем новый отзыв с выбранным рейтингом
-                                          const { error } = await supabase
-                                            .from('master_reviews')
-                                            .insert({
-                                              master_id: profile.id,
-                                              reviewer_id: currentUser.id,
+                                          const { data: { session } } = await supabase.auth.getSession()
+                                          const token = session?.access_token
+                                          if (!token) throw new Error('Не авторизован')
+                                          const res = await fetch('/api/reviews', {
+                                            method: 'POST',
+                                            headers: {
+                                              'Content-Type': 'application/json',
+                                              Authorization: `Bearer ${token}`,
+                                            },
+                                            body: JSON.stringify({
+                                              targetType: 'master',
+                                              targetId: profile.id,
                                               rating: quickReviewRating,
                                               comment: quickReviewText.trim() || null,
-                                            })
-
-                                          if (error) {
-                                            if (error.code === '23505') {
-                                              alert('Вы уже оставили отзыв. Можно отредактировать существующий.')
+                                            }),
+                                          })
+                                          const body = await res.json().catch(() => ({}))
+                                          if (!res.ok) {
+                                            if (body.code === 'COMPLETED_DEAL_REQUIRED') {
+                                              alert(body.error || 'Отзыв только после завершённого заказа')
                                               return
                                             }
-                                            throw error
+                                            if (res.status === 400 && String(body.error || '').includes('уже')) {
+                                              alert(body.error)
+                                              return
+                                            }
+                                            throw new Error(body.error || 'Ошибка при сохранении отзыва')
                                           }
                                         }
 
@@ -1301,7 +1353,7 @@ export default function ProfilePage() {
                       Свернуть
                     </button>
                   </div>
-                  {currentUser && !isOwnProfile && (
+                  {currentUser && !isOwnProfile && canReview && (
                     <button
                       type="button"
                       onClick={() => { setShowReviewForm(true); setEditingReview(null) }}
@@ -1310,7 +1362,12 @@ export default function ProfilePage() {
                       Оставить отзыв
                     </button>
                   )}
-                  {showReviewForm && currentUser && !isOwnProfile && (
+                  {currentUser && !isOwnProfile && !canReview && (
+                    <p className="mb-3 text-[11px] text-text-secondary text-center">
+                      Отзыв можно оставить после завершённого заказа
+                    </p>
+                  )}
+                  {showReviewForm && currentUser && !isOwnProfile && canReview && (
                     <div className="mb-4">
                       <ReviewForm
                         targetId={Array.isArray(params.id) ? params.id[0] : params.id}

@@ -4,6 +4,8 @@ import { cookies } from 'next/headers'
 import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { haversineKm } from '@/lib/geo'
 import { stripPhone } from '@/lib/guest-access'
+import { geocodeQuery } from '@/lib/geocode-server'
+import { findMasterIdsServingLocation } from '@/lib/masters-serve-location'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -184,21 +186,12 @@ export async function GET(request: NextRequest) {
 
       let serveIds: string[] = []
       try {
-        const origin = request.nextUrl.origin
-        const geoRes = await fetch(`${origin}/api/geocode`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: city }),
-        })
-        const geo = await geoRes.json()
+        const geo = await geocodeQuery(city)
         if (geo?.lat != null && geo?.lng != null) {
-          const locRes = await fetch(
-            `${origin}/api/masters/serve-location?lat=${encodeURIComponent(geo.lat)}&lng=${encodeURIComponent(geo.lng)}`
-          )
-          const loc = await locRes.json()
-          if (Array.isArray(loc?.profileIds)) serveIds = loc.profileIds
+          serveIds = await findMasterIdsServingLocation(Number(geo.lat), Number(geo.lng))
         }
-      } catch {
+      } catch (geoErr) {
+        console.error('search/masters geocode/serve-location failed:', geoErr)
         // оставляем только cityMatchIds
       }
       const locationIds = Array.from(new Set([...cityMatchIds, ...serveIds]))

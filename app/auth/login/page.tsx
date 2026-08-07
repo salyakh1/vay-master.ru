@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import AuthBrandHero from '@/components/auth/AuthBrandHero'
+import { localizeAuthError } from '@/components/auth/localizeAuthError'
 
 function LoginForm() {
   const router = useRouter()
@@ -39,17 +40,7 @@ function LoginForm() {
         router.push(returnTo.startsWith('/') ? returnTo : '/')
       }
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : ''
-      if (msg === 'Failed to fetch' || msg.includes('fetch') || msg.includes('NetworkError') || msg.includes('ERR_')) {
-        const isLocal = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.origin)
-        setError(
-          isLocal
-            ? 'Нет связи с Supabase с localhost. Проверьте антивирус или фаервол.'
-            : 'Нет связи с сервером. Проверьте интернет и доступ к Supabase.'
-        )
-      } else {
-        setError(msg || 'Ошибка при входе')
-      }
+      setError(localizeAuthError(error))
     } finally {
       setLoading(false)
     }
@@ -62,11 +53,11 @@ function LoginForm() {
       <div className="flex-1 px-4 -mt-6 relative z-10 pb-10">
         <div className="bg-white rounded-2xl border border-[#e5e5ea] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
           <h2 className="text-lg font-bold text-[#1c1c1e] mb-1 text-center">Вход в аккаунт</h2>
-          <p className="text-center text-xs text-[#8e8e93] mb-5">Добро пожаловать обратно в VAY-MASTER</p>
+          <p className="text-center text-xs text-text-secondary mb-5">Добро пожаловать обратно в VAY-MASTER</p>
 
           <form onSubmit={handleLogin} className="space-y-3.5">
             <div>
-              <label htmlFor="login-email" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
+              <label htmlFor="login-email" className="block text-xs font-semibold text-text-secondary mb-1.5">
                 Email
               </label>
               <input
@@ -82,7 +73,7 @@ function LoginForm() {
             </div>
 
             <div>
-              <label htmlFor="login-password" className="block text-xs font-semibold text-[#8e8e93] mb-1.5">
+              <label htmlFor="login-password" className="block text-xs font-semibold text-text-secondary mb-1.5">
                 Пароль
               </label>
               <input

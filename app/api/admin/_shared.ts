@@ -47,3 +47,37 @@ export async function requireAdmin(request: NextRequest) {
 
   return { ok: true as const, adminId }
 }
+
+/** Требует роли super_admin */
+export async function requireSuperAdmin(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader) {
+    return { ok: false as const, status: 401, error: 'Не авторизован' }
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+  const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+
+  const { data: authData, error: authError } = await supabaseClient.auth.getUser()
+  if (authError || !authData?.user) {
+    return { ok: false as const, status: 401, error: 'Не авторизован' }
+  }
+
+  const adminId = authData.user.id
+
+  const { data: adminRole } = await supabaseClient
+    .from('admin_roles')
+    .select('id')
+    .eq('user_id', adminId)
+    .eq('is_active', true)
+    .in('role', ['super_admin'])
+    .maybeSingle()
+
+  if (!adminRole) {
+    return { ok: false as const, status: 403, error: 'Только супер-администратор' }
+  }
+
+  return { ok: true as const, adminId }
+}

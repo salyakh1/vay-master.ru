@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS public.payment_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_payment_sessions_user_id ON public.payment_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_payment_sessions_status ON public.payment_sessions(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_sessions_tinkoff_payment_id_unique
+  ON public.payment_sessions (tinkoff_payment_id)
+  WHERE tinkoff_payment_id IS NOT NULL;
 
 ALTER TABLE public.payment_sessions ENABLE ROW LEVEL SECURITY;
 

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
 // Поиск адресов через Nominatim (автодополнение)
 export async function GET(req: NextRequest) {
+  const { success } = rateLimit(`geocode-search:${getClientIp(req)}`, 40, 60_000)
+  if (!success) return rateLimitResponse()
+
   try {
     const searchParams = req.nextUrl.searchParams
     const query = searchParams.get('q')?.trim() || ''
