@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { FiStar, FiMessageCircle, FiShield } from 'react-icons/fi'
 
@@ -45,18 +46,15 @@ export default function AuthBrandHero({
 
       <div className="relative z-10 px-5 pt-10 pb-14">
         <Link href="/" className="inline-flex items-center gap-3 mb-7 group">
-          <div className="w-12 h-12 rounded-2xl bg-white/12 border border-white/20 flex items-center justify-center backdrop-blur-md shadow-lg group-active:scale-95 transition-transform">
-            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden>
-              <path
-                d="M8 22 L16 6 L24 22 Z"
-                stroke="white"
-                strokeWidth="2.2"
-                strokeLinejoin="round"
-                fill="none"
-              />
-              <path d="M11 18 H21" stroke="white" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="16" cy="24" r="2" fill="#C7362F" />
-            </svg>
+          <div className="w-12 h-12 rounded-2xl bg-white/12 border border-white/20 overflow-hidden backdrop-blur-md shadow-lg group-active:scale-95 transition-transform flex-shrink-0">
+            <Image
+              src="/icon.jpg"
+              alt="VayMaster"
+              width={48}
+              height={48}
+              className="w-full h-full object-cover"
+              priority
+            />
           </div>
           <div className="text-left">
             <div className="text-[19px] font-extrabold tracking-wide leading-none">
@@ -70,7 +68,7 @@ export default function AuthBrandHero({
 
         <div className="flex gap-4 items-start">
           <div className="flex-1 min-w-0">
-            <h1 className="text-[22px] font-bold leading-tight mb-2 tracking-tight">
+            <h1 className="text-[22px] font-bold leading-tight mb-2 tracking-tight text-white">
               Ваш надёжный сервис для дома и ремонта
             </h1>
             <p className="text-sm text-white/80 leading-relaxed max-w-[300px]">{subtitle}</p>

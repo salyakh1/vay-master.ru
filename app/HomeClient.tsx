@@ -209,12 +209,14 @@ function HomePageBanner({ initialBanners = null }: { initialBanners?: AdBanner[]
       </div>
     ) : null
 
+  const cta = (banner.brand_name || '').trim() || 'Смотреть'
+
   return (
     <div className="pt-1 pb-0.5 px-3.5">
       <button
         type="button"
         onClick={() => handleClick(banner)}
-        className="relative block w-full rounded-[20px] overflow-hidden text-left aspect-[2/1] min-h-[150px] max-h-[180px]"
+        className="relative block w-full rounded-[20px] overflow-hidden text-left aspect-[2/1] min-h-[150px] max-h-[180px] shadow-sm"
       >
         {hasImage ? (
           <img
@@ -228,25 +230,23 @@ function HomePageBanner({ initialBanners = null }: { initialBanners?: AdBanner[]
             style={{ background: 'linear-gradient(110deg, #1a1a2e 0%, #C7362F 100%)' }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/20 to-transparent" />
-        <div
-          className="absolute -right-2.5 -top-2.5 w-[70px] h-[70px] rounded-full bg-white/[0.07] pointer-events-none"
-          aria-hidden
-        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
         <div className="relative z-10 h-full flex flex-col justify-between p-3.5">
           <div className="min-w-0 max-w-[65%]">
-            <span className="inline-block bg-white/20 text-white text-[9px] font-bold px-[7px] py-0.5 rounded-[10px] mb-1.5 tracking-wide uppercase">
-              {banner.badge_text || 'РЕКЛАМА'}
-            </span>
+            {banner.show_badge !== false && (
+              <span className="inline-block bg-black/35 text-white text-[9px] font-bold px-[7px] py-0.5 rounded-[10px] mb-1.5 tracking-wide uppercase backdrop-blur-[2px]">
+                {banner.badge_text || 'АКЦИЯ'}
+              </span>
+            )}
             {banner.show_title !== false && banner.title && (
-              <p className="text-white text-[13px] font-extrabold leading-tight mb-1">{banner.title}</p>
+              <p className="text-white text-[13px] font-extrabold leading-tight mb-1 drop-shadow-sm">{banner.title}</p>
             )}
             {banner.show_description !== false && banner.description && (
-              <p className="text-white/75 text-[10px] leading-snug line-clamp-2">{banner.description}</p>
+              <p className="text-white/80 text-[10px] leading-snug line-clamp-2">{banner.description}</p>
             )}
           </div>
-          <span className="self-start bg-white text-brand-accent text-[10px] font-extrabold px-3 py-1.5 rounded-[10px] whitespace-nowrap">
-            Подробнее
+          <span className="self-start bg-white text-[#1c1c1e] text-[10px] font-extrabold px-3 py-1.5 rounded-[10px] whitespace-nowrap shadow-sm">
+            {cta}
           </span>
         </div>
       </button>

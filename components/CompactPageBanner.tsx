@@ -9,13 +9,14 @@ import type { AdBanner } from '@/lib/supabase'
 type CompactPageBannerProps = {
   page: 'search' | 'products' | 'home'
   initialBanners?: AdBanner[] | null
+  /** Текст кнопки, если в баннере не задан brand_name */
   buttonLabel?: string
 }
 
 export default function CompactPageBanner({
   page,
   initialBanners = null,
-  buttonLabel = 'Подробнее',
+  buttonLabel = 'Смотреть',
 }: CompactPageBannerProps) {
   const router = useRouter()
   const { user } = useAuth()
@@ -66,17 +67,18 @@ export default function CompactPageBanner({
 
   const banner = banners[index]
   const hasImage = !!banner.image_url
+  const cta = (banner.brand_name || '').trim() || buttonLabel
 
   const dots =
     banners.length > 1 ? (
-      <div className="flex gap-1 justify-center pt-1 pb-0.5">
+      <div className="flex gap-1.5 justify-center pt-1.5 pb-0.5">
         {banners.map((_, i) => (
           <button
             key={i}
             type="button"
             onClick={() => setIndex(i)}
-            className={`h-[5px] rounded-full transition-all ${
-              i === index ? 'bg-brand-accent w-3.5 rounded-[3px]' : 'bg-[#ddd] w-[5px]'
+            className={`h-1.5 rounded-full transition-all ${
+              i === index ? 'bg-brand-accent w-1.5' : 'bg-[#d0d0d0] w-1.5'
             }`}
             aria-label={`Баннер ${i + 1}`}
           />
@@ -89,7 +91,7 @@ export default function CompactPageBanner({
       <button
         type="button"
         onClick={() => handleClick(banner)}
-        className="relative block w-full rounded-[14px] overflow-hidden text-left min-h-[88px] aspect-[2.8/1]"
+        className="relative block w-full rounded-[14px] overflow-hidden text-left min-h-[88px] aspect-[2.8/1] shadow-sm"
       >
         {hasImage ? (
           <img
@@ -103,25 +105,27 @@ export default function CompactPageBanner({
             style={{ background: 'linear-gradient(110deg, #1a1a2e 0%, #C7362F 100%)' }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/15 to-transparent" />
-        <div
-          className="absolute -right-2 -top-2 w-[60px] h-[60px] rounded-full bg-white/[0.07] pointer-events-none"
-          aria-hidden
-        />
-        <div className="relative z-10 h-full flex items-center justify-between gap-2 px-3.5 py-3">
-          <div className="min-w-0 flex-1">
-            <span className="inline-block bg-white/20 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md mb-1 tracking-wide uppercase">
-              {banner.badge_text || 'РЕКЛАМА'}
-            </span>
+        {/* Формат A: сильный градиент слева, фото справа читается */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
+
+        <div className="relative z-10 h-full flex flex-col justify-between px-3.5 py-2.5">
+          <div className="min-w-0 max-w-[68%]">
+            {banner.show_badge !== false && (
+              <span className="inline-block bg-black/35 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md mb-1 tracking-wide uppercase backdrop-blur-[2px]">
+                {banner.badge_text || 'АКЦИЯ'}
+              </span>
+            )}
             {banner.show_title !== false && banner.title && (
-              <p className="text-white text-xs font-extrabold leading-tight mb-0.5 line-clamp-2">{banner.title}</p>
+              <p className="text-white text-xs font-extrabold leading-tight mb-0.5 line-clamp-2 drop-shadow-sm">
+                {banner.title}
+              </p>
             )}
             {banner.show_description !== false && banner.description && (
-              <p className="text-white/70 text-[9px] leading-snug line-clamp-2">{banner.description}</p>
+              <p className="text-white/80 text-[9px] leading-snug line-clamp-2">{banner.description}</p>
             )}
           </div>
-          <span className="bg-white text-brand-accent text-[9px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap flex-shrink-0">
-            {buttonLabel}
+          <span className="self-start bg-white text-[#1c1c1e] text-[9px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-sm">
+            {cta}
           </span>
         </div>
       </button>

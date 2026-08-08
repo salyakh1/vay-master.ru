@@ -97,10 +97,10 @@ export default function AdminBannersPage() {
       category: [],
       keywords: [],
       regions: ['ALL'],
-      brand_name: '',
       pricing_model: 'fixed',
       show_badge: true,
-      badge_text: 'Реклама',
+      badge_text: 'АКЦИЯ',
+      brand_name: 'Смотреть',
       show_title: true,
       show_description: true,
     })
@@ -150,10 +150,10 @@ export default function AdminBannersPage() {
       category: [],
       keywords: [],
       regions: ['ALL'],
-      brand_name: '',
       pricing_model: 'fixed',
       show_badge: true,
-      badge_text: 'Реклама',
+      badge_text: 'АКЦИЯ',
+      brand_name: 'Смотреть',
       show_title: true,
       show_description: true,
     })
@@ -252,7 +252,7 @@ export default function AdminBannersPage() {
         regions: editingBanner.regions || ['ALL'],
         pricing_model: editingBanner.pricing_model || 'fixed',
         show_badge: editingBanner.show_badge ?? true,
-        badge_text: editingBanner.badge_text || 'Реклама',
+        badge_text: editingBanner.badge_text || 'АКЦИЯ',
         show_title: editingBanner.show_title ?? true,
         show_description: editingBanner.show_description ?? true,
         created_by: currentUser.id,
@@ -464,7 +464,7 @@ export default function AdminBannersPage() {
                   </div>
                   {banner.brand_name && (
                     <div className="text-sm text-text-secondary mb-2">
-                      <span className="font-medium">Бренд:</span> {banner.brand_name}
+                      <span className="font-medium">Кнопка:</span> {banner.brand_name}
                     </div>
                   )}
                   <div className="flex flex-wrap gap-1 mb-2">
@@ -546,7 +546,7 @@ export default function AdminBannersPage() {
               </div>
               {selectedBanner.brand_name && (
                 <div>
-                  <div className="text-sm text-text-secondary mb-1">Бренд</div>
+                  <div className="text-sm text-text-secondary mb-1">Текст кнопки</div>
                   <div className="font-medium text-text-primary">{selectedBanner.brand_name}</div>
                 </div>
               )}
@@ -684,38 +684,106 @@ export default function AdminBannersPage() {
               </h2>
 
               <div className="space-y-4">
+                {/* Подсказка формата A + живое превью */}
+                <div className="rounded-xl border border-[#e5e5ea] bg-[#f2f2f7] p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[#1c1c1e]">Общий баннер — формат A</p>
+                    <p className="text-xs text-[#8e8e93] mt-1 leading-relaxed">
+                      Фото на весь блок · слева тёмный градиент · сверху метка (АКЦИЯ) · заголовок · подзаголовок · белая кнопка снизу слева.
+                      Размер на сайте как сейчас (компактный). Страницы: Поиск / Товары / Главная.
+                    </p>
+                  </div>
+                  <div className="relative w-full rounded-[14px] overflow-hidden min-h-[88px] aspect-[2.8/1] bg-[#1c1c1e]">
+                    {editingBanner.image_url ? (
+                      <img
+                        src={editingBanner.image_url}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#1a1a2e] to-[#C7362F]" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
+                    <div className="relative z-10 h-full flex flex-col justify-between px-3.5 py-2.5">
+                      <div className="min-w-0 max-w-[68%]">
+                        {editingBanner.show_badge !== false && (
+                          <span className="inline-block bg-black/35 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md mb-1 uppercase">
+                            {editingBanner.badge_text || 'АКЦИЯ'}
+                          </span>
+                        )}
+                        {editingBanner.show_title !== false && (
+                          <p className="text-white text-xs font-extrabold leading-tight mb-0.5 line-clamp-2">
+                            {editingBanner.title || 'Заголовок баннера'}
+                          </p>
+                        )}
+                        {editingBanner.show_description !== false && (
+                          <p className="text-white/80 text-[9px] leading-snug line-clamp-2">
+                            {editingBanner.description || 'Короткое описание под заголовком'}
+                          </p>
+                        )}
+                      </div>
+                      <span className="self-start bg-white text-[#1c1c1e] text-[9px] font-extrabold px-2.5 py-1.5 rounded-lg">
+                        {(editingBanner.brand_name || '').trim() || 'Смотреть'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-[#8e8e93]">↑ Превью обновляется при вводе полей ниже</p>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-1">
-                    Название *
+                    Заголовок на баннере *
                   </label>
+                  <p className="text-xs text-text-secondary mb-1.5">
+                    Крупный белый текст слева. Пример: «Мастера рядом с вами». До ~40 символов.
+                  </p>
                   <input
                     type="text"
                     value={editingBanner.title || ''}
                     onChange={(e) => setEditingBanner({ ...editingBanner, title: e.target.value })}
                     className="input w-full"
-                    placeholder="Название баннера"
+                    placeholder="Мастера рядом с вами"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-1">
-                    Описание
+                    Подзаголовок (описание)
                   </label>
+                  <p className="text-xs text-text-secondary mb-1.5">
+                    Серый/белый мелкий текст под заголовком. Пример: «Найдем проверенного специалиста…»
+                  </p>
                   <textarea
                     value={editingBanner.description || ''}
                     onChange={(e) => setEditingBanner({ ...editingBanner, description: e.target.value })}
                     className="textarea w-full"
-                    rows={3}
-                    placeholder="Описание (для типов с текстом)"
+                    rows={2}
+                    placeholder="Найдем проверенного специалиста для вашего дома"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1">
+                    Текст белой кнопки
+                  </label>
+                  <p className="text-xs text-text-secondary mb-1.5">
+                    Кнопка внизу слева на баннере. Пример: «Смотреть», «Подробнее», «Открыть».
+                  </p>
+                  <input
+                    type="text"
+                    value={editingBanner.brand_name || ''}
+                    onChange={(e) => setEditingBanner({ ...editingBanner, brand_name: e.target.value })}
+                    className="input w-full"
+                    placeholder="Смотреть"
                   />
                 </div>
 
                 <div className="border border-border-light rounded-lg p-4 bg-bg-secondary/50">
                   <p className="text-sm font-medium text-text-primary mb-3">
-                    Скрыть название и описание на баннере
+                    Что показывать на баннере
                   </p>
                   <p className="text-xs text-text-secondary mb-3">
-                    Снимите галочку, чтобы не показывать название или описание на самом баннере (на сайте).
+                    Снимите галочку, если элемент не нужен на картинке (в админке название всё равно останется для списка).
                   </p>
                   <div className="flex flex-wrap gap-4">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -725,7 +793,7 @@ export default function AdminBannersPage() {
                         onChange={(e) => setEditingBanner({ ...editingBanner, show_title: e.target.checked })}
                         className="rounded"
                       />
-                      <span className="text-sm text-text-primary">Показывать название на баннере</span>
+                      <span className="text-sm text-text-primary">Показывать заголовок</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -734,15 +802,19 @@ export default function AdminBannersPage() {
                         onChange={(e) => setEditingBanner({ ...editingBanner, show_description: e.target.checked })}
                         className="rounded"
                       />
-                      <span className="text-sm text-text-primary">Показывать описание на баннере</span>
+                      <span className="text-sm text-text-primary">Показывать подзаголовок</span>
                     </label>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-1">
-                    Изображение *
+                    Фото баннера *
                   </label>
+                  <p className="text-xs text-text-secondary mb-1.5">
+                    Заполняет весь баннер. Важное — справа (инструменты, мастер): слева текст на градиенте.
+                    Рекомендуемое соотношение ≈ 2.8∶1 (широкое).
+                  </p>
                   <div className="space-y-2">
                     <input
                       type="file"
@@ -764,22 +836,6 @@ export default function AdminBannersPage() {
                       placeholder="https://example.com/image.jpg"
                     />
                   </div>
-                  {editingBanner.image_url && (
-                    <div className="mt-2">
-                      <img
-                        src={editingBanner.image_url}
-                        alt="Preview"
-                        className="w-full h-40 object-cover rounded border border-border-color"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none'
-                          const errorDiv = document.createElement('div')
-                          errorDiv.className = 'text-sm text-red-600 p-2 bg-red-50 rounded'
-                          errorDiv.textContent = 'Не удалось загрузить изображение. Проверьте URL.'
-                          e.currentTarget.parentElement?.appendChild(errorDiv)
-                        }}
-                      />
-                    </div>
-                  )}
                 </div>
 
                 <div>
@@ -840,21 +896,11 @@ export default function AdminBannersPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-1">
-                    Название бренда
-                  </label>
-                  <input
-                    type="text"
-                    value={editingBanner.brand_name || ''}
-                    onChange={(e) => setEditingBanner({ ...editingBanner, brand_name: e.target.value })}
-                    className="input w-full"
-                    placeholder="Название бренда или рекламодателя"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-1">
                     Тип перехода
                   </label>
+                  <p className="text-xs text-text-secondary mb-1.5">
+                    Куда ведёт весь баннер (и кнопка) при нажатии.
+                  </p>
                   <select
                     value={editingBanner.target_type || ''}
                     onChange={(e) =>
@@ -911,6 +957,9 @@ export default function AdminBannersPage() {
                   <label className="block text-sm font-medium text-text-primary mb-1">
                     Страницы показа *
                   </label>
+                  <p className="text-xs text-text-secondary mb-2">
+                    Для общего баннера формата A обычно: Поиск мастеров, Каталог товаров, Главная.
+                  </p>
                   <div className="space-y-2">
                     {PAGES.map((page) => (
                       <label key={page.value} className="flex items-center gap-2">
@@ -1251,8 +1300,11 @@ export default function AdminBannersPage() {
 
                 {/* Бейдж */}
                 <div className="border-t border-border-color pt-4 mt-4">
-                  <h3 className="text-lg font-semibold text-text-primary mb-3">Маркировка</h3>
-                  
+                  <h3 className="text-lg font-semibold text-text-primary mb-3">Метка на баннере</h3>
+                  <p className="text-xs text-text-secondary mb-3">
+                    Маленькая плашка сверху слева (как «АКЦИЯ» на макете).
+                  </p>
+
                   <div className="mb-3">
                     <label className="flex items-center gap-2">
                       <input
@@ -1263,23 +1315,26 @@ export default function AdminBannersPage() {
                         }
                         className="rounded"
                       />
-                      <span className="text-sm text-text-primary">Показывать бейдж «Реклама»</span>
+                      <span className="text-sm text-text-primary">Показывать метку</span>
                     </label>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-text-primary mb-1">
-                      Текст бейджа
+                      Текст метки
                     </label>
                     <input
                       type="text"
-                      value={editingBanner.badge_text || 'Реклама'}
+                      value={editingBanner.badge_text || 'АКЦИЯ'}
                       onChange={(e) =>
                         setEditingBanner({ ...editingBanner, badge_text: e.target.value })
                       }
                       className="input w-full"
-                      placeholder="Реклама"
+                      placeholder="АКЦИЯ"
                     />
+                    <p className="text-xs text-text-secondary mt-1">
+                      Примеры: АКЦИЯ · РЕКОМЕНДУЕМ · PRO · РЕКЛАМА
+                    </p>
                   </div>
                 </div>
               </div>

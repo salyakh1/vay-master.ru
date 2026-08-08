@@ -581,7 +581,7 @@ function ProductsContent({
         </div>
       </div>
 
-      <CompactPageBanner page="products" buttonLabel="Разместить" initialBanners={initialBanners} />
+      <CompactPageBanner page="products" buttonLabel="Смотреть" initialBanners={initialBanners} />
 
       {(stories.length > 0 ||
         (!!user && (user.role === 'master' || user.role === 'seller'))) && (
