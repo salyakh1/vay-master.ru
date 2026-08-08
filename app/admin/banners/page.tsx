@@ -198,7 +198,8 @@ export default function AdminBannersPage() {
     if (!confirm('Вы уверены, что хотите удалить этот баннер?')) return
 
     try {
-      await supabase.from('ad_banners').delete().eq('id', bannerId)
+      const { error } = await supabase.from('ad_banners').delete().eq('id', bannerId)
+      if (error) throw error
 
       await logAdminAction(currentUser.id, 'delete_banner', 'banner', bannerId)
       alert('Баннер удален')
@@ -208,7 +209,7 @@ export default function AdminBannersPage() {
       }
     } catch (error) {
       console.error('Error deleting banner:', error)
-      alert('Ошибка при удалении баннера')
+      alert('Ошибка при удалении баннера. Проверьте права RLS или отключите баннер (is_active).')
     }
   }
 

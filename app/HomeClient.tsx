@@ -154,9 +154,7 @@ function HomePageBanner({ initialBanners = null }: { initialBanners?: AdBanner[]
       .then((r) => (cancelled || !r.ok ? null : r.json()))
       .then((data) => {
         if (cancelled) return
-        if (data?.banners?.length) {
-          setBanners((prev) => (data.banners.length >= prev.length ? data.banners : prev))
-        } else if (!initialBanners?.length) setBanners([])
+        setBanners(Array.isArray(data?.banners) ? data.banners : [])
       })
       .catch(() => {
         if (!initialBanners?.length) setBanners([])

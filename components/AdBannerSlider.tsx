@@ -93,13 +93,9 @@ export default function AdBannerSlider({
       .then((r) => (cancelled || !r.ok ? null : r.json()))
       .then((data) => {
         if (cancelled) return
-        if (data?.banners?.length) {
-          // Не заменять на меньший список: если с SSR пришло 2, а с API — 1, оставляем 2 для слайдера
-          setBanners((prev) =>
-            data.banners.length >= prev.length ? data.banners : prev
-          )
-          trackViewRef.current?.(data.banners[0].id)
-        } else if (!initialBanners?.length) setBanners([])
+        const next = Array.isArray(data?.banners) ? data.banners : []
+        setBanners(next)
+        if (next[0]?.id) trackViewRef.current?.(next[0].id)
       })
       .catch(() => { if (!cancelled && !initialBanners?.length) setBanners([]) })
       .finally(() => { if (!cancelled) setLoading(false) })

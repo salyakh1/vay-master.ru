@@ -65,7 +65,8 @@ export async function GET(request: NextRequest) {
     const banners = filterProductionBanners(filteredBanners as any[])
 
     const res = NextResponse.json({ banners })
-    res.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
+    // Не кэшировать долго: после удаления в админке баннеры должны сразу пропасть у пользователей
+    res.headers.set('Cache-Control', 'private, no-store, max-age=0')
     return res
   } catch (error) {
     console.error('Error in banners API:', error)

@@ -30,9 +30,8 @@ export default function CompactPageBanner({
       .then((r) => (cancelled || !r.ok ? null : r.json()))
       .then((data) => {
         if (cancelled) return
-        if (data?.banners?.length) {
-          setBanners((prev) => (data.banners.length >= prev.length ? data.banners : prev))
-        } else if (!initialBanners?.length) setBanners([])
+        // Всегда доверяем актуальному ответу API (удалённые/выключенные не должны «залипать»)
+        setBanners(Array.isArray(data?.banners) ? data.banners : [])
       })
       .catch(() => {
         if (!initialBanners?.length) setBanners([])
