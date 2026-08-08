@@ -253,7 +253,7 @@ export default function AdminBannersPage() {
         regions: editingBanner.regions || ['ALL'],
         pricing_model: editingBanner.pricing_model || 'fixed',
         show_badge: editingBanner.show_badge ?? true,
-        badge_text: editingBanner.badge_text || 'АКЦИЯ',
+        badge_text: (editingBanner.badge_text ?? '').trim() || 'АКЦИЯ',
         show_title: editingBanner.show_title ?? true,
         show_description: editingBanner.show_description ?? true,
         created_by: currentUser.id,
@@ -731,6 +731,32 @@ export default function AdminBannersPage() {
                   <p className="text-[11px] text-[#8e8e93]">↑ Превью обновляется при вводе полей ниже</p>
                 </div>
 
+                <div className="rounded-lg border border-brand-accent/30 bg-red-50/40 p-4">
+                  <label className="block text-sm font-semibold text-text-primary mb-1">
+                    Текст метки (вместо «АКЦИЯ»)
+                  </label>
+                  <p className="text-xs text-text-secondary mb-2">
+                    Плашка сверху слева на баннере. Можно написать любое слово: АКЦИЯ, РЕКОМЕНДУЕМ, PRO, НОВИНКА, СКИДКА…
+                  </p>
+                  <input
+                    type="text"
+                    value={editingBanner.badge_text ?? ''}
+                    onChange={(e) => setEditingBanner({ ...editingBanner, badge_text: e.target.value })}
+                    className="input w-full"
+                    placeholder="АКЦИЯ"
+                    maxLength={24}
+                  />
+                  <label className="mt-3 flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editingBanner.show_badge !== false}
+                      onChange={(e) => setEditingBanner({ ...editingBanner, show_badge: e.target.checked })}
+                      className="rounded"
+                    />
+                    <span className="text-sm text-text-primary">Показывать эту метку на баннере</span>
+                  </label>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-1">
                     Заголовок на баннере *
@@ -804,6 +830,15 @@ export default function AdminBannersPage() {
                         className="rounded"
                       />
                       <span className="text-sm text-text-primary">Показывать подзаголовок</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingBanner.show_badge !== false}
+                        onChange={(e) => setEditingBanner({ ...editingBanner, show_badge: e.target.checked })}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-text-primary">Показывать метку</span>
                     </label>
                   </div>
                 </div>
@@ -1299,45 +1334,6 @@ export default function AdminBannersPage() {
                   </div>
                 </div>
 
-                {/* Бейдж */}
-                <div className="border-t border-border-color pt-4 mt-4">
-                  <h3 className="text-lg font-semibold text-text-primary mb-3">Метка на баннере</h3>
-                  <p className="text-xs text-text-secondary mb-3">
-                    Маленькая плашка сверху слева (как «АКЦИЯ» на макете).
-                  </p>
-
-                  <div className="mb-3">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={editingBanner.show_badge ?? true}
-                        onChange={(e) =>
-                          setEditingBanner({ ...editingBanner, show_badge: e.target.checked })
-                        }
-                        className="rounded"
-                      />
-                      <span className="text-sm text-text-primary">Показывать метку</span>
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-1">
-                      Текст метки
-                    </label>
-                    <input
-                      type="text"
-                      value={editingBanner.badge_text || 'АКЦИЯ'}
-                      onChange={(e) =>
-                        setEditingBanner({ ...editingBanner, badge_text: e.target.value })
-                      }
-                      className="input w-full"
-                      placeholder="АКЦИЯ"
-                    />
-                    <p className="text-xs text-text-secondary mt-1">
-                      Примеры: АКЦИЯ · РЕКОМЕНДУЕМ · PRO · РЕКЛАМА
-                    </p>
-                  </div>
-                </div>
               </div>
 
               <div className="flex gap-3 mt-6">
