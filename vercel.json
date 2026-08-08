@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/admin-broadcast",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 10 * * *"
     }
   ]
 }

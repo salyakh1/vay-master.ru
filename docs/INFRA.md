@@ -48,7 +48,9 @@ SENTRY_PROJECT=
 ### Рекомендованная схема (Vercel Cron + Supabase)
 1. Таблица `admin_broadcast_jobs` / `admin_broadcast_recipients` (миграция — отдельный PR в supabase/).
 2. API создаёт job `pending` и сразу отвечает `{ jobId }`.
-3. Cron `*/5 * * * *` → `/api/cron/admin-broadcast` обрабатывает пачку N получателей.
+3. Cron раз в сутки (Hobby) → `/api/cron/admin-broadcast` обрабатывает пачку N получателей.
+   - Сейчас в `vercel.json`: `0 10 * * *` (10:00 UTC) — лимит Hobby: **не чаще 1 раза в день**.
+   - На Pro можно вернуть `*/5 * * * *` для очереди каждые 5 минут.
 4. В `vercel.json` уже добавлен placeholder cron (см. файл).
 
 Пока endpoint cron можно вернуть 501, пока таблица не создана.
