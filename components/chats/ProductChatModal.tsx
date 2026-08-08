@@ -314,7 +314,7 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
         )}
 
         {/* Сообщения */}
-        <div ref={listRef} className="flex-1 overflow-y-auto pl-3 pr-1.5 py-3 bg-[#f5f5f7] space-y-2">
+        <div ref={listRef} className="flex-1 overflow-y-auto pl-3.5 pr-3 py-3 bg-[#f5f5f7] space-y-2">
           {loading ? (
             <p className="text-center text-[12px] text-[#888] py-8">Загрузка чата…</p>
           ) : error ? (

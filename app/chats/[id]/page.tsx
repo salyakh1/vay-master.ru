@@ -621,7 +621,7 @@ export default function ChatPage() {
         </Link>
       )}
 
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto pl-3 pr-1 py-2 flex flex-col gap-1.5 min-h-0">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto pl-3.5 pr-3 py-2 flex flex-col gap-1.5 min-h-0">
         {hasOlderMessages && (
           <div className="text-center py-2">
             <button
