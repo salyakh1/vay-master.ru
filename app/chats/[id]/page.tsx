@@ -621,7 +621,7 @@ export default function ChatPage() {
         </Link>
       )}
 
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto pl-3 pr-1.5 py-2 flex flex-col gap-1.5 min-h-0">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto pl-3 pr-1 py-2 flex flex-col gap-1.5 min-h-0">
         {hasOlderMessages && (
           <div className="text-center py-2">
             <button
@@ -659,7 +659,7 @@ export default function ChatPage() {
               return (
                 <div
                   key={message.id}
-                  className={`flex flex-col max-w-[75%] mb-1 ${isOwn ? 'self-end items-end' : 'self-start items-start'}`}
+                  className={`flex flex-col max-w-[75%] mb-1 ${isOwn ? 'ml-auto items-end' : 'mr-auto items-start'}`}
                 >
                   {message.image_url && (
                     <div className="relative w-[140px] h-[100px] rounded-xl overflow-hidden mb-1 bg-[#f0f0f0]">
