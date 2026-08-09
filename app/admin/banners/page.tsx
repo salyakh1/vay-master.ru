@@ -134,8 +134,6 @@ export default function AdminBannersPage() {
       description: '',
       image_url: '',
       type: 'image_text',
-      ad_type: 'HERO_SPONSORED',
-      hero_layout: 'full_image',
       target_type: null,
       pages: ['home', 'search'],
       priority: 0,
@@ -151,6 +149,7 @@ export default function AdminBannersPage() {
       show_title: true,
       show_description: true,
       ...overrides,
+      // Новый формат всегда поверх overrides
       ad_type: 'HERO_SPONSORED',
       hero_layout: 'full_image',
     })
