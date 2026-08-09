@@ -146,6 +146,9 @@ export default function AdminBannerCreateWizard({
       setSaving(true)
       setDraft(asDraft)
       await onPublish(payload)
+    } catch (e: any) {
+      // ошибка уже показана в onPublish / saveBannerData
+      console.error(e)
     } finally {
       setSaving(false)
       setDraft(false)

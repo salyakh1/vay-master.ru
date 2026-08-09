@@ -282,48 +282,91 @@ export default function AdminBannersPage() {
   }
 
   const saveBannerData = async (source: Partial<AdBanner>) => {
-    if (!currentUser) return
+    if (!currentUser) {
+      alert('Сессия истекла — войдите снова')
+      throw new Error('auth')
+    }
 
-    if (!source.title || !source.image_url || !source.pages || source.pages.length === 0) {
-      alert('Заполните все обязательные поля')
+    if (!source.image_url || !source.pages || source.pages.length === 0) {
+      alert('Нужны картинка и хотя бы одна страница показа')
       throw new Error('validation')
+    }
+
+    // Создание (быстрый режим и конструктор) — через service_role, иначе RLS часто глотает insert
+    if (!source.id) {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      if (!token) {
+        alert('Сессия истекла — войдите снова')
+        throw new Error('auth')
+      }
+
+      const res = await fetch('/api/admin/banners', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'create',
+          banner: {
+            ...source,
+            title: source.title || 'Баннер',
+            // Явно: false для «картинка+ссылка», true для конструктора
+            show_title: source.show_title === true,
+            show_description: source.show_description === true,
+          },
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(body?.error || `Ошибка создания (${res.status})`)
+      }
+
+      await logAdminAction(currentUser.id, 'create_banner', 'banner', body.banner?.id)
+      alert(source.is_active === false ? 'Черновик сохранён' : 'Баннер опубликован')
+      setShowCreateModal(false)
+      setShowCreateWizard(false)
+      setEditingBanner(null)
+      fetchBanners()
+      return
     }
 
     const isHero = source.ad_type === 'HERO_SPONSORED' || !source.ad_type
     const heroLayout = (source as any).hero_layout
     const bannerData: any = {
-      ...source,
+      title: source.title || 'Баннер',
+      description: source.description ?? '',
+      image_url: source.image_url,
+      type: source.type || 'image',
+      ad_type: source.ad_type || 'HERO_SPONSORED',
+      target_type: source.target_type ?? null,
+      target_id: source.target_id || null,
+      external_url: source.external_url || null,
+      pages: source.pages,
       priority: source.priority || 0,
       duration: source.duration || 5,
       is_active: source.is_active ?? true,
-      ad_type: source.ad_type || 'HERO_SPONSORED',
       ...(isHero && { hero_layout: heroLayout === 'full_image' ? 'full_image' : 'split' }),
       category: source.category || [],
       keywords: source.keywords || [],
       regions: source.regions || ['ALL'],
+      brand_name: source.brand_name ?? '',
       pricing_model: source.pricing_model || 'fixed',
       show_badge: source.show_badge ?? true,
       badge_text: (source.badge_text ?? '').trim() || 'АКЦИЯ',
-      show_title: source.show_title ?? true,
-      show_description: source.show_description ?? true,
-      created_by: currentUser.id,
+      show_title: source.show_title === true,
+      show_description: source.show_description === true,
     }
 
     Object.keys(bannerData).forEach((key) => {
       if (bannerData[key] === undefined) delete bannerData[key]
     })
 
-    if (source.id) {
-      const { error } = await supabase.from('ad_banners').update(bannerData).eq('id', source.id)
-      if (error) throw error
-      await logAdminAction(currentUser.id, 'update_banner', 'banner', source.id)
-      alert('Баннер обновлен')
-    } else {
-      const { data, error } = await supabase.from('ad_banners').insert(bannerData).select().single()
-      if (error) throw error
-      await logAdminAction(currentUser.id, 'create_banner', 'banner', data.id)
-      alert(source.is_active === false ? 'Черновик сохранён' : 'Баннер создан')
-    }
+    const { error } = await supabase.from('ad_banners').update(bannerData).eq('id', source.id)
+    if (error) throw error
+    await logAdminAction(currentUser.id, 'update_banner', 'banner', source.id)
+    alert('Баннер обновлен')
 
     setShowCreateModal(false)
     setShowCreateWizard(false)
@@ -334,11 +377,16 @@ export default function AdminBannersPage() {
   const handleSaveBanner = async () => {
     if (!editingBanner) return
     try {
-      await saveBannerData(editingBanner)
+      // В конструкторе по умолчанию показываем тексты, если галочки не сняты
+      await saveBannerData({
+        ...editingBanner,
+        show_title: editingBanner.show_title !== false,
+        show_description: editingBanner.show_description !== false,
+      })
     } catch (error: any) {
-      if (error?.message === 'validation') return
+      if (error?.message === 'validation' || error?.message === 'auth') return
       console.error('Error saving banner:', error)
-      alert('Ошибка при сохранении баннера')
+      alert(error?.message || 'Ошибка при сохранении баннера')
     }
   }
 
@@ -724,7 +772,13 @@ export default function AdminBannersPage() {
           onOpenFullConstructor={() => openFullConstructor()}
           uploadImage={uploadBannerImage}
           onPublish={async (banner) => {
-            await saveBannerData(banner)
+            try {
+              await saveBannerData(banner)
+            } catch (e: any) {
+              if (e?.message === 'validation' || e?.message === 'auth') return
+              alert(e?.message || 'Не удалось опубликовать баннер')
+              throw e
+            }
           }}
         />
       )}
