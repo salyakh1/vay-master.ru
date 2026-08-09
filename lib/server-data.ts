@@ -32,9 +32,8 @@ export async function getBannersForPage(
     .from('ad_banners')
     .select('*')
     .eq('is_active', true)
-    .or('ad_type.eq.HERO_SPONSORED,ad_type.is.null')
     .order('priority', { ascending: false })
-    .limit(limit * 2)
+    .limit(Math.max(limit * 5, 30))
 
   if (error) return []
 

@@ -12,19 +12,13 @@ export async function GET(request: NextRequest) {
 
     const now = new Date().toISOString()
 
-    // Получаем активные баннеры ТОЛЬКО типа HERO_SPONSORED (или без типа для обратной совместимости)
-    // AdBannerSlider предназначен только для Hero рекламы
-    let query = supabase
+    // Только активные; тип/страницы фильтруем в JS (надёжнее, чем .or() в PostgREST)
+    const { data, error } = await supabase
       .from('ad_banners')
       .select('*')
       .eq('is_active', true)
       .order('priority', { ascending: false })
-      .limit(limit * 2)
-
-    // Фильтруем по типу: только HERO_SPONSORED или без типа (для старых баннеров)
-    query = query.or('ad_type.eq.HERO_SPONSORED,ad_type.is.null')
-
-    const { data, error } = await query
+      .limit(Math.max(limit * 5, 30))
 
     if (error) {
       console.error('Error fetching banners:', error)
@@ -33,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     // Фильтруем по странице и датам на стороне сервера
     const filteredBanners = (data || []).filter((banner: any) => {
-      // Проверяем тип - только HERO_SPONSORED или без типа
+      // Новый единый формат: HERO_SPONSORED или без типа (legacy, ещё показываем)
       if (banner.ad_type && banner.ad_type !== 'HERO_SPONSORED') {
         return false
       }
@@ -60,7 +54,7 @@ export async function GET(request: NextRequest) {
       }
 
       return true
-    }).slice(0, limit) // Ограничиваем до нужного количества
+    }).slice(0, limit)
 
     const banners = filterProductionBanners(filteredBanners as any[])
 

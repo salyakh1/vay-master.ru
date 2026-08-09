@@ -9,23 +9,6 @@ import { ru } from 'date-fns/locale'
 import { FiPlus, FiEdit, FiTrash2, FiEye, FiEyeOff, FiCopy, FiImage } from 'react-icons/fi'
 import AdminBannerCreateWizard from '@/components/admin/AdminBannerCreateWizard'
 
-const BANNER_TYPES = [
-  { value: 'image', label: 'Только изображение' },
-  { value: 'image_text', label: 'Изображение + текст' },
-  { value: 'image_button', label: 'Изображение + кнопка' },
-  { value: 'master_promo', label: 'Промо мастера' },
-  { value: 'product_promo', label: 'Промо товара' },
-  { value: 'category_promo', label: 'Промо категории' },
-]
-
-const AD_TYPES = [
-  { value: 'HERO_SPONSORED', label: 'Верхние промо-блоки (Hero)' },
-  { value: 'INLINE_CONTEXT', label: 'Контекстная реклама (между карточками)' },
-  { value: 'SPONSORED_CARD', label: 'Карточка-реклама (в списках)' },
-  { value: 'PROFILE_RELATED', label: 'Реклама в профиле мастера' },
-  { value: 'FOOTER_BRAND', label: 'Логотипы партнёров (футер)' },
-]
-
 const PRICING_MODELS = [
   { value: 'fixed', label: 'Фиксированная цена' },
   { value: 'cpc', label: 'За клик (CPC)' },
@@ -48,6 +31,16 @@ const PAGES = [
   { value: 'products', label: 'Каталог товаров' },
   { value: 'feed', label: 'Лента' },
 ]
+
+function bannerFormatLabel(banner: AdBanner): string {
+  if (banner.ad_type && banner.ad_type !== 'HERO_SPONSORED') {
+    return `Устаревший (${banner.ad_type})`
+  }
+  if (banner.show_title === false && banner.show_description === false) {
+    return 'Картинка + ссылка'
+  }
+  return 'Конструктор (формат A)'
+}
 
 export default function AdminBannersPage() {
   const { user: currentUser } = useAuth()
@@ -158,48 +151,52 @@ export default function AdminBannersPage() {
       show_title: true,
       show_description: true,
       ...overrides,
+      ad_type: 'HERO_SPONSORED',
+      hero_layout: 'full_image',
     })
     setShowCreateModal(true)
-  }
-
-  const handleCreateBannerWithType = (adType: string) => {
-    // Определяем формат баннера по умолчанию для каждого типа
-    let defaultType = 'image'
-    let defaultPages = ['home']
-    
-    switch (adType) {
-      case 'HERO_SPONSORED':
-        setShowCreateWizard(true)
-        return
-      case 'INLINE_CONTEXT':
-        defaultType = 'image'
-        defaultPages = ['search', 'products']
-        break
-      case 'SPONSORED_CARD':
-        defaultType = 'image_text'
-        defaultPages = ['search', 'products']
-        break
-      case 'PROFILE_RELATED':
-        defaultType = 'image_text'
-        defaultPages = []
-        break
-      case 'FOOTER_BRAND':
-        defaultType = 'image'
-        defaultPages = ['home']
-        break
-    }
-
-    openFullConstructor({
-      type: defaultType as any,
-      ad_type: adType as any,
-      pages: defaultPages,
-      hero_layout: undefined,
-    })
   }
 
   const handleEditBanner = (banner: AdBanner) => {
-    setEditingBanner(banner)
+    setEditingBanner({
+      ...banner,
+      ad_type: 'HERO_SPONSORED',
+      hero_layout: 'full_image',
+    })
     setShowCreateModal(true)
+  }
+
+  const handleDeactivateLegacyFormats = async () => {
+    if (!currentUser) return
+    if (
+      !confirm(
+        'Выключить все баннеры старых типов (Inline / Sponsored Card / Profile / Footer)? Новые форматы не трогаем.'
+      )
+    ) {
+      return
+    }
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      if (!token) {
+        alert('Сессия истекла')
+        return
+      }
+      const res = await fetch('/api/admin/banners', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'deactivate_legacy_formats' }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body?.error || 'Ошибка')
+      alert(`Выключено устаревших баннеров: ${body.deactivated ?? 0}`)
+      fetchBanners()
+    } catch (e: any) {
+      alert(e?.message || 'Ошибка')
+    }
   }
 
   const handleDuplicateBanner = async (banner: AdBanner) => {
@@ -332,14 +329,14 @@ export default function AdminBannersPage() {
       return
     }
 
-    const isHero = source.ad_type === 'HERO_SPONSORED' || !source.ad_type
-    const heroLayout = (source as any).hero_layout
-    const bannerData: any = {
+      // Обновление — тоже нормализуем в новый формат
+      const isConstructor = source.show_title === true || source.show_description === true
+      const bannerData: any = {
       title: source.title || 'Баннер',
       description: source.description ?? '',
       image_url: source.image_url,
-      type: source.type || 'image',
-      ad_type: source.ad_type || 'HERO_SPONSORED',
+      type: isConstructor ? 'image_text' : 'image',
+      ad_type: 'HERO_SPONSORED',
       target_type: source.target_type ?? null,
       target_id: source.target_id || null,
       external_url: source.external_url || null,
@@ -347,14 +344,14 @@ export default function AdminBannersPage() {
       priority: source.priority || 0,
       duration: source.duration || 5,
       is_active: source.is_active ?? true,
-      ...(isHero && { hero_layout: heroLayout === 'full_image' ? 'full_image' : 'split' }),
+      hero_layout: 'full_image',
       category: source.category || [],
       keywords: source.keywords || [],
       regions: source.regions || ['ALL'],
       brand_name: source.brand_name ?? '',
       pricing_model: source.pricing_model || 'fixed',
       show_badge: source.show_badge ?? true,
-      badge_text: (source.badge_text ?? '').trim() || 'АКЦИЯ',
+      badge_text: (source.badge_text ?? '').trim() || (isConstructor ? 'АКЦИЯ' : 'Реклама'),
       show_title: source.show_title === true,
       show_description: source.show_description === true,
     }
@@ -443,6 +440,13 @@ export default function AdminBannersPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
+              onClick={handleDeactivateLegacyFormats}
+              className="btn btn-outline text-sm text-orange-700 border-orange-300"
+            >
+              Выключить старые форматы
+            </button>
+            <button
+              type="button"
               onClick={handleDeactivateAllActive}
               className="btn btn-outline text-sm text-orange-700 border-orange-300"
             >
@@ -454,43 +458,10 @@ export default function AdminBannersPage() {
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button 
-            onClick={() => handleCreateBannerWithType('HERO_SPONSORED')} 
-            className="btn btn-outline text-sm px-3 py-2"
-          >
-            <FiPlus className="mr-2" size={16} />
-            Hero реклама
-          </button>
-          <button 
-            onClick={() => handleCreateBannerWithType('INLINE_CONTEXT')} 
-            className="btn btn-outline text-sm px-3 py-2"
-          >
-            <FiPlus className="mr-2" size={16} />
-            Inline реклама
-          </button>
-          <button 
-            onClick={() => handleCreateBannerWithType('SPONSORED_CARD')} 
-            className="btn btn-outline text-sm px-3 py-2"
-          >
-            <FiPlus className="mr-2" size={16} />
-            Sponsored Card
-          </button>
-          <button 
-            onClick={() => handleCreateBannerWithType('PROFILE_RELATED')} 
-            className="btn btn-outline text-sm px-3 py-2"
-          >
-            <FiPlus className="mr-2" size={16} />
-            Profile Related
-          </button>
-          <button 
-            onClick={() => handleCreateBannerWithType('FOOTER_BRAND')} 
-            className="btn btn-outline text-sm px-3 py-2"
-          >
-            <FiPlus className="mr-2" size={16} />
-            Footer Brand
-          </button>
-        </div>
+        <p className="text-xs text-text-secondary">
+          Только новые форматы: <strong>Картинка + ссылка</strong> и <strong>Конструктор (формат A)</strong>,
+          размер 1400×500.
+        </p>
       </div>
 
       {/* Stats */}
@@ -545,13 +516,11 @@ export default function AdminBannersPage() {
                   </div>
                   <div className="text-sm text-text-secondary mb-2">
                     <div className="mb-1">
-                      <span className="font-medium">Тип рекламы:</span>{' '}
-                      {AD_TYPES.find((t) => t.value === banner.ad_type)?.label || banner.ad_type || 'HERO_SPONSORED'}
+                      <span className="font-medium">Формат:</span> {bannerFormatLabel(banner)}
                     </div>
-                    <div>
-                      <span className="font-medium">Формат:</span>{' '}
-                      {BANNER_TYPES.find((t) => t.value === banner.type)?.label || banner.type}
-                    </div>
+                    {!banner.is_active && (
+                      <div className="text-orange-600 text-xs">Черновик / выключен</div>
+                    )}
                   </div>
                   {banner.brand_name && (
                     <div className="text-sm text-text-secondary mb-2">
@@ -624,16 +593,8 @@ export default function AdminBannersPage() {
                 </div>
               )}
               <div>
-                <div className="text-sm text-text-secondary mb-1">Тип рекламы</div>
-                <div className="font-medium text-text-primary">
-                  {AD_TYPES.find((t) => t.value === selectedBanner.ad_type)?.label || selectedBanner.ad_type || 'HERO_SPONSORED'}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-text-secondary mb-1">Формат баннера</div>
-                <div className="font-medium text-text-primary">
-                  {BANNER_TYPES.find((t) => t.value === selectedBanner.type)?.label || selectedBanner.type}
-                </div>
+                <div className="text-sm text-text-secondary mb-1">Формат</div>
+                <div className="font-medium text-text-primary">{bannerFormatLabel(selectedBanner)}</div>
               </div>
               {selectedBanner.brand_name && (
                 <div>
@@ -983,61 +944,10 @@ export default function AdminBannersPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-1">
-                    Тип баннера *
-                  </label>
-                  <select
-                    value={editingBanner.type || 'image'}
-                    onChange={(e) => setEditingBanner({ ...editingBanner, type: e.target.value as any })}
-                    className="input w-full"
-                  >
-                    {BANNER_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="rounded-lg border border-[#e5e5ea] bg-[#f9f9fb] px-3 py-2 text-xs text-[#8e8e93]">
+                  Формат: <strong className="text-[#1c1c1e]">Конструктор A</strong> · тип всегда Hero ·
+                  размер 1400×500. Старые типы (Inline / Card / Footer) больше не создаются.
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-1">
-                    Тип рекламы (Ad Type) *
-                  </label>
-                  <select
-                    value={editingBanner.ad_type || 'HERO_SPONSORED'}
-                    onChange={(e) => setEditingBanner({ ...editingBanner, ad_type: e.target.value as any })}
-                    className="input w-full"
-                  >
-                    {AD_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-text-secondary mt-1">
-                    Определяет, где и как будет показываться реклама
-                  </p>
-                </div>
-
-                {(editingBanner.ad_type === 'HERO_SPONSORED' || !editingBanner.ad_type) && (
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-1">
-                      Режим Hero-баннера
-                    </label>
-                    <select
-                      value={(editingBanner as any).hero_layout || 'split'}
-                      onChange={(e) => setEditingBanner({ ...editingBanner, hero_layout: e.target.value as 'split' | 'full_image' })}
-                      className="input w-full"
-                    >
-                      <option value="split">Текст слева + картинка справа</option>
-                      <option value="full_image">Картинка на весь блок</option>
-                    </select>
-                    <p className="text-xs text-text-secondary mt-1">
-                      full_image — картинка заполняет весь блок, заголовок поверх внизу
-                    </p>
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-1">

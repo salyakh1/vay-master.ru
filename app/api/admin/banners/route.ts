@@ -65,6 +65,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const admin = getSupabaseAdmin()
 
+    if (body?.action === 'deactivate_legacy_formats') {
+      // Старые типы (inline/card/footer/profile) больше не используем
+      const { data, error } = await admin
+        .from('ad_banners')
+        .update({ is_active: false })
+        .not('ad_type', 'is', null)
+        .neq('ad_type', 'HERO_SPONSORED')
+        .eq('is_active', true)
+        .select('id')
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      revalidateBannerPages()
+      return NextResponse.json({ ok: true, deactivated: data?.length || 0 })
+    }
+
     if (body?.action === 'deactivate_all_active') {
       const { data, error } = await admin
         .from('ad_banners')
@@ -93,8 +111,9 @@ export async function POST(request: NextRequest) {
         title: (b.title || 'Баннер').toString().trim() || 'Баннер',
         description: b.description ?? '',
         image_url: b.image_url,
-        type: b.type || 'image',
-        ad_type: b.ad_type || 'HERO_SPONSORED',
+        // Только новый формат
+        type: b.show_title === true ? 'image_text' : 'image',
+        ad_type: 'HERO_SPONSORED',
         target_type: b.target_type ?? null,
         target_id: b.target_id || null,
         external_url: b.external_url || null,
@@ -108,15 +127,13 @@ export async function POST(request: NextRequest) {
         brand_name: b.brand_name ?? '',
         pricing_model: b.pricing_model || 'fixed',
         show_badge: b.show_badge !== false,
-        badge_text: (b.badge_text || 'Реклама').toString().trim() || 'Реклама',
-        // false не затирать: быстрый режим = картинка без наших текстов
+        badge_text: (b.badge_text || (b.show_title === true ? 'АКЦИЯ' : 'Реклама'))
+          .toString()
+          .trim(),
         show_title: b.show_title === true,
         show_description: b.show_description === true,
+        hero_layout: 'full_image',
         created_by: gate.adminId,
-      }
-
-      if (b.hero_layout === 'full_image' || b.hero_layout === 'split') {
-        row.hero_layout = b.hero_layout
       }
       if (b.start_date) row.start_date = b.start_date
       if (b.end_date) row.end_date = b.end_date
