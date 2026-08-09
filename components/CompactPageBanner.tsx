@@ -76,11 +76,15 @@ export default function CompactPageBanner({
   const banner = banners[index]
   const hasImage = !!banner.image_url
   const cta = (banner.brand_name || '').trim() || buttonLabel
-  /** Быстрый режим: готовая картинка со своим текстом — без наших заголовков/кнопки */
+  /** Готовая картинка: без наших заголовков/кнопки/затемнения */
   const imageOnly =
-    banner.show_title === false &&
-    banner.show_description === false &&
-    !(banner.brand_name || '').trim()
+    (banner.show_title === false &&
+      banner.show_description === false &&
+      !(banner.brand_name || '').trim()) ||
+    (banner.type === 'image' &&
+      (!banner.title || banner.title.trim() === 'Баннер') &&
+      !(banner.description || '').trim() &&
+      !(banner.brand_name || '').trim())
 
   const dots =
     banners.length > 1 ? (
@@ -120,33 +124,32 @@ export default function CompactPageBanner({
         )}
 
         {imageOnly ? (
-          <span className="absolute bottom-1.5 right-2 z-10 text-[8px] font-semibold text-white/70 bg-black/35 px-1.5 py-0.5 rounded">
+          <span className="absolute bottom-1.5 right-2 z-10 text-[8px] font-semibold text-white bg-black/40 px-1.5 py-0.5 rounded">
             {banner.badge_text || 'Реклама'}
           </span>
         ) : (
-          <>
-            <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
-            <div className="relative z-10 h-full flex flex-col justify-between px-3.5 py-2.5">
-              <div className="min-w-0 max-w-[68%]">
-                {banner.show_badge !== false && (
-                  <span className="inline-block bg-black/35 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md mb-1 tracking-wide uppercase backdrop-blur-[2px]">
-                    {banner.badge_text || 'АКЦИЯ'}
-                  </span>
-                )}
-                {banner.show_title !== false && banner.title && (
-                  <p className="text-white text-xs font-extrabold leading-tight mb-0.5 line-clamp-2 drop-shadow-sm">
-                    {banner.title}
-                  </p>
-                )}
-                {banner.show_description !== false && banner.description && (
-                  <p className="text-white/80 text-[9px] leading-snug line-clamp-2">{banner.description}</p>
-                )}
-              </div>
-              <span className="self-start bg-white text-[#1c1c1e] text-[9px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-sm">
-                {cta}
-              </span>
+          <div className="relative z-10 h-full flex flex-col justify-between items-end text-right px-3.5 py-2.5">
+            <div className="min-w-0 max-w-[55%] flex flex-col items-end">
+              {banner.show_badge !== false && (
+                <span className="inline-block bg-white/90 text-[#1c1c1e] text-[8px] font-bold px-1.5 py-0.5 rounded-md mb-1 tracking-wide uppercase shadow-sm">
+                  {banner.badge_text || 'АКЦИЯ'}
+                </span>
+              )}
+              {banner.show_title !== false && banner.title && (
+                <p className="text-white text-xs font-extrabold leading-tight mb-0.5 line-clamp-2 drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]">
+                  {banner.title}
+                </p>
+              )}
+              {banner.show_description !== false && banner.description && (
+                <p className="text-white/95 text-[9px] leading-snug line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  {banner.description}
+                </p>
+              )}
             </div>
-          </>
+            <span className="self-end bg-white text-[#1c1c1e] text-[9px] font-extrabold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-sm">
+              {cta}
+            </span>
+          </div>
         )}
       </button>
       {dots}
