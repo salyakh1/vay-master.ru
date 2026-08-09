@@ -66,6 +66,20 @@ export default function AdminBannersPage() {
   const fetchBanners = async () => {
     try {
       setLoading(true)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      if (token) {
+        const res = await fetch('/api/admin/banners', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        })
+        if (res.ok) {
+          const body = await res.json()
+          setBanners((body.banners || []) as AdBanner[])
+          return
+        }
+      }
+      // Fallback: прямой select (может отличаться из‑за RLS)
       const { data, error } = await supabase
         .from('ad_banners')
         .select('*')
@@ -78,6 +92,39 @@ export default function AdminBannersPage() {
       console.error('Error fetching banners:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeactivateAllActive = async () => {
+    if (!currentUser) return
+    if (
+      !confirm(
+        'Выключить ВСЕ активные баннеры в базе? Они пропадут у пользователей. Удалёнными не станут — только is_active=false.'
+      )
+    ) {
+      return
+    }
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      if (!token) {
+        alert('Сессия истекла')
+        return
+      }
+      const res = await fetch('/api/admin/banners', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'deactivate_all_active' }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body?.error || 'Ошибка')
+      alert(`Выключено баннеров: ${body.deactivated ?? 0}. Обновите сайт (Ctrl+F5).`)
+      fetchBanners()
+    } catch (e: any) {
+      alert(e?.message || 'Ошибка')
     }
   }
 
@@ -198,18 +245,32 @@ export default function AdminBannersPage() {
     if (!confirm('Вы уверены, что хотите удалить этот баннер?')) return
 
     try {
-      const { error } = await supabase.from('ad_banners').delete().eq('id', bannerId)
-      if (error) throw error
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      if (!token) {
+        alert('Сессия истекла — войдите снова')
+        return
+      }
+
+      // Удаление через service_role API + revalidate страниц (прямой delete часто «тихо» не срабатывает из‑за RLS)
+      const res = await fetch(`/api/admin/banners/${bannerId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(body?.error || `Ошибка удаления (${res.status})`)
+      }
 
       await logAdminAction(currentUser.id, 'delete_banner', 'banner', bannerId)
-      alert('Баннер удален')
+      alert('Баннер удалён. Обновите сайт пользователя (лучше Ctrl+F5).')
       fetchBanners()
       if (selectedBanner?.id === bannerId) {
         setSelectedBanner(null)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting banner:', error)
-      alert('Ошибка при удалении баннера. Проверьте права RLS или отключите баннер (is_active).')
+      alert(error?.message || 'Ошибка при удалении баннера')
     }
   }
 
@@ -359,10 +420,19 @@ export default function AdminBannersPage() {
             <h1 className="text-2xl font-semibold text-text-primary mb-2">Баннеры</h1>
             <p className="text-text-secondary">Управление рекламными баннерами</p>
           </div>
-          <button onClick={handleCreateBanner} className="btn btn-primary">
-            <FiPlus className="mr-2" size={18} />
-            Создать баннер
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleDeactivateAllActive}
+              className="btn btn-outline text-sm text-orange-700 border-orange-300"
+            >
+              Выключить все активные
+            </button>
+            <button onClick={handleCreateBanner} className="btn btn-primary">
+              <FiPlus className="mr-2" size={18} />
+              Создать баннер
+            </button>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button 

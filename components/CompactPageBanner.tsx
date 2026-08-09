@@ -24,22 +24,22 @@ export default function CompactPageBanner({
   const [index, setIndex] = useState(0)
 
   useEffect(() => {
-    if (initialBanners?.length) setBanners(initialBanners)
     let cancelled = false
-    fetch(`/api/banners?page=${page}&limit=10`)
+    // Сразу синхронизируем с SSR, затем обязательно перезапрашиваем без кэша
+    setBanners(initialBanners ?? [])
+    fetch(`/api/banners?page=${page}&limit=10`, { cache: 'no-store' })
       .then((r) => (cancelled || !r.ok ? null : r.json()))
       .then((data) => {
         if (cancelled) return
-        // Всегда доверяем актуальному ответу API (удалённые/выключенные не должны «залипать»)
         setBanners(Array.isArray(data?.banners) ? data.banners : [])
       })
       .catch(() => {
-        if (!initialBanners?.length) setBanners([])
+        if (!cancelled) setBanners([])
       })
     return () => {
       cancelled = true
     }
-  }, [page, initialBanners?.length])
+  }, [page, initialBanners])
 
   useEffect(() => {
     if (banners.length <= 1) return

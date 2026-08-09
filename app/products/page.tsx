@@ -3,6 +3,9 @@ import { getBannersForPage } from '@/lib/server-data'
 import { getInitialProductsForCatalog } from '../search/getInitialSearchData'
 import type { Viewport } from 'next'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 /** Pinch-zoom разрешён (WCAG 1.4.4). */
 export const viewport: Viewport = {
   width: 'device-width',

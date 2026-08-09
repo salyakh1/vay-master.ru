@@ -83,13 +83,12 @@ export default function AdBannerSlider({
 
   useEffect(() => {
     trackedViewsRef.current.clear()
-    if (initialBanners?.length) {
-      setBanners(initialBanners)
-      setLoading(false)
-      trackViewRef.current?.(initialBanners[0].id)
-    }
     let cancelled = false
-    fetch(`/api/banners?page=${page}&limit=10`)
+    setBanners(initialBanners ?? [])
+    setLoading(!(initialBanners && initialBanners.length > 0))
+    if (initialBanners?.[0]?.id) trackViewRef.current?.(initialBanners[0].id)
+
+    fetch(`/api/banners?page=${page}&limit=10`, { cache: 'no-store' })
       .then((r) => (cancelled || !r.ok ? null : r.json()))
       .then((data) => {
         if (cancelled) return
@@ -97,10 +96,16 @@ export default function AdBannerSlider({
         setBanners(next)
         if (next[0]?.id) trackViewRef.current?.(next[0].id)
       })
-      .catch(() => { if (!cancelled && !initialBanners?.length) setBanners([]) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [page, initialBanners?.length])
+      .catch(() => {
+        if (!cancelled) setBanners([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [page, initialBanners])
 
   useEffect(() => {
     if (!autoplay || banners.length <= 1 || isPaused) {

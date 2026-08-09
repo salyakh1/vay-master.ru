@@ -148,21 +148,21 @@ function HomePageBanner({ initialBanners = null }: { initialBanners?: AdBanner[]
   const [index, setIndex] = useState(0)
 
   useEffect(() => {
-    if (initialBanners?.length) setBanners(initialBanners)
     let cancelled = false
-    fetch('/api/banners?page=home&limit=10')
+    setBanners(initialBanners ?? [])
+    fetch('/api/banners?page=home&limit=10', { cache: 'no-store' })
       .then((r) => (cancelled || !r.ok ? null : r.json()))
       .then((data) => {
         if (cancelled) return
         setBanners(Array.isArray(data?.banners) ? data.banners : [])
       })
       .catch(() => {
-        if (!initialBanners?.length) setBanners([])
+        if (!cancelled) setBanners([])
       })
     return () => {
       cancelled = true
     }
-  }, [initialBanners?.length])
+  }, [initialBanners])
 
   useEffect(() => {
     if (banners.length <= 1) return

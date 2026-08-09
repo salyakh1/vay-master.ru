@@ -9,9 +9,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase env: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY')
 }
 
-/** Серверный клиент для RSC (без кэша сессии). */
+/** Серверный клиент для RSC — без Data Cache Next.js (баннеры должны пропадать сразу после удаления). */
 function getServerSupabase() {
-  return createClient(supabaseUrl!, supabaseAnonKey!, { auth: { persistSession: false } })
+  return createClient(supabaseUrl!, supabaseAnonKey!, {
+    auth: { persistSession: false },
+    global: {
+      fetch: (url, options = {}) =>
+        fetch(url, { ...options, cache: 'no-store' }),
+    },
+  })
 }
 
 /** Баннеры для первой отрисовки (SSR). Логика как в /api/banners. */
