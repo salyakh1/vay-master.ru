@@ -758,8 +758,7 @@ export default function AdminBannersPage() {
                   <div>
                     <p className="text-sm font-semibold text-[#1c1c1e]">Общий баннер — формат A</p>
                     <p className="text-xs text-[#8e8e93] mt-1 leading-relaxed">
-                      Единый формат на главной, поиске, товарах и ленте: фото на весь блок · слева градиент ·
-                      метка · заголовок · подзаголовок · белая кнопка. Размер макета для заказчиков:{' '}
+                      Фото на весь блок · без затемнения · метка, заголовок и кнопка справа. Размер:{' '}
                       <strong>1400×500 px (2.8∶1)</strong>.
                     </p>
                   </div>
@@ -773,26 +772,25 @@ export default function AdminBannersPage() {
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-r from-[#1a1a2e] to-[#C7362F]" />
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
-                    <div className="relative z-10 h-full flex flex-col justify-between px-3.5 py-2.5">
-                      <div className="min-w-0 max-w-[68%]">
+                    <div className="relative z-10 h-full flex flex-col justify-between items-end text-right px-3.5 py-2.5">
+                      <div className="min-w-0 max-w-[55%] flex flex-col items-end">
                         {editingBanner.show_badge !== false && (
-                          <span className="inline-block bg-black/35 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md mb-1 uppercase">
+                          <span className="inline-block bg-white/90 text-[#1c1c1e] text-[8px] font-bold px-1.5 py-0.5 rounded-md mb-1 uppercase">
                             {editingBanner.badge_text || 'АКЦИЯ'}
                           </span>
                         )}
                         {editingBanner.show_title !== false && (
-                          <p className="text-white text-xs font-extrabold leading-tight mb-0.5 line-clamp-2">
+                          <p className="text-white text-xs font-extrabold leading-tight mb-0.5 line-clamp-2 drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]">
                             {editingBanner.title || 'Заголовок баннера'}
                           </p>
                         )}
                         {editingBanner.show_description !== false && (
-                          <p className="text-white/80 text-[9px] leading-snug line-clamp-2">
+                          <p className="text-white/95 text-[9px] leading-snug line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                             {editingBanner.description || 'Короткое описание под заголовком'}
                           </p>
                         )}
                       </div>
-                      <span className="self-start bg-white text-[#1c1c1e] text-[9px] font-extrabold px-2.5 py-1.5 rounded-lg">
+                      <span className="self-end bg-white text-[#1c1c1e] text-[9px] font-extrabold px-2.5 py-1.5 rounded-lg">
                         {(editingBanner.brand_name || '').trim() || 'Смотреть'}
                       </span>
                     </div>
