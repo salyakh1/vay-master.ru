@@ -7,6 +7,7 @@ import { logAdminAction } from '@/lib/admin'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { FiPlus, FiEdit, FiTrash2, FiEye, FiEyeOff, FiCopy, FiImage } from 'react-icons/fi'
+import AdminBannerCreateWizard from '@/components/admin/AdminBannerCreateWizard'
 
 const BANNER_TYPES = [
   { value: 'image', label: 'Только изображение' },
@@ -54,6 +55,7 @@ export default function AdminBannersPage() {
   const [loading, setLoading] = useState(true)
   const [selectedBanner, setSelectedBanner] = useState<AdBanner | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showCreateWizard, setShowCreateWizard] = useState(false)
   const [editingBanner, setEditingBanner] = useState<Partial<AdBanner> | null>(null)
 
   useEffect(() => {
@@ -129,15 +131,20 @@ export default function AdminBannersPage() {
   }
 
   const handleCreateBanner = () => {
+    setShowCreateWizard(true)
+  }
+
+  const openFullConstructor = (overrides?: Partial<AdBanner>) => {
+    setShowCreateWizard(false)
     setEditingBanner({
       title: '',
       description: '',
       image_url: '',
-      type: 'image',
+      type: 'image_text',
       ad_type: 'HERO_SPONSORED',
-      hero_layout: 'split',
+      hero_layout: 'full_image',
       target_type: null,
-      pages: [],
+      pages: ['home', 'search'],
       priority: 0,
       duration: 5,
       is_active: true,
@@ -150,6 +157,7 @@ export default function AdminBannersPage() {
       brand_name: 'Смотреть',
       show_title: true,
       show_description: true,
+      ...overrides,
     })
     setShowCreateModal(true)
   }
@@ -161,9 +169,8 @@ export default function AdminBannersPage() {
     
     switch (adType) {
       case 'HERO_SPONSORED':
-        defaultType = 'image_text'
-        defaultPages = ['home']
-        break
+        setShowCreateWizard(true)
+        return
       case 'INLINE_CONTEXT':
         defaultType = 'image'
         defaultPages = ['search', 'products']
@@ -182,29 +189,12 @@ export default function AdminBannersPage() {
         break
     }
 
-    setEditingBanner({
-      title: '',
-      description: '',
-      image_url: '',
+    openFullConstructor({
       type: defaultType as any,
       ad_type: adType as any,
-      hero_layout: adType === 'HERO_SPONSORED' ? 'split' : undefined,
-      target_type: null,
       pages: defaultPages,
-      priority: 0,
-      duration: 5,
-      is_active: true,
-      category: [],
-      keywords: [],
-      regions: ['ALL'],
-      pricing_model: 'fixed',
-      show_badge: true,
-      badge_text: 'АКЦИЯ',
-      brand_name: 'Смотреть',
-      show_title: true,
-      show_description: true,
+      hero_layout: undefined,
     })
-    setShowCreateModal(true)
   }
 
   const handleEditBanner = (banner: AdBanner) => {
@@ -291,117 +281,99 @@ export default function AdminBannersPage() {
     }
   }
 
+  const saveBannerData = async (source: Partial<AdBanner>) => {
+    if (!currentUser) return
+
+    if (!source.title || !source.image_url || !source.pages || source.pages.length === 0) {
+      alert('Заполните все обязательные поля')
+      throw new Error('validation')
+    }
+
+    const isHero = source.ad_type === 'HERO_SPONSORED' || !source.ad_type
+    const heroLayout = (source as any).hero_layout
+    const bannerData: any = {
+      ...source,
+      priority: source.priority || 0,
+      duration: source.duration || 5,
+      is_active: source.is_active ?? true,
+      ad_type: source.ad_type || 'HERO_SPONSORED',
+      ...(isHero && { hero_layout: heroLayout === 'full_image' ? 'full_image' : 'split' }),
+      category: source.category || [],
+      keywords: source.keywords || [],
+      regions: source.regions || ['ALL'],
+      pricing_model: source.pricing_model || 'fixed',
+      show_badge: source.show_badge ?? true,
+      badge_text: (source.badge_text ?? '').trim() || 'АКЦИЯ',
+      show_title: source.show_title ?? true,
+      show_description: source.show_description ?? true,
+      created_by: currentUser.id,
+    }
+
+    Object.keys(bannerData).forEach((key) => {
+      if (bannerData[key] === undefined) delete bannerData[key]
+    })
+
+    if (source.id) {
+      const { error } = await supabase.from('ad_banners').update(bannerData).eq('id', source.id)
+      if (error) throw error
+      await logAdminAction(currentUser.id, 'update_banner', 'banner', source.id)
+      alert('Баннер обновлен')
+    } else {
+      const { data, error } = await supabase.from('ad_banners').insert(bannerData).select().single()
+      if (error) throw error
+      await logAdminAction(currentUser.id, 'create_banner', 'banner', data.id)
+      alert(source.is_active === false ? 'Черновик сохранён' : 'Баннер создан')
+    }
+
+    setShowCreateModal(false)
+    setShowCreateWizard(false)
+    setEditingBanner(null)
+    fetchBanners()
+  }
+
   const handleSaveBanner = async () => {
-    if (!currentUser || !editingBanner) return
-
+    if (!editingBanner) return
     try {
-      if (!editingBanner.title || !editingBanner.image_url || !editingBanner.pages || editingBanner.pages.length === 0) {
-        alert('Заполните все обязательные поля')
-        return
-      }
-
-      const isHero = editingBanner.ad_type === 'HERO_SPONSORED' || !editingBanner.ad_type
-      const heroLayout = (editingBanner as any).hero_layout
-      const bannerData: any = {
-        ...editingBanner,
-        priority: editingBanner.priority || 0,
-        duration: editingBanner.duration || 5,
-        is_active: editingBanner.is_active ?? true,
-        ad_type: editingBanner.ad_type || 'HERO_SPONSORED',
-        ...(isHero && { hero_layout: heroLayout === 'full_image' ? 'full_image' : 'split' }),
-        category: editingBanner.category || [],
-        keywords: editingBanner.keywords || [],
-        regions: editingBanner.regions || ['ALL'],
-        pricing_model: editingBanner.pricing_model || 'fixed',
-        show_badge: editingBanner.show_badge ?? true,
-        badge_text: (editingBanner.badge_text ?? '').trim() || 'АКЦИЯ',
-        show_title: editingBanner.show_title ?? true,
-        show_description: editingBanner.show_description ?? true,
-        created_by: currentUser.id,
-      }
-
-      // Удаляем undefined значения
-      Object.keys(bannerData).forEach((key) => {
-        if (bannerData[key] === undefined) {
-          delete bannerData[key]
-        }
-      })
-
-      if (editingBanner.id) {
-        // Update
-        await supabase
-          .from('ad_banners')
-          .update(bannerData)
-          .eq('id', editingBanner.id)
-
-        await logAdminAction(currentUser.id, 'update_banner', 'banner', editingBanner.id)
-        alert('Баннер обновлен')
-      } else {
-        // Create
-        const { data, error } = await supabase
-          .from('ad_banners')
-          .insert(bannerData)
-          .select()
-          .single()
-
-        if (error) throw error
-
-        await logAdminAction(currentUser.id, 'create_banner', 'banner', data.id)
-        alert('Баннер создан')
-      }
-
-      setShowCreateModal(false)
-      setEditingBanner(null)
-      fetchBanners()
-    } catch (error) {
+      await saveBannerData(editingBanner)
+    } catch (error: any) {
+      if (error?.message === 'validation') return
       console.error('Error saving banner:', error)
       alert('Ошибка при сохранении баннера')
     }
   }
 
+  const uploadBannerImage = async (file: File): Promise<string> => {
+    if (!currentUser) throw new Error('Не авторизован')
+
+    const fileExt = file.name.split('.').pop()
+    const fileName = `banners/${currentUser.id}/${Date.now()}.${fileExt}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('banner-images')
+      .upload(fileName, file, { upsert: false })
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError)
+      if (uploadError.message.includes('Bucket not found') || uploadError.message.includes('not found')) {
+        throw new Error('Bucket "banner-images" не найден. Используйте URL или настройте Storage.')
+      }
+      if (uploadError.message.includes('new row violates row-level security policy')) {
+        throw new Error('Нет прав для загрузки изображений (RLS).')
+      }
+      throw new Error(uploadError.message || 'Ошибка загрузки')
+    }
+
+    const { data: urlData } = supabase.storage.from('banner-images').getPublicUrl(fileName)
+    if (!urlData?.publicUrl) throw new Error('Не удалось получить URL')
+    return urlData.publicUrl
+  }
+
   const handleImageUpload = async (file: File) => {
-    if (!currentUser) return
-
+    if (!currentUser || !editingBanner) return
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `banners/${currentUser.id}/${Date.now()}.${fileExt}`
-
-      // Пытаемся сразу загрузить файл
-      const { error: uploadError } = await supabase.storage
-        .from('banner-images')
-        .upload(fileName, file, { upsert: false })
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError)
-        if (uploadError.message.includes('Bucket not found') || uploadError.message.includes('not found')) {
-          alert(
-            'Bucket "banner-images" не найден или нет прав доступа.\n\n' +
-            'Проверьте:\n' +
-            '1. Bucket создан в Supabase Storage\n' +
-            '2. Bucket имеет статус PUBLIC\n' +
-            '3. RLS политики настроены для загрузки\n\n' +
-            'Или используйте прямой URL изображения в поле ниже.'
-          )
-        } else if (uploadError.message.includes('new row violates row-level security policy')) {
-          alert(
-            'Нет прав для загрузки изображений.\n\n' +
-            'Убедитесь, что у вас есть права администратора и RLS политики настроены правильно.'
-          )
-        } else {
-          alert(`Ошибка при загрузке изображения: ${uploadError.message}`)
-        }
-        return
-      }
-
-      const { data: urlData } = supabase.storage.from('banner-images').getPublicUrl(fileName)
-
-      if (editingBanner && urlData) {
-        setEditingBanner({
-          ...editingBanner,
-          image_url: urlData.publicUrl,
-        })
-        alert('Изображение успешно загружено')
-      }
+      const publicUrl = await uploadBannerImage(file)
+      setEditingBanner({ ...editingBanner, image_url: publicUrl })
+      alert('Изображение успешно загружено')
     } catch (error: any) {
       console.error('Error uploading image:', error)
       alert(`Ошибка при загрузке изображения: ${error.message || 'Неизвестная ошибка'}`)
@@ -744,6 +716,18 @@ export default function AdminBannersPage() {
           </div>
         )}
       </div>
+
+      {/* Wizard: быстрый / конструктор */}
+      {showCreateWizard && (
+        <AdminBannerCreateWizard
+          onClose={() => setShowCreateWizard(false)}
+          onOpenFullConstructor={() => openFullConstructor()}
+          uploadImage={uploadBannerImage}
+          onPublish={async (banner) => {
+            await saveBannerData(banner)
+          }}
+        />
+      )}
 
       {/* Create/Edit Modal */}
       {showCreateModal && editingBanner && (
