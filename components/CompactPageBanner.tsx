@@ -6,8 +6,18 @@ import { useAuth } from '@/app/providers'
 import { profileLoginUrl } from '@/lib/guest-access'
 import type { AdBanner } from '@/lib/supabase'
 
+/** Единый размер всех общих баннеров (home / search / products / feed) */
+export const UNIFIED_BANNER = {
+  aspect: '2.8 / 1',
+  /** Рекомендуемый файл для заказчиков */
+  designWidth: 1400,
+  designHeight: 500,
+  minHeightPx: 88,
+  radiusPx: 14,
+} as const
+
 type CompactPageBannerProps = {
-  page: 'search' | 'products' | 'home'
+  page: 'search' | 'products' | 'home' | 'feed' | 'orders'
   initialBanners?: AdBanner[] | null
   /** Текст кнопки, если в баннере не задан brand_name */
   buttonLabel?: string
@@ -25,7 +35,6 @@ export default function CompactPageBanner({
 
   useEffect(() => {
     let cancelled = false
-    // Сразу синхронизируем с SSR, затем обязательно перезапрашиваем без кэша
     setBanners(initialBanners ?? [])
     fetch(`/api/banners?page=${page}&limit=10`, { cache: 'no-store' })
       .then((r) => (cancelled || !r.ok ? null : r.json()))
@@ -90,7 +99,7 @@ export default function CompactPageBanner({
       <button
         type="button"
         onClick={() => handleClick(banner)}
-        className="relative block w-full rounded-[14px] overflow-hidden text-left min-h-[88px] aspect-[2.8/1] shadow-sm"
+        className="relative block w-full overflow-hidden text-left shadow-sm min-h-[88px] aspect-[2.8/1] rounded-[14px]"
       >
         {hasImage ? (
           <img
@@ -104,7 +113,6 @@ export default function CompactPageBanner({
             style={{ background: 'linear-gradient(110deg, #1a1a2e 0%, #C7362F 100%)' }}
           />
         )}
-        {/* Формат A: сильный градиент слева, фото справа читается */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
 
         <div className="relative z-10 h-full flex flex-col justify-between px-3.5 py-2.5">

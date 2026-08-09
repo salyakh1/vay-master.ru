@@ -14,6 +14,7 @@ import type { MasterCategoryWithCount } from '@/lib/server-data'
 import { FiSearch, FiStar, FiArrowRight, FiUser, FiShoppingBag, FiTag, FiX } from 'react-icons/fi'
 import { getCategoryEmoji } from '@/lib/categoryEmoji'
 import StoriesCircle from '@/components/StoriesCircle'
+import CompactPageBanner from '@/components/CompactPageBanner'
 
 type HomeSuggestion = {
   id: string
@@ -138,118 +139,6 @@ function MasterCard({ master }: { master: User }) {
         </div>
       </div>
     </GuestAwareProfileLink>
-  )
-}
-
-function HomePageBanner({ initialBanners = null }: { initialBanners?: AdBanner[] | null }) {
-  const router = useRouter()
-  const { user } = useAuth()
-  const [banners, setBanners] = useState<AdBanner[]>(initialBanners ?? [])
-  const [index, setIndex] = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    setBanners(initialBanners ?? [])
-    fetch('/api/banners?page=home&limit=10', { cache: 'no-store' })
-      .then((r) => (cancelled || !r.ok ? null : r.json()))
-      .then((data) => {
-        if (cancelled) return
-        setBanners(Array.isArray(data?.banners) ? data.banners : [])
-      })
-      .catch(() => {
-        if (!cancelled) setBanners([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [initialBanners])
-
-  useEffect(() => {
-    if (banners.length <= 1) return
-    const t = setInterval(() => setIndex((i) => (i + 1) % banners.length), 5000)
-    return () => clearInterval(t)
-  }, [banners.length])
-
-  const handleClick = (banner: AdBanner) => {
-    fetch(`/api/banners/${banner.id}/click`, { method: 'POST' }).catch(() => {})
-    if (banner.target_type === 'external_url' && banner.external_url) {
-      window.open(banner.external_url, '_blank', 'noopener,noreferrer')
-      return
-    }
-    if (banner.target_type === 'master' && banner.target_id) {
-      router.push(user ? `/profile/${banner.target_id}` : profileLoginUrl(banner.target_id))
-      return
-    }
-    if (banner.target_type === 'product' && banner.target_id) router.push(`/products/${banner.target_id}`)
-    else if (banner.target_type === 'category' && banner.target_id) router.push(`/products?category=${banner.target_id}`)
-    else if (banner.target_type === 'order' && banner.target_id) router.push(`/orders/${banner.target_id}`)
-  }
-
-  if (banners.length === 0) return null
-
-  const banner = banners[index]
-  const hasImage = !!banner.image_url
-
-  const dots =
-    banners.length > 1 ? (
-      <div className="flex gap-1 justify-center py-1.5 pb-0.5">
-        {banners.map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => setIndex(i)}
-            className={`h-[5px] rounded-full transition-all ${
-              i === index ? 'bg-brand-accent w-3.5 rounded-[3px]' : 'bg-[#ddd] w-[5px]'
-            }`}
-            aria-label={`Баннер ${i + 1}`}
-          />
-        ))}
-      </div>
-    ) : null
-
-  const cta = (banner.brand_name || '').trim() || 'Смотреть'
-
-  return (
-    <div className="pt-1 pb-0.5 px-3.5">
-      <button
-        type="button"
-        onClick={() => handleClick(banner)}
-        className="relative block w-full rounded-[20px] overflow-hidden text-left aspect-[2/1] min-h-[150px] max-h-[180px] shadow-sm"
-      >
-        {hasImage ? (
-          <img
-            src={banner.image_url}
-            alt={banner.title || 'Реклама'}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        ) : (
-          <div
-            className="absolute inset-0"
-            style={{ background: 'linear-gradient(110deg, #1a1a2e 0%, #C7362F 100%)' }}
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
-        <div className="relative z-10 h-full flex flex-col justify-between p-3.5">
-          <div className="min-w-0 max-w-[65%]">
-            {banner.show_badge !== false && (
-              <span className="inline-block bg-black/35 text-white text-[9px] font-bold px-[7px] py-0.5 rounded-[10px] mb-1.5 tracking-wide uppercase backdrop-blur-[2px]">
-                {banner.badge_text || 'АКЦИЯ'}
-              </span>
-            )}
-            {banner.show_title !== false && banner.title && (
-              <p className="text-white text-[13px] font-extrabold leading-tight mb-1 drop-shadow-sm">{banner.title}</p>
-            )}
-            {banner.show_description !== false && banner.description && (
-              <p className="text-white/80 text-[10px] leading-snug line-clamp-2">{banner.description}</p>
-            )}
-          </div>
-          <span className="self-start bg-white text-[#1c1c1e] text-[10px] font-extrabold px-3 py-1.5 rounded-[10px] whitespace-nowrap shadow-sm">
-            {cta}
-          </span>
-        </div>
-      </button>
-      {dots}
-    </div>
   )
 }
 
@@ -564,7 +453,7 @@ export default function HomeClient({
         </div>
       )}
 
-      <HomePageBanner initialBanners={initialBanners} />
+      <CompactPageBanner page="home" initialBanners={initialBanners} />
 
       {DIVIDER}
 

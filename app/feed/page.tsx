@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '../providers'
 import { supabase, PortfolioItem, PortfolioComment, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import AdBannerSlider from '@/components/AdBannerSlider'
+import CompactPageBanner from '@/components/CompactPageBanner'
 import Link from 'next/link'
 import { FiArrowLeft } from 'react-icons/fi'
 import StoriesCircle from '@/components/StoriesCircle'
@@ -646,9 +646,7 @@ export default function FeedPage() {
 
       {showGrid && (
         <div className="px-0 pt-0">
-          <div className="px-3 py-2">
-            <AdBannerSlider page="feed" />
-          </div>
+          <CompactPageBanner page="feed" />
         </div>
       )}
 

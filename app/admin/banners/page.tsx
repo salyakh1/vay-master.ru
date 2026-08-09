@@ -760,8 +760,9 @@ export default function AdminBannersPage() {
                   <div>
                     <p className="text-sm font-semibold text-[#1c1c1e]">Общий баннер — формат A</p>
                     <p className="text-xs text-[#8e8e93] mt-1 leading-relaxed">
-                      Фото на весь блок · слева тёмный градиент · сверху метка (АКЦИЯ) · заголовок · подзаголовок · белая кнопка снизу слева.
-                      Размер на сайте как сейчас (компактный). Страницы: Поиск / Товары / Главная.
+                      Единый формат на главной, поиске, товарах и ленте: фото на весь блок · слева градиент ·
+                      метка · заголовок · подзаголовок · белая кнопка. Размер макета для заказчиков:{' '}
+                      <strong>1400×500 px (2.8∶1)</strong>.
                     </p>
                   </div>
                   <div className="relative w-full rounded-[14px] overflow-hidden min-h-[88px] aspect-[2.8/1] bg-[#1c1c1e]">
@@ -918,8 +919,8 @@ export default function AdminBannersPage() {
                     Фото баннера *
                   </label>
                   <p className="text-xs text-text-secondary mb-1.5">
-                    Заполняет весь баннер. Важное — справа (инструменты, мастер): слева текст на градиенте.
-                    Рекомендуемое соотношение ≈ 2.8∶1 (широкое).
+                    Единый размер везде: соотношение <strong>2.8∶1</strong>, файл{' '}
+                    <strong>1400×500 px</strong>. Важное — справа; слева место под текст.
                   </p>
                   <div className="space-y-2">
                     <input
