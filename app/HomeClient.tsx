@@ -109,34 +109,53 @@ function MasterCard({ master }: { master: User }) {
     .toUpperCase() || '?'
   const rating = master.master_rating ?? 0
   const reviews = master.master_reviews_count ?? 0
-  const specs =
-    master.specialization ||
-    (master as User & { profile_subcategories?: Array<{ subcategory?: { name?: string } }> })
-      .profile_subcategories?.[0]?.subcategory?.name ||
-    'Мастер'
+  const withRelations = master as User & {
+    profile_services?: Array<{ service?: { name?: string | null } | null }>
+    profile_subcategories?: Array<{ subcategory?: { name?: string | null } | null }>
+  }
+  const serviceNames = (withRelations.profile_services || [])
+    .map((row) => row.service?.name?.trim())
+    .filter((name): name is string => Boolean(name))
+    .slice(0, 3)
+  const subcategoryNames = (withRelations.profile_subcategories || [])
+    .map((row) => row.subcategory?.name?.trim())
+    .filter((name): name is string => Boolean(name))
+    .slice(0, 3)
+  const servicesLabel =
+    (serviceNames.length > 0 ? serviceNames : subcategoryNames).join(' · ') ||
+    master.specialization?.trim() ||
+    ''
 
   return (
     <GuestAwareProfileLink profileId={master.id} className="block w-[140px] flex-shrink-0">
       <div className="bg-white rounded-[18px] p-3 border border-[#f0f0f0]">
-        <div className="flex items-start justify-between mb-2">
-          <div className="w-11 h-11 rounded-full bg-brand-accent text-white text-sm font-bold flex items-center justify-center overflow-hidden">
-            {master.avatar_url ? (
-              <Image src={master.avatar_url} alt="" width={44} height={44} className="object-cover w-full h-full" />
-            ) : (
-              initials
+        <div className="flex items-start justify-between gap-1.5 mb-2">
+          <div className="relative flex-shrink-0">
+            <div className="w-11 h-11 rounded-full bg-brand-accent text-white text-sm font-bold flex items-center justify-center overflow-hidden">
+              {master.avatar_url ? (
+                <Image src={master.avatar_url} alt="" width={44} height={44} className="object-cover w-full h-full" />
+              ) : (
+                initials
+              )}
+            </div>
+            {master.is_pro && (
+              <span className="absolute -bottom-0.5 -right-0.5 bg-brand-accent text-white text-[8px] font-extrabold px-1 py-0.5 rounded-[3px] border-2 border-white">
+                PRO
+              </span>
             )}
           </div>
-          {master.is_pro && (
-            <span className="bg-brand-accent text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-md">PRO</span>
-          )}
+          <div className="inline-flex items-center gap-0.5 bg-[#fff8e6] px-1.5 py-0.5 rounded-md text-[11px] flex-shrink-0">
+            <FiStar className="text-[#f4a228] fill-[#f4a228]" size={11} />
+            <span className="font-bold text-[#1c1c1e]">{rating > 0 ? rating.toFixed(1) : '—'}</span>
+            {reviews > 0 && <span className="text-[#8e8e93] font-medium">({reviews})</span>}
+          </div>
         </div>
         <p className="text-[13px] font-bold text-[#111] truncate">{master.full_name}</p>
-        <p className="text-[11px] text-[#888] truncate mb-1.5">{specs}</p>
-        <div className="inline-flex items-center gap-1 bg-[#fff8e6] px-1.5 py-0.5 rounded-md text-[11px]">
-          <FiStar className="text-[#f4a228] fill-[#f4a228]" size={11} />
-          <span className="font-bold text-[#1c1c1e]">{rating > 0 ? rating.toFixed(1) : '—'}</span>
-          {reviews > 0 && <span className="text-[#8e8e93] font-medium">({reviews})</span>}
-        </div>
+        {servicesLabel ? (
+          <p className="text-[11px] text-[#888] leading-snug line-clamp-2 min-h-[28px]">{servicesLabel}</p>
+        ) : (
+          <div className="min-h-[28px]" aria-hidden />
+        )}
       </div>
     </GuestAwareProfileLink>
   )

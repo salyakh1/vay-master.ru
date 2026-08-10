@@ -8,11 +8,12 @@ import type { AdBanner } from '@/lib/supabase'
 
 /** Единый размер всех общих баннеров (home / search / products / feed) */
 export const UNIFIED_BANNER = {
-  aspect: '2.8 / 1',
+  aspect: '2.5 / 1',
+  aspectLabel: '2.5∶1',
   /** Рекомендуемый файл для заказчиков */
   designWidth: 1400,
-  designHeight: 500,
-  minHeightPx: 88,
+  designHeight: 560,
+  minHeightPx: 100,
   radiusPx: 14,
 } as const
 
@@ -108,7 +109,7 @@ export default function CompactPageBanner({
       <button
         type="button"
         onClick={() => handleClick(banner)}
-        className="relative block w-full overflow-hidden text-left shadow-sm min-h-[88px] aspect-[2.8/1] rounded-[14px]"
+        className="relative block w-full overflow-hidden text-left shadow-sm min-h-[100px] aspect-[2.5/1] rounded-[14px]"
       >
         {hasImage ? (
           <img

@@ -254,7 +254,8 @@ export default function AdminBannerCreateWizard({
                       <div className="text-xl mb-0.5">▬</div>
                       <div className="text-[11px] font-bold text-[#1c1c1e]">Единый</div>
                       <div className="text-[10px] text-[#8e8e93]">
-                        {UNIFIED_BANNER.designWidth} × {UNIFIED_BANNER.designHeight} px · 2.8∶1
+                        {UNIFIED_BANNER.designWidth} × {UNIFIED_BANNER.designHeight} px ·{' '}
+                        {UNIFIED_BANNER.aspectLabel}
                       </div>
                     </div>
                   </div>
@@ -293,7 +294,7 @@ export default function AdminBannerCreateWizard({
                       </div>
                     </button>
                   ) : (
-                    <div className="relative w-full aspect-[2.8/1] rounded-xl overflow-hidden bg-[#111]">
+                    <div className="relative w-full aspect-[2.5/1] rounded-xl overflow-hidden bg-[#111]">
                       <img src={imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
                       <button
                         type="button"
@@ -454,7 +455,7 @@ export default function AdminBannerCreateWizard({
                 <p className="text-[11px] text-[#8e8e93] leading-relaxed">
                   Подготовьте картинку заранее с текстом и дизайном. Размер:{' '}
                   <strong>
-                    {UNIFIED_BANNER.designWidth}×{UNIFIED_BANNER.designHeight} px (2.8∶1)
+                    {UNIFIED_BANNER.designWidth}×{UNIFIED_BANNER.designHeight} px ({UNIFIED_BANNER.aspectLabel})
                   </strong>
                   . Пометка «Реклама» добавится автоматически.
                 </p>
@@ -489,7 +490,8 @@ export default function AdminBannerCreateWizard({
               <div className="flex gap-2 bg-[#f9f9fb] border border-[#e5e5ea] rounded-[10px] p-2.5">
                 <span className="text-[15px]">🎨</span>
                 <p className="text-[11px] text-[#8e8e93] leading-relaxed">
-                  Конструктор: заголовок, подзаголовок, метка, кнопка, фото 1400×500, расписание — формат A.
+                  Конструктор: заголовок, подзаголовок, метка, кнопка, фото{' '}
+                  {UNIFIED_BANNER.designWidth}×{UNIFIED_BANNER.designHeight}, расписание — формат A.
                 </p>
               </div>
               <div className="bg-white rounded-[14px] border border-[#e5e5ea] p-6 text-center">
@@ -501,7 +503,10 @@ export default function AdminBannerCreateWizard({
                 <ul className="text-left text-[12px] text-[#1c1c1e] space-y-1.5 bg-[#f9f9fb] border border-[#e5e5ea] rounded-xl p-3.5 mb-4">
                   <li>📝 Заголовок + описание + метка</li>
                   <li>🤍 Текст белой кнопки</li>
-                  <li>🖼️ Фото 1400×500 (2.8∶1)</li>
+                  <li>
+                    🖼️ Фото {UNIFIED_BANNER.designWidth}×{UNIFIED_BANNER.designHeight} (
+                    {UNIFIED_BANNER.aspectLabel})
+                  </li>
                   <li>📅 Расписание и лимиты</li>
                   <li>👁️ Превью в реальном времени</li>
                 </ul>

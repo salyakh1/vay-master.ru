@@ -5,16 +5,23 @@ import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import type { User } from '@/lib/supabase'
 
 function getSpecs(master: User): string {
-  const fromSubs = Array.isArray(
-    (master as User & { profile_subcategories?: Array<{ subcategory?: { name?: string } }> }).profile_subcategories
-  )
-    ? (master as User & { profile_subcategories: Array<{ subcategory?: { name?: string } }> }).profile_subcategories
-        .map((item) => item.subcategory?.name)
-        .filter(Boolean)
-        .slice(0, 2)
-        .join(' · ')
-    : ''
-  return fromSubs || master.specialization || 'Мастер'
+  const withRelations = master as User & {
+    profile_services?: Array<{ service?: { name?: string | null } | null }>
+    profile_subcategories?: Array<{ subcategory?: { name?: string | null } | null }>
+  }
+  const fromServices = (withRelations.profile_services || [])
+    .map((item) => item.service?.name?.trim())
+    .filter((name): name is string => Boolean(name))
+    .slice(0, 3)
+  if (fromServices.length > 0) return fromServices.join(' · ')
+
+  const fromSubs = (withRelations.profile_subcategories || [])
+    .map((item) => item.subcategory?.name?.trim())
+    .filter((name): name is string => Boolean(name))
+    .slice(0, 3)
+  if (fromSubs.length > 0) return fromSubs.join(' · ')
+
+  return master.specialization?.trim() || ''
 }
 
 const AVATAR_BG = ['#c0392b', '#555555', '#8B4513', '#22a85e', '#1d3557', '#6a4c93']

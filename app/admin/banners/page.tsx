@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { FiPlus, FiEdit, FiTrash2, FiEye, FiEyeOff, FiCopy, FiImage } from 'react-icons/fi'
 import AdminBannerCreateWizard from '@/components/admin/AdminBannerCreateWizard'
+import { UNIFIED_BANNER } from '@/components/CompactPageBanner'
 
 const PRICING_MODELS = [
   { value: 'fixed', label: 'Фиксированная цена' },
@@ -459,7 +460,7 @@ export default function AdminBannersPage() {
         </div>
         <p className="text-xs text-text-secondary">
           Только новые форматы: <strong>Картинка + ссылка</strong> и <strong>Конструктор (формат A)</strong>,
-          размер 1400×500.
+          размер {UNIFIED_BANNER.designWidth}×{UNIFIED_BANNER.designHeight}.
         </p>
       </div>
 
@@ -759,10 +760,14 @@ export default function AdminBannersPage() {
                     <p className="text-sm font-semibold text-[#1c1c1e]">Общий баннер — формат A</p>
                     <p className="text-xs text-[#8e8e93] mt-1 leading-relaxed">
                       Фото на весь блок · без затемнения · метка, заголовок и кнопка справа. Размер:{' '}
-                      <strong>1400×500 px (2.8∶1)</strong>.
+                      <strong>
+                        {UNIFIED_BANNER.designWidth}×{UNIFIED_BANNER.designHeight} px (
+                        {UNIFIED_BANNER.aspectLabel})
+                      </strong>
+                      .
                     </p>
                   </div>
-                  <div className="relative w-full rounded-[14px] overflow-hidden min-h-[88px] aspect-[2.8/1] bg-[#1c1c1e]">
+                  <div className="relative w-full rounded-[14px] overflow-hidden min-h-[100px] aspect-[2.5/1] bg-[#1c1c1e]">
                     {editingBanner.image_url ? (
                       <img
                         src={editingBanner.image_url}
@@ -915,8 +920,11 @@ export default function AdminBannersPage() {
                     Фото баннера *
                   </label>
                   <p className="text-xs text-text-secondary mb-1.5">
-                    Единый размер везде: соотношение <strong>2.8∶1</strong>, файл{' '}
-                    <strong>1400×500 px</strong>. Важное — справа; слева место под текст.
+                    Единый размер везде: соотношение <strong>{UNIFIED_BANNER.aspectLabel}</strong>, файл{' '}
+                    <strong>
+                      {UNIFIED_BANNER.designWidth}×{UNIFIED_BANNER.designHeight} px
+                    </strong>
+                    . Важное — справа; слева место под текст.
                   </p>
                   <div className="space-y-2">
                     <input
@@ -943,7 +951,7 @@ export default function AdminBannersPage() {
 
                 <div className="rounded-lg border border-[#e5e5ea] bg-[#f9f9fb] px-3 py-2 text-xs text-[#8e8e93]">
                   Формат: <strong className="text-[#1c1c1e]">Конструктор A</strong> · тип всегда Hero ·
-                  размер 1400×500. Старые типы (Inline / Card / Footer) больше не создаются.
+                  размер {UNIFIED_BANNER.designWidth}×{UNIFIED_BANNER.designHeight}. Старые типы (Inline / Card / Footer) больше не создаются.
                 </div>
 
                 <div>
