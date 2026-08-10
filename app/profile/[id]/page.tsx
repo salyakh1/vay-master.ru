@@ -6,7 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@/app/providers'
-import { supabase, User, PortfolioItem, Service, Product } from '@/lib/supabase'
+import { supabase, User, PortfolioItem, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import PortfolioGrid from '@/components/PortfolioGrid'
 
@@ -28,9 +28,10 @@ import RatingStars from '@/components/RatingStars'
 import StoriesCircle from '@/components/StoriesCircle'
 import ProfileStrictHeader from '@/components/profile/ProfileStrictHeader'
 import ProfileServicesRow from '@/components/profile/ProfileServicesRow'
-import ProfileServicesSheet from '@/components/profile/ProfileServicesSheet'
+import ProfileServicesSheet, { type PricedServiceItem } from '@/components/profile/ProfileServicesSheet'
 import ProfileReviewsPreview from '@/components/profile/ProfileReviewsPreview'
 import SellerProductsSection from '@/components/profile/SellerProductsSection'
+import { isServicePriceUnit } from '@/lib/service-price'
 
 const StoreLocationMapModal = dynamic(() => import('@/components/StoreLocationMapModal'), { ssr: false })
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
@@ -49,7 +50,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [adminRole, setAdminRole] = useState<string | null>(null)
   const [profileSubcategories, setProfileSubcategories] = useState<Array<{ id: string; name: string; slug: string; category?: { id: string; name: string; slug: string } }>>([])
-  const [profileServices, setProfileServices] = useState<Service[]>([])
+  const [profileServices, setProfileServices] = useState<PricedServiceItem[]>([])
   const [isFollowing, setIsFollowing] = useState<boolean>(false)
   const [followLoading, setFollowLoading] = useState(false)
   const [followersCount, setFollowersCount] = useState<number>(0)
@@ -255,15 +256,25 @@ export default function ProfilePage() {
           .eq('profile_id', profileId),
         supabase
           .from('profile_services')
-          .select('service:services(id, name, slug, subcategory_id)')
+          .select('id, price, price_unit, service:services(id, name, slug, subcategory_id)')
           .eq('profile_id', profileId),
       ])
       const subs = (subRows || [])
         .map((row: any) => row.subcategory)
         .filter(Boolean) as Array<{ id: string; name: string; slug: string; category?: { id: string; name: string; slug: string } }>
       const svcs = (svcRows || [])
-        .map((row: any) => row.service)
-        .filter(Boolean) as Service[]
+        .map((row: any) => {
+          const svc = row.service
+          if (!svc?.id) return null
+          return {
+            id: svc.id,
+            name: svc.name,
+            price: row.price != null ? Number(row.price) : null,
+            price_unit: isServicePriceUnit(row.price_unit) ? row.price_unit : null,
+            profileServiceId: row.id as string,
+          } satisfies PricedServiceItem
+        })
+        .filter(Boolean) as PricedServiceItem[]
       setProfileSubcategories(subs)
       setProfileServices(svcs)
     } catch (error) {
@@ -962,7 +973,6 @@ export default function ProfilePage() {
                 followLoading={followLoading}
                 followersCount={followersCount}
                 followingCount={followingCount}
-                profileSubcategories={profileSubcategories}
                 productsCount={productsCount}
                 onFollow={toggleFollow}
                 onMessage={handleStartChat}
@@ -1003,8 +1013,10 @@ export default function ProfilePage() {
                     services={
                       profileServices.length > 0
                         ? profileServices
-                        : profileSubcategories.map((s) => ({ id: s.id, name: s.name }) as Service)
+                        : profileSubcategories.map((s) => ({ id: s.id, name: s.name }))
                     }
+                    isOwnProfile={isOwnProfile && profileServices.length > 0}
+                    onPricesChange={setProfileServices}
                     onClose={() => setShowServicesSheet(false)}
                   />
                 </>

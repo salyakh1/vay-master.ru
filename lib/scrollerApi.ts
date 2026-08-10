@@ -7,6 +7,11 @@ export const LIST_PAGE_SIZE = 6
 export type MasterScrollerItem = User & {
   distance_km?: number
   profile_subcategories?: Array<{ subcategory?: { name?: string } }>
+  profile_services?: Array<{
+    price?: number | string | null
+    price_unit?: string | null
+    service?: { id?: string; name?: string | null; slug?: string | null }
+  }>
 }
 export type ProductScrollerItem = Product & { distance_km?: number }
 

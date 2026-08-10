@@ -6,6 +6,7 @@ import { useAuth } from '@/app/providers'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import type { MasterScrollerItem } from '@/lib/scrollerApi'
 import { getInitials, getMasterAvatarAlt, getMasterSpecs } from '@/lib/master-display'
+import { pickMatchedServicePrice } from '@/lib/service-price'
 
 const AVATAR_COLORS = ['#c0392b', '#555', '#8B4513', '#1d5fa6', '#22a85e', '#6c3483']
 
@@ -27,9 +28,13 @@ export function MasterListCardSkeleton() {
 export function MasterListCard({
   master,
   colorIndex = 0,
+  matchedServiceIds,
+  searchQuery,
 }: {
   master: MasterScrollerItem
   colorIndex?: number
+  matchedServiceIds?: string[]
+  searchQuery?: string
 }) {
   const { user } = useAuth()
   const color = AVATAR_COLORS[colorIndex % AVATAR_COLORS.length]
@@ -38,6 +43,10 @@ export function MasterListCard({
   const rating = master.master_rating ?? 0
   const isPro = master.is_pro || (master.pro_until && new Date(master.pro_until) > new Date())
   const showPhone = !!user && !!master.phone
+  const matchedPrice = pickMatchedServicePrice(master.profile_services, {
+    serviceIds: matchedServiceIds,
+    q: searchQuery,
+  })
 
   return (
     <GuestAwareProfileLink
@@ -84,8 +93,12 @@ export function MasterListCard({
         )}
       </div>
 
+      {matchedPrice && (
+        <p className="text-[12px] font-medium text-[#111111] tabular-nums mb-1">{matchedPrice.label}</p>
+      )}
+
       <p className={`text-[11px] text-[#8e8e93] leading-snug line-clamp-2 ${showPhone ? 'mb-1.5' : 'mb-0'}`}>
-        {specs}
+        {matchedPrice?.serviceName || specs}
         {master.distance_km != null && (
           <span className="block text-brand-accent font-medium mt-0.5">{master.distance_km} км от вас</span>
         )}

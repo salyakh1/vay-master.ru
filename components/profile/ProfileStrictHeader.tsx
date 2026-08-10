@@ -6,8 +6,6 @@ import { FiMessageCircle, FiShare2 } from 'react-icons/fi'
 import type { User } from '@/lib/supabase'
 import { getInitials, yearsOnSite, yearsOnSiteLabel } from './profile-utils'
 
-type SubcategoryChip = { id: string; name: string }
-
 type ProfileStrictHeaderProps = {
   profile: User
   displayRoleLabel: string
@@ -16,7 +14,6 @@ type ProfileStrictHeaderProps = {
   followLoading: boolean
   followersCount: number
   followingCount: number
-  profileSubcategories: SubcategoryChip[]
   productsCount?: number
   onFollow: () => void
   onMessage: () => void
@@ -33,7 +30,6 @@ export default function ProfileStrictHeader({
   followLoading,
   followersCount,
   followingCount,
-  profileSubcategories,
   productsCount = 0,
   onFollow,
   onMessage,
@@ -134,29 +130,6 @@ export default function ProfileStrictHeader({
           </span>
           {profile.city && <span className="text-[11px] text-[#6b7280]">{profile.city}</span>}
         </div>
-
-        {isMaster && profileSubcategories.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2.5">
-            {profileSubcategories.map((spec) => (
-              <span
-                key={spec.id}
-                className="text-[10px] text-[#374151] bg-[#e8e8e8] px-2 py-1 rounded-lg"
-              >
-                {spec.name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {isMaster && profileSubcategories.length === 0 && profile.specialization && (
-          <div className="flex flex-wrap gap-1.5 mb-2.5">
-            {profile.specialization.split(',').map((spec, i) => (
-              <span key={i} className="text-[10px] text-[#374151] bg-[#e8e8e8] px-2 py-1 rounded-lg">
-                {spec.trim()}
-              </span>
-            ))}
-          </div>
-        )}
 
         {profile.description && (
           <p className="text-[12px] text-[#374151] leading-relaxed mb-3">{profile.description}</p>

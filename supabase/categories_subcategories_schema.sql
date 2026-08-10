@@ -78,8 +78,11 @@ CREATE TABLE public.profile_services (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   service_id UUID NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
+  price NUMERIC(12, 2) NULL,
+  price_unit TEXT NULL CHECK (price_unit IS NULL OR price_unit IN ('m', 'm2', 'm3')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
-  UNIQUE (profile_id, service_id)
+  UNIQUE (profile_id, service_id),
+  CONSTRAINT profile_services_price_nonneg CHECK (price IS NULL OR price >= 0)
 );
 
 CREATE INDEX idx_profile_services_profile ON public.profile_services(profile_id);
@@ -122,6 +125,8 @@ DROP POLICY IF EXISTS "profile_services insert own" ON public.profile_services;
 CREATE POLICY "profile_services insert own" ON public.profile_services FOR INSERT WITH CHECK (auth.uid() = profile_id);
 DROP POLICY IF EXISTS "profile_services delete own" ON public.profile_services;
 CREATE POLICY "profile_services delete own" ON public.profile_services FOR DELETE USING (auth.uid() = profile_id);
+DROP POLICY IF EXISTS "profile_services update own" ON public.profile_services;
+CREATE POLICY "profile_services update own" ON public.profile_services FOR UPDATE USING (auth.uid() = profile_id) WITH CHECK (auth.uid() = profile_id);
 
 -- Вставка справочников — только service_role (сиды/админ)
 DROP POLICY IF EXISTS "categories insert service_role" ON public.categories;

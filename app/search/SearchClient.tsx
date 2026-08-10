@@ -654,7 +654,13 @@ function SearchContent({
         ) : (
           <div className="grid grid-cols-2 gap-2 px-3.5 pb-2">
             {listMasters.map((master, i) => (
-              <MasterListCard key={master.id} master={master} colorIndex={i} />
+              <MasterListCard
+                key={master.id}
+                master={master}
+                colorIndex={i}
+                matchedServiceIds={selectedServiceIds}
+                searchQuery={query}
+              />
             ))}
           </div>
         )}

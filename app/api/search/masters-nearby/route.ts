@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
           subcategory:subcategories (id, name, slug, category:categories (id, name, slug))
         ),
         profile_services (
+          price,
+          price_unit,
           service:services (id, name, slug, subcategory:subcategories (id, name, slug, category:categories (id, name, slug)))
         ),
         master_rating,
