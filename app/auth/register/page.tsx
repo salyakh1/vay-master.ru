@@ -41,7 +41,7 @@ function RegisterForm() {
 
     if (!role) {
       setRoleTouched(true)
-      setError('РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ СЂРѕР»СЊ')
+      setError('Пожалуйста, выберите роль')
       setLoading(false)
       return
     }
@@ -137,17 +137,17 @@ function RegisterForm() {
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] max-w-lg mx-auto w-full flex flex-col">
-      <AuthBrandHero subtitle="РЎРѕР·РґР°Р№С‚Рµ Р°РєРєР°СѓРЅС‚ Р·Р° РјРёРЅСѓС‚Сѓ вЂ” Р±РµСЃРїР»Р°С‚РЅРѕ. РњР°СЃС‚РµСЂР°, РїСЂРѕРґР°РІС†С‹ Рё РєР»РёРµРЅС‚С‹ РІ РѕРґРЅРѕР№ СЌРєРѕСЃРёСЃС‚РµРјРµ." />
+      <AuthBrandHero subtitle="Создайте аккаунт за минуту — бесплатно. Мастера, продавцы и клиенты в одной экосистеме." />
 
       <div className="flex-1 px-4 -mt-6 relative z-10 pb-10">
         <div className="bg-white rounded-2xl border border-[#e5e5ea] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
-          <h2 className="text-lg font-bold text-[#1c1c1e] mb-1 text-center">Р РµРіРёСЃС‚СЂР°С†РёСЏ</h2>
-          <p className="text-center text-xs text-text-secondary mb-5">Р’С‹Р±РµСЂРёС‚Рµ СЂРѕР»СЊ Рё Р·Р°РїРѕР»РЅРёС‚Рµ РґР°РЅРЅС‹Рµ</p>
+          <h2 className="text-lg font-bold text-[#1c1c1e] mb-1 text-center">Регистрация</h2>
+          <p className="text-center text-xs text-text-secondary mb-5">Выберите роль и заполните данные</p>
 
           <form onSubmit={handleRegister} className="space-y-3.5">
             <div>
               <label htmlFor="reg-name" className="block text-xs font-semibold text-text-secondary mb-1.5">
-                Р¤РРћ *
+                ФИО *
               </label>
               <input
                 id="reg-name"
@@ -156,7 +156,7 @@ function RegisterForm() {
                 onChange={(e) => setFullName(e.target.value)}
                 required
                 className="input w-full"
-                placeholder="РРІР°РЅ РРІР°РЅРѕРІ"
+                placeholder="Иван Иванов"
                 autoComplete="name"
               />
             </div>
@@ -179,7 +179,7 @@ function RegisterForm() {
 
             <div>
               <label htmlFor="reg-password" className="block text-xs font-semibold text-text-secondary mb-1.5">
-                РџР°СЂРѕР»СЊ *
+                Пароль *
               </label>
               <input
                 id="reg-password"
@@ -189,7 +189,7 @@ function RegisterForm() {
                 required
                 minLength={6}
                 className="input w-full"
-                placeholder="РњРёРЅРёРјСѓРј 6 СЃРёРјРІРѕР»РѕРІ"
+                placeholder="Минимум 6 символов"
                 autoComplete="new-password"
               />
             </div>
@@ -197,7 +197,7 @@ function RegisterForm() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="reg-phone" className="block text-xs font-semibold text-text-secondary mb-1.5">
-                  РўРµР»РµС„РѕРЅ
+                  Телефон
                 </label>
                 <input
                   id="reg-phone"
@@ -211,7 +211,7 @@ function RegisterForm() {
               </div>
               <div>
                 <label htmlFor="reg-city" className="block text-xs font-semibold text-text-secondary mb-1.5">
-                  Р“РѕСЂРѕРґ
+                  Город
                 </label>
                 <input
                   id="reg-city"
@@ -219,7 +219,7 @@ function RegisterForm() {
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="input w-full"
-                  placeholder="РњРѕСЃРєРІР°"
+                  placeholder="Москва"
                   autoComplete="address-level2"
                 />
               </div>
@@ -227,14 +227,14 @@ function RegisterForm() {
 
             <div className="pt-1">
               <div className="flex items-center justify-between gap-3 mb-2">
-                <label className="block text-xs font-semibold text-text-secondary">Р’С‹Р±РµСЂРёС‚Рµ СЂРѕР»СЊ *</label>
+                <label className="block text-xs font-semibold text-text-secondary">Выберите роль *</label>
                 {roleTouched && !role && (
-                  <span className="text-[11px] font-semibold text-brand-accent">Р РѕР»СЊ РЅРµ РІС‹Р±СЂР°РЅР°</span>
+                  <span className="text-[11px] font-semibold text-brand-accent">Роль не выбрана</span>
                 )}
               </div>
               <div
                 role="radiogroup"
-                aria-label="Р РѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"
+                aria-label="Роль пользователя"
                 aria-invalid={roleTouched && !role ? 'true' : 'false'}
                 className={[
                   'grid grid-cols-3 gap-2',
@@ -243,9 +243,9 @@ function RegisterForm() {
               >
                 {(
                   [
-                    { id: 'role-master', value: 'master' as const, label: 'РњР°СЃС‚РµСЂ', icon: 'рџ”Ё' },
-                    { id: 'role-seller', value: 'seller' as const, label: 'РџСЂРѕРґР°РІРµС†', icon: 'рџ›’' },
-                    { id: 'role-client', value: 'client' as const, label: 'РљР»РёРµРЅС‚', icon: 'рџ‘¤' },
+                    { id: 'role-master', value: 'master' as const, label: 'Мастер', icon: '🔨' },
+                    { id: 'role-seller', value: 'seller' as const, label: 'Продавец', icon: '🛒' },
+                    { id: 'role-client', value: 'client' as const, label: 'Клиент', icon: '👤' },
                   ] as const
                 ).map((item) => {
                   const selected = role === item.value
@@ -298,21 +298,21 @@ function RegisterForm() {
               disabled={loading}
               className="w-full btn btn-primary py-3.5 font-bold text-[15px]"
             >
-              {loading ? 'Р РµРіРёСЃС‚СЂР°С†РёСЏвЂ¦' : 'РЎРѕР·РґР°С‚СЊ Р°РєРєР°СѓРЅС‚'}
+              {loading ? 'Регистрация…' : 'Создать аккаунт'}
             </button>
           </form>
 
           <p className="mt-5 text-center text-sm text-[#8e8e93]">
-            РЈР¶Рµ РµСЃС‚СЊ Р°РєРєР°СѓРЅС‚?{' '}
+            Уже есть аккаунт?{' '}
             <Link href="/auth/login" className="text-brand-accent font-semibold hover:underline">
-              Р’РѕР№С‚Рё
+              Войти
             </Link>
           </p>
         </div>
 
         <p className="text-center mt-6">
           <Link href="/" className="text-sm text-[#8e8e93] hover:text-[#1c1c1e] transition-colors">
-            в†ђ РќР° РіР»Р°РІРЅСѓСЋ
+            ← На главную
           </Link>
         </p>
       </div>

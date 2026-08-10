@@ -48,11 +48,11 @@ export default function FeedPage() {
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({})
   const [submittingComments, setSubmittingComments] = useState<Record<string, boolean>>({})
   const [feedTab, setFeedTab] = useState<'all' | 'masters' | 'sellers'>('all')
-  // Р РµР¶РёРј Р»РµРЅС‚С‹: 'following' вЂ” С‚РѕР»СЊРєРѕ С‚Рµ, РЅР° РєРѕРіРѕ РїРѕРґРїРёСЃР°РЅ (РєР°Рє СЂР°РЅСЊС€Рµ);
-  // 'explore' вЂ” РІРѕРѕР±С‰Рµ РІСЃРµ РїСѓР±Р»РёРєР°С†РёРё РЅР° РїР»Р°С‚С„РѕСЂРјРµ, Р°РЅР°Р»РѕРі Explore РІ Instagram / В«РќРѕРІРѕСЃС‚РёВ» РІРѕ VK
+  // Режим ленты: 'following' — только те, на кого подписан (как раньше);
+  // 'explore' — вообще все публикации на платформе, аналог Explore в Instagram / «Новости» во VK
   const [feedMode, setFeedMode] = useState<'following' | 'explore'>('following')
   const [initialFeedModeResolved, setInitialFeedModeResolved] = useState(false)
-  /** Р’ Р РµРєРѕРјРµРЅРґР°С†РёСЏС…: СЃРµС‚РєР° РёР»Рё РІРµСЂС‚РёРєР°Р»СЊРЅР°СЏ Р»РµРЅС‚Р° РїРѕСЃР»Рµ РєР»РёРєР° */
+  /** В Рекомендациях: сетка или вертикальная лента после клика */
   const [exploreView, setExploreView] = useState<'grid' | 'feed'>('grid')
   const [viewerStartKey, setViewerStartKey] = useState<string | null>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
@@ -66,7 +66,7 @@ export default function FeedPage() {
     }
   }, [user, authLoading, router])
 
-  // РќРѕРІС‹Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј Р±РµР· РїРѕРґРїРёСЃРѕРє СЃСЂР°Р·Сѓ РїРѕРєР°Р·С‹РІР°РµРј В«Р РµРєРѕРјРµРЅРґР°С†РёРёВ», Р° РЅРµ РїСѓСЃС‚С‹Рµ В«РџРѕРґРїРёСЃРєРёВ»
+  // Новым пользователям без подписок сразу показываем «Рекомендации», а не пустые «Подписки»
   useEffect(() => {
     if (!user || initialFeedModeResolved) return
     let cancelled = false
@@ -126,7 +126,7 @@ export default function FeedPage() {
     return () => window.removeEventListener('focus', handleFocus)
   }, [user])
 
-  // РџРѕРґРіСЂСѓР·РєР° РїСЂРё РїСЂРѕРєСЂСѓС‚РєРµ РІРЅРёР· (sentinel РІ РєРѕРЅС†Рµ Р»РµРЅС‚С‹)
+  // Подгрузка при прокрутке вниз (sentinel в конце ленты)
   useEffect(() => {
     const sentinel = loadMoreSentinelRef.current
     if (!sentinel || items.length === 0 || !hasMore || loadingMore) return

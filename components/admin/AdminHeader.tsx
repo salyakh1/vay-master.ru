@@ -22,7 +22,7 @@ export default function AdminHeader({ onMenuClick, complaintsNew = 0 }: AdminHea
 
   const subtitle =
     pathname === '/admin'
-      ? `РћР±Р·РѕСЂ РїР»Р°С‚С„РѕСЂРјС‹ РЅР° ${format(new Date(), 'd MMMM yyyy', { locale: ru })}`
+      ? `Обзор платформы на ${format(new Date(), 'd MMMM yyyy', { locale: ru })}`
       : meta.subtitle
 
   const handleLogout = async () => {
@@ -37,7 +37,7 @@ export default function AdminHeader({ onMenuClick, complaintsNew = 0 }: AdminHea
           type="button"
           onClick={onMenuClick}
           className="lg:hidden w-8 h-8 rounded-lg bg-admin-bg border border-admin-border flex items-center justify-center text-admin-ink shrink-0"
-          aria-label="РњРµРЅСЋ"
+          aria-label="Меню"
         >
           <FiMenu size={16} />
         </button>
@@ -53,13 +53,13 @@ export default function AdminHeader({ onMenuClick, complaintsNew = 0 }: AdminHea
           className="hidden sm:flex items-center gap-1.5 bg-admin-bg border border-admin-border rounded-[10px] px-3 py-1.5 text-[11px] text-admin-muted w-[180px]"
         >
           <FiSearch size={12} className="text-brand-accent shrink-0" />
-          <span className="truncate">РџРѕРёСЃРє РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ...</span>
+          <span className="truncate">Поиск пользователя...</span>
         </Link>
 
         <Link
           href="/admin/complaints"
           className="relative w-8 h-8 rounded-lg bg-admin-bg border border-admin-border flex items-center justify-center text-base"
-          aria-label="РЈРІРµРґРѕРјР»РµРЅРёСЏ"
+          aria-label="Уведомления"
         >
           <FiBell size={15} className="text-admin-ink" />
           {complaintsNew > 0 && (
@@ -81,7 +81,7 @@ export default function AdminHeader({ onMenuClick, complaintsNew = 0 }: AdminHea
             href="/admin/banners"
             className="hidden md:inline-flex bg-brand-accent text-white text-[11px] font-bold px-3.5 py-2 rounded-lg whitespace-nowrap"
           >
-            + РЎРѕР·РґР°С‚СЊ Р±Р°РЅРЅРµСЂ
+            + Создать баннер
           </Link>
         )}
 
@@ -89,7 +89,7 @@ export default function AdminHeader({ onMenuClick, complaintsNew = 0 }: AdminHea
           type="button"
           onClick={handleLogout}
           className="hidden md:flex items-center gap-1.5 text-[11px] text-admin-muted hover:text-admin-ink font-medium px-2"
-          title={user?.email ?? 'Р’С‹Р№С‚Рё'}
+          title={user?.email ?? 'Выйти'}
         >
           <FiLogOut size={14} />
         </button>
@@ -97,4 +97,3 @@ export default function AdminHeader({ onMenuClick, complaintsNew = 0 }: AdminHea
     </header>
   )
 }
-
