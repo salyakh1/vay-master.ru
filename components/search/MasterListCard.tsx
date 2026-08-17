@@ -1,12 +1,12 @@
 'use client'
 
 import Image from 'next/image'
-import { FiPhone } from 'react-icons/fi'
-import { useAuth } from '@/app/providers'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import type { MasterScrollerItem } from '@/lib/scrollerApi'
 import { getInitials, getMasterAvatarAlt, getMasterSpecs } from '@/lib/master-display'
 import { pickMatchedServicePrice } from '@/lib/service-price'
+import { isProActive } from '@/lib/masterAccess'
+import { trackFunnel } from '@/lib/track-funnel'
 
 const AVATAR_COLORS = ['#c0392b', '#555', '#8B4513', '#1d5fa6', '#22a85e', '#6c3483']
 
@@ -36,13 +36,11 @@ export function MasterListCard({
   matchedServiceIds?: string[]
   searchQuery?: string
 }) {
-  const { user } = useAuth()
   const color = AVATAR_COLORS[colorIndex % AVATAR_COLORS.length]
   const initials = getInitials(master.full_name, '??')
   const specs = getMasterSpecs(master)
   const rating = master.master_rating ?? 0
-  const isPro = master.is_pro || (master.pro_until && new Date(master.pro_until) > new Date())
-  const showPhone = !!user && !!master.phone
+  const isPro = isProActive(master)
   const matchedPrice = pickMatchedServicePrice(master.profile_services, {
     serviceIds: matchedServiceIds,
     q: searchQuery,
@@ -52,6 +50,9 @@ export function MasterListCard({
     <GuestAwareProfileLink
       profileId={master.id}
       className="block bg-white rounded-2xl border border-[#e5e5ea] p-3 h-full active:scale-[0.98] transition-transform text-left"
+      onClick={() => {
+        void trackFunnel('click_master', { masterId: master.id })
+      }}
     >
       <div className="relative w-12 h-12 mb-2 flex-shrink-0">
         {master.avatar_url ? (
@@ -97,19 +98,12 @@ export function MasterListCard({
         <p className="text-[12px] font-medium text-[#111111] tabular-nums mb-1">{matchedPrice.label}</p>
       )}
 
-      <p className={`text-[11px] text-[#8e8e93] leading-snug line-clamp-2 ${showPhone ? 'mb-1.5' : 'mb-0'}`}>
+      <p className="text-[11px] text-[#8e8e93] leading-snug line-clamp-2 mb-0">
         {matchedPrice?.serviceName || specs}
         {master.distance_km != null && (
           <span className="block text-brand-accent font-medium mt-0.5">{master.distance_km} км от вас</span>
         )}
       </p>
-
-      {showPhone && (
-        <p className="text-[11px] text-[#1c1c1e] font-medium flex items-center gap-1 truncate">
-          <FiPhone size={12} className="text-brand-accent flex-shrink-0" aria-hidden />
-          {master.phone}
-        </p>
-      )}
     </GuestAwareProfileLink>
   )
 }

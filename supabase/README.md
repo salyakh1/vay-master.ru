@@ -12,7 +12,12 @@
 8. `payment_sessions.sql` + `payment_settings_seed.sql` — оплата
 9. `payment_sessions_add_processing_status.sql` — статус `processing` для атомарного webhook (если таблица уже была создана без него)
 10. `backend_security_critical.sql` — защита is_pro, accept_order_response ownership, CHECK заказов, GIN-индексы, unique tinkoff_payment_id
-11. Остальные файлы `add_*`, `fix_*`, `*_migration.sql` — по необходимости после проверки дубликатов
+11. `complete_loop_and_review_rls.sql` — двустороннее завершение заказа + RLS отзывов только после completed
+12. `profile_services_price.sql` — цены услуг
+13. `funnel_events.sql` — события воронки
+14. Остальные файлы `add_*`, `fix_*`, `*_migration.sql` — по необходимости после проверки дубликатов
+
+**Прод без ручного прогона SQL не защищён**, даже если код задеплоен. Порядок: `payment_sessions.sql` → `backend_security_critical.sql` → `complete_loop_and_review_rls.sql`. Статус на живой БД: админка `/admin/security` → блок SQL status.
 
 ## Новые миграции
 

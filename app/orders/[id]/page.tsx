@@ -44,6 +44,8 @@ export default function OrderPage() {
   const [showProModal, setShowProModal] = useState(false)
   const [proCountdownText, setProCountdownText] = useState<string | undefined>(undefined)
   const [disableMasterRestrictions, setDisableMasterRestrictions] = useState(false)
+  const [completeBusy, setCompleteBusy] = useState(false)
+  const [completeError, setCompleteError] = useState<string | null>(null)
   const [showOrderMapModal, setShowOrderMapModal] = useState(false)
 
   useEffect(() => {
@@ -172,6 +174,30 @@ export default function OrderPage() {
     // Обновляем список откликов и проверяем свой отклик
     await fetchResponses()
     await checkUserResponse()
+  }
+
+  const handleComplete = async () => {
+    if (!user || !order) return
+    setCompleteError(null)
+    setCompleteBusy(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Не авторизован')
+      const response = await fetch(`/api/orders/${order.id}/complete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || 'Не удалось завершить заказ')
+      }
+      await fetchOrder()
+    } catch (e) {
+      setCompleteError(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setCompleteBusy(false)
+    }
   }
 
   const handleAcceptResponse = async () => {
@@ -532,14 +558,58 @@ export default function OrderPage() {
         )}
 
         {!isOwnOrder && order.status === 'in_progress' && order.selected_master_id === user.id && (
-          <button
-            type="button"
-            onClick={handleContact}
-            className="w-full mb-3.5 bg-brand-accent text-white text-[13px] font-medium py-2.5 rounded-[10px] flex items-center justify-center gap-1.5"
+          <>
+            <button
+              type="button"
+              onClick={handleContact}
+              className="w-full mb-2 bg-brand-accent text-white text-[13px] font-medium py-2.5 rounded-[10px] flex items-center justify-center gap-1.5"
+            >
+              <FiMessageCircle size={16} />
+              Чат с клиентом
+            </button>
+            <button
+              type="button"
+              onClick={handleComplete}
+              disabled={completeBusy || order.complete_requested_by === user.id}
+              className="w-full mb-3.5 bg-white border border-[#e5e7eb] text-[#111] text-[13px] font-medium py-2.5 rounded-[10px] flex items-center justify-center gap-1.5 disabled:opacity-60"
+            >
+              <FiCheckCircle size={16} />
+              {order.complete_requested_by === user.id
+                ? 'Ожидаем подтверждения клиента'
+                : order.complete_requested_by
+                  ? 'Подтвердить выполнение'
+                  : 'Работа выполнена'}
+            </button>
+            {completeError && <p className="text-[12px] text-red-600 mb-3">{completeError}</p>}
+          </>
+        )}
+
+        {isOwnOrder && order.status === 'in_progress' && order.selected_master_id && (
+          <div className="mb-3.5">
+            <button
+              type="button"
+              onClick={handleComplete}
+              disabled={completeBusy || order.complete_requested_by === user.id}
+              className="w-full bg-brand-accent text-white text-[13px] font-medium py-2.5 rounded-[10px] flex items-center justify-center gap-1.5 disabled:opacity-60"
+            >
+              <FiCheckCircle size={16} />
+              {order.complete_requested_by === user.id
+                ? 'Ожидаем подтверждения мастера'
+                : order.complete_requested_by
+                  ? 'Подтвердить выполнение'
+                  : 'Работа выполнена'}
+            </button>
+            {completeError && <p className="text-[12px] text-red-600 mt-2">{completeError}</p>}
+          </div>
+        )}
+
+        {order.status === 'completed' && (isOwnOrder || order.selected_master_id === user.id) && (
+          <Link
+            href={isOwnOrder ? `/profile/${order.selected_master_id}` : `/profile/${order.client_id}`}
+            className="block w-full mb-3.5 bg-white border border-[#e5e7eb] text-center text-[13px] font-medium py-2.5 rounded-[10px]"
           >
-            <FiMessageCircle size={16} />
-            Чат с клиентом
-          </button>
+            Оставить отзыв
+          </Link>
         )}
 
         {isOwnOrder && (

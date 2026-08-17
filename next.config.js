@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // ESLint в CI/Vercel не блокирует прод-деплой (ошибки ловим локально через next lint)
+  // ESLint в CI/Vercel не блокирует прод-деплой.
+  // Тикет: вычистить next lint и снять ignoreDuringBuilds (не блокер complete-loop).
   eslint: {
     ignoreDuringBuilds: true,
   },

@@ -1,26 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
-import { useAuth } from '@/app/providers'
 
 export default function RulesPage() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!loading && !user) router.push('/')
-  }, [loading, user, router])
-
-  if (loading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-bg-primary">
-        <div className="text-base text-text-secondary">Загрузка...</div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-bg-primary pb-20">
       <Navbar />
@@ -73,4 +55,3 @@ export default function RulesPage() {
     </div>
   )
 }
-

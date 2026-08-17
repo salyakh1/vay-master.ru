@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
+import { getBearerUser } from '@/lib/api-auth'
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getMasterAccess } from '@/lib/masterAccess'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -137,10 +140,19 @@ export async function GET(request: NextRequest) {
 // POST - Создать историю
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { userId, media, mediaType, description } = body
+    const { success } = rateLimit(`stories:${getClientIp(request)}`, 20, 60_000)
+    if (!success) return rateLimitResponse()
 
-    if (!userId || !media || !mediaType) {
+    const user = await getBearerUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+    }
+    const userId = user.id
+
+    const body = await request.json()
+    const { media, mediaType, description } = body
+
+    if (!media || !mediaType) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -161,28 +173,17 @@ export async function POST(request: NextRequest) {
         const restrictionsDisabled =
           (role === 'master' && disableMasters) || (role === 'seller' && disableSellers)
 
-        if (restrictionsDisabled) {
-          // Глобально отключены ограничения — разрешаем
-          // (не выходим; просто не применяем блокировку ниже)
-        } else {
-        const trialStartRaw = (profile as any)?.pro_trial_started_at || (profile as any)?.created_at
-        const trialStart = trialStartRaw ? new Date(trialStartRaw) : new Date()
-        const base = Number.isNaN(trialStart.getTime()) ? new Date() : trialStart
-        const trialEnds = new Date(base.getTime() + 7 * 24 * 60 * 60 * 1000)
-        const proUntil = (profile as any)?.pro_until ? new Date((profile as any).pro_until) : null
-        const isPro = (profile as any)?.is_pro === true || (proUntil && proUntil.getTime() > Date.now())
-        const isTrial = Date.now() < trialEnds.getTime()
-
-        if (!isPro && !isTrial) {
-          return NextResponse.json(
-            { error: 'Истории доступны только в PRO после пробной недели', code: 'PRO_REQUIRED_STORIES' },
-            { status: 403 }
-          )
-        }
+        if (!restrictionsDisabled) {
+          const access = getMasterAccess(profile)
+          if (!access.isPro && !access.isTrial) {
+            return NextResponse.json(
+              { error: 'Истории доступны только в PRO после пробной недели', code: 'PRO_REQUIRED_STORIES' },
+              { status: 403 }
+            )
+          }
         }
       }
     } catch (e) {
-      // если профиль не загрузился — не блокируем, чтобы не ломать поток (логика продублирована на клиенте)
       console.warn('Stories PRO check failed:', e)
     }
 

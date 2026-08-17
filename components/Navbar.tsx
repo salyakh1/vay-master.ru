@@ -7,7 +7,6 @@ import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import AppTopHeader from '@/components/AppTopHeader'
 import {
-  FiHome,
   FiShoppingBag,
   FiMessageCircle,
   FiUser,
@@ -89,96 +88,73 @@ export default function Navbar({ bottomOnly = false, topOnly = false }: NavbarPr
     }
   }, [user])
 
-  const bottomNav = user ? (
+  const bottomNav = user ? (() => {
+    const role = user.role
+    const profileHref = `/profile/${user.id}`
+    const tabs =
+      role === 'master'
+        ? ([
+            { href: '/orders', label: 'Заказы', icon: FiBriefcase, match: (p: string) => p.startsWith('/orders') },
+            { href: '/chats', label: 'Отклики', icon: FiMessageCircle, match: (p: string) => p.startsWith('/chats'), badge: unreadChatsCount },
+            { href: profileHref, label: 'Профиль', icon: FiUser, match: (p: string) => p.startsWith('/profile') || p.startsWith('/settings') },
+          ] as const)
+        : role === 'seller'
+          ? ([
+              { href: '/products', label: 'Товары', icon: FiShoppingBag, match: (p: string) => p.startsWith('/products') },
+              { href: '/orders', label: 'Заказы', icon: FiBriefcase, match: (p: string) => p.startsWith('/orders') },
+              { href: profileHref, label: 'Профиль', icon: FiUser, match: (p: string) => p.startsWith('/profile') || p.startsWith('/settings') },
+            ] as const)
+          : ([
+              { href: '/search', label: 'Поиск', icon: FiSearch, match: (p: string) => p === '/search' || p.startsWith('/search') },
+              { href: '/orders', label: 'Заказы', icon: FiBriefcase, match: (p: string) => p.startsWith('/orders') },
+              { href: '/chats', label: 'Чаты', icon: FiMessageCircle, match: (p: string) => p.startsWith('/chats'), badge: unreadChatsCount },
+              { href: profileHref, label: 'Профиль', icon: FiUser, match: (p: string) => p.startsWith('/profile') || p.startsWith('/settings') },
+            ] as const)
+
+    const cols = tabs.length
+
+    return (
     <nav
       className="fixed bottom-0 left-0 right-0 w-full max-w-[100vw] bg-white border-t border-[#e5e5ea] z-[100] pointer-events-auto"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
     >
       <div className="max-w-lg mx-auto w-full">
-        <div className="grid grid-cols-6 gap-0 min-h-[52px] sm:min-h-[56px] w-full">
-          <Link
-            href="/feed"
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 min-w-0 transition-colors ${
-              pathname === '/feed' ? 'text-brand-accent' : 'text-[#8e8e93] hover:text-[#1c1c1e]'
-            }`}
-            prefetch={false}
-          >
-            <FiHome className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={pathname === '/feed' ? 2.5 : 2} />
-            <span className={`text-[9px] sm:text-[10px] leading-tight truncate w-full text-center ${pathname === '/feed' ? 'font-semibold' : 'font-medium'}`}>
-              Лента
-            </span>
-          </Link>
-
-          <Link
-            href="/search"
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 min-w-0 transition-colors ${
-              pathname === '/search' ? 'text-brand-accent' : 'text-[#8e8e93] hover:text-[#1c1c1e]'
-            }`}
-            prefetch={false}
-          >
-            <FiSearch className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={pathname === '/search' ? 2.5 : 2} />
-            <span className="text-[9px] sm:text-[10px] font-medium leading-tight truncate w-full text-center">Мастера</span>
-          </Link>
-
-          <Link
-            href="/orders"
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 min-w-0 transition-colors ${
-              pathname?.startsWith('/orders') ? 'text-brand-accent' : 'text-[#8e8e93] hover:text-[#1c1c1e]'
-            }`}
-            prefetch={false}
-          >
-            <FiBriefcase className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={pathname?.startsWith('/orders') ? 2.5 : 2} />
-            <span className="text-[9px] sm:text-[10px] font-medium leading-tight truncate w-full text-center">Заказы</span>
-          </Link>
-
-          <Link
-            href="/products"
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 min-w-0 transition-colors ${
-              pathname?.startsWith('/products') ? 'text-brand-accent' : 'text-[#8e8e93] hover:text-[#1c1c1e]'
-            }`}
-            prefetch={false}
-          >
-            <FiShoppingBag className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={pathname?.startsWith('/products') ? 2.5 : 2} />
-            <span className="text-[9px] sm:text-[10px] font-medium leading-tight truncate w-full text-center">Товары</span>
-          </Link>
-
-          <Link
-            href="/chats"
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 min-w-0 transition-colors relative ${
-              pathname?.startsWith('/chats') ? 'text-brand-accent' : 'text-[#8e8e93] hover:text-[#1c1c1e]'
-            }`}
-            prefetch={false}
-          >
-            <div className="relative flex-shrink-0">
-              <FiMessageCircle className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={pathname?.startsWith('/chats') ? 2.5 : 2} />
-              {!pathname?.startsWith('/chats') && unreadChatsCount > 0 && (
-                <span className="absolute -top-0.5 -right-1.5 bg-brand-accent text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] h-3.5 flex items-center justify-center px-0.5">
-                  {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
+        <div
+          className="grid gap-0 min-h-[52px] sm:min-h-[56px] w-full"
+          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+        >
+          {tabs.map((tab) => {
+            const active = tab.match(pathname || '')
+            const Icon = tab.icon
+            const badge = 'badge' in tab ? tab.badge : 0
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 min-w-0 transition-colors relative ${
+                  active ? 'text-brand-accent' : 'text-[#8e8e93] hover:text-[#1c1c1e]'
+                }`}
+                prefetch={false}
+              >
+                <div className="relative flex-shrink-0">
+                  <Icon className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={active ? 2.5 : 2} />
+                  {!active && typeof badge === 'number' && badge > 0 && (
+                    <span className="absolute -top-0.5 -right-1.5 bg-brand-accent text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] h-3.5 flex items-center justify-center px-0.5">
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </div>
+                <span className={`text-[9px] sm:text-[10px] leading-tight truncate w-full text-center ${active ? 'font-semibold' : 'font-medium'}`}>
+                  {tab.label}
                 </span>
-              )}
-            </div>
-            <span className="text-[9px] sm:text-[10px] font-medium leading-tight truncate w-full text-center">Чаты</span>
-          </Link>
-
-          <Link
-            href={`/profile/${user.id}`}
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 min-w-0 transition-colors ${
-              pathname?.startsWith('/profile') || pathname?.startsWith('/settings')
-                ? 'text-brand-accent'
-                : 'text-[#8e8e93] hover:text-[#1c1c1e]'
-            }`}
-            prefetch={false}
-          >
-            <FiUser
-              className="w-[18px] h-[18px] sm:w-5 sm:h-5"
-              strokeWidth={pathname?.startsWith('/profile') || pathname?.startsWith('/settings') ? 2.5 : 2}
-            />
-            <span className="text-[9px] sm:text-[10px] font-medium leading-tight truncate w-full text-center">Профиль</span>
-          </Link>
+              </Link>
+            )
+          })}
         </div>
       </div>
     </nav>
-  ) : null
+    )
+  })() : null
 
   if (bottomOnly) return bottomNav
   if (topOnly) return <AppTopHeader />

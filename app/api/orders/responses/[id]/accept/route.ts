@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendPushToUser } from '@/lib/notify'
+import { insertFunnelEvent } from '@/lib/funnel-server'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -123,6 +124,11 @@ export async function POST(
     } catch (notifError) {
       console.error('Error sending notification:', notifError)
     }
+
+    await insertFunnelEvent(supabaseAdmin, 'accept', user.id, {
+      orderId: order.id,
+      masterId: response.master_id,
+    })
 
     return NextResponse.json(
       { 

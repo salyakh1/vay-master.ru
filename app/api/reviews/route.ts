@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
 import { hasCompletedDeal } from '@/lib/review-eligibility'
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { insertFunnelEvent } from '@/lib/funnel-server'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -200,6 +202,9 @@ export async function GET(request: NextRequest) {
 // POST - Создать отзыв
 export async function POST(request: NextRequest) {
   try {
+    const { success } = rateLimit(`reviews:${getClientIp(request)}`, 20, 60_000)
+    if (!success) return rateLimitResponse()
+
     const authHeader = request.headers.get('authorization')
     if (!authHeader) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
@@ -262,6 +267,7 @@ export async function POST(request: NextRequest) {
         throw error
       }
 
+      await insertFunnelEvent(supabaseAdmin, 'review', user.id, { targetType, targetId })
       return NextResponse.json({ review: data })
     } else if (targetType === 'seller') {
       // Прямые отзывы о продавце (аналогично master_reviews)
@@ -289,6 +295,7 @@ export async function POST(request: NextRequest) {
         throw error
       }
 
+      await insertFunnelEvent(supabaseAdmin, 'review', user.id, { targetType, targetId })
       return NextResponse.json({ review: data })
     } else if (targetType === 'product') {
       if (!sellerId) {
@@ -320,6 +327,7 @@ export async function POST(request: NextRequest) {
         throw error
       }
 
+      await insertFunnelEvent(supabaseAdmin, 'review', user.id, { targetType, targetId })
       return NextResponse.json({ review: data })
     }
 

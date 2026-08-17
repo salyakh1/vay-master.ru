@@ -4,8 +4,8 @@ INSERT INTO public.system_settings (key, value, description, category) VALUES
 ON CONFLICT (key) DO UPDATE SET description = EXCLUDED.description;
 
 INSERT INTO public.system_settings (key, value, description, category) VALUES
-('order_publication_price_rub', '199'::jsonb, 'Стоимость публикации заказа (₽)', 'system')
-ON CONFLICT (key) DO UPDATE SET description = EXCLUDED.description;
+('order_publication_price_rub', '200'::jsonb, 'Стоимость публикации заказа (₽)', 'system')
+ON CONFLICT (key) DO UPDATE SET description = EXCLUDED.description, value = EXCLUDED.value;
 
 INSERT INTO public.system_settings (key, value, description, category) VALUES
 ('payment_tinkoff_enabled', 'false'::jsonb, 'Включить оплату через Тинькофф (нужны TINKOFF_TERMINAL_KEY и TINKOFF_PASSWORD в .env на сервере)', 'system')

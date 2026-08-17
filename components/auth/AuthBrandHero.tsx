@@ -7,8 +7,8 @@ import { FiStar, FiMessageCircle, FiShield } from 'react-icons/fi'
 const BENEFITS = [
   {
     icon: FiStar,
-    title: 'Проверенные мастера',
-    desc: 'Рейтинги и отзывы после заказов',
+    title: 'Мастера рядом',
+    desc: 'Профили, услуги и цены в одном месте',
   },
   {
     icon: FiMessageCircle,
@@ -17,8 +17,8 @@ const BENEFITS = [
   },
   {
     icon: FiShield,
-    title: 'Модерация профилей',
-    desc: 'Безопасность и поддержка 24/7',
+    title: 'Модерация',
+    desc: 'Жалобы разбирает администрация',
   },
 ] as const
 

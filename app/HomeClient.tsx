@@ -8,11 +8,12 @@ import { useAuth } from './providers'
 import { supabase, User, Product, Story } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
-import { sanitizeProductsForGuest, profileLoginUrl } from '@/lib/guest-access'
+import { sanitizeProductsForGuest } from '@/lib/guest-access'
 import type { AdBanner } from '@/lib/supabase'
 import type { MasterCategoryWithCount } from '@/lib/server-data'
 import { FiSearch, FiStar, FiArrowRight, FiUser, FiShoppingBag, FiTag, FiX } from 'react-icons/fi'
 import { getCategoryEmoji } from '@/lib/categoryEmoji'
+import { isProActive } from '@/lib/masterAccess'
 import StoriesCircle from '@/components/StoriesCircle'
 import CompactPageBanner from '@/components/CompactPageBanner'
 
@@ -53,6 +54,7 @@ interface HomeClientProps {
   initialBanners?: AdBanner[] | null
   initialCategories?: MasterCategoryWithCount[] | null
   initialTotalMasters?: number | null
+  initialMasters?: User[] | null
 }
 
 const DIVIDER = <div className="h-2 bg-[#f5f5f7]" aria-hidden />
@@ -70,20 +72,20 @@ const STEPS = [
   { title: 'Опишите задачу', desc: 'Ремонт, стройка, демонтаж — кратко' },
   { title: 'Выберите мастера', desc: 'Профили, рейтинги, портфолио' },
   { title: 'Договоритесь в чате', desc: 'Цена и сроки напрямую' },
-  { title: 'Оставьте отзыв', desc: 'Помогите другим выбрать' },
+  { title: 'Оцените работу', desc: 'После выполнения заказа' },
 ]
 
 const TRUST = [
-  { icon: '✓', title: 'Модерация', desc: 'Профили проверяются до публикации' },
-  { icon: '⭐', title: 'Реальные отзывы', desc: 'Только после выполненных заказов' },
-  { icon: '🛡', title: 'Жалобы', desc: 'Ответ за 24 часа' },
+  { icon: '✓', title: 'Модерация', desc: 'Жалобы разбирает администрация' },
+  { icon: '⭐', title: 'Отзывы', desc: 'После выполненного заказа' },
+  { icon: '🛡', title: 'Жалобы', desc: 'Пишите в чат администрации' },
   { icon: '💬', title: 'Поддержка', desc: 'Администрация на связи' },
 ]
 
 const ROLES = [
   { icon: '🔨', title: 'Мастерам', desc: 'Заказы без комиссий, портфолио, PRO', href: '/auth/register?role=master', active: true },
   { icon: '🛒', title: 'Продавцам', desc: 'Продавайте инструменты и материалы', href: '/auth/register?role=seller' },
-  { icon: '👤', title: 'Клиентам', desc: 'Проверенные мастера с отзывами', href: '/auth/register?role=client' },
+  { icon: '👤', title: 'Клиентам', desc: 'Мастера и материалы рядом', href: '/auth/register?role=client' },
   { icon: '🆓', title: 'Бесплатно', desc: 'Регистрация без скрытых платежей', href: '/auth/register' },
 ]
 
@@ -138,7 +140,7 @@ function MasterCard({ master }: { master: User }) {
                 initials
               )}
             </div>
-            {master.is_pro && (
+            {master.is_pro && isProActive(master) && (
               <span className="absolute -bottom-0.5 -right-0.5 bg-brand-accent text-white text-[8px] font-extrabold px-1 py-0.5 rounded-[3px] border-2 border-white">
                 PRO
               </span>
@@ -187,13 +189,14 @@ function ProductCardHome({ product }: { product: Product }) {
 export default function HomeClient({
   initialBanners = null,
   initialCategories = null,
+  initialMasters = null,
 }: HomeClientProps) {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
   const [searchQ, setSearchQ] = useState('')
-  const [masters, setMasters] = useState<User[]>([])
+  const [masters, setMasters] = useState<User[]>(() => (initialMasters || []) as User[])
   const [products, setProducts] = useState<Product[]>([])
-  const [homeFeedLoading, setHomeFeedLoading] = useState(true)
+  const [homeFeedLoading, setHomeFeedLoading] = useState(() => !(initialMasters && initialMasters.length > 0))
   const [stories, setStories] = useState<Story[]>([])
 
   // Автодополнение поиска: мастера + товары + услуги + категории в одном списке
@@ -281,7 +284,8 @@ export default function HomeClient({
 
   useEffect(() => {
     let cancelled = false
-    setHomeFeedLoading(true)
+    const hasSsrMasters = (initialMasters?.length ?? 0) > 0
+    if (!hasSsrMasters) setHomeFeedLoading(true)
     Promise.all([
       fetch('/api/search/masters?page=1')
         .then((r) => (r.ok ? r.json() : { masters: [] }))
@@ -289,7 +293,7 @@ export default function HomeClient({
           if (!cancelled) setMasters((d.masters || []).slice(0, 8))
         })
         .catch(() => {
-          if (!cancelled) setMasters([])
+          if (!cancelled && !hasSsrMasters) setMasters([])
         }),
       supabase
         .from('products')
@@ -321,7 +325,7 @@ export default function HomeClient({
     return () => {
       cancelled = true
     }
-  }, [user])
+  }, [user, initialMasters])
 
   const onSearch = () => {
     const q = searchQ.trim()

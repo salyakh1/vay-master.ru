@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { notifyUser, sendPushToUser } from '@/lib/notify'
 import { findOrCreateDirectChat, sendDirectChatMessage } from '@/lib/directChat'
+import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { isProActive, getTrialStartAt, getTrialEndsAt } from '@/lib/masterAccess'
+import { insertFunnelEvent } from '@/lib/funnel-server'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -33,6 +36,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { success } = rateLimit(`respond:${getClientIp(request)}`, 20, 60_000)
+    if (!success) return rateLimitResponse()
+
     const orderId = params.id
     const authHeader = request.headers.get('authorization')
     
@@ -87,12 +93,9 @@ export async function POST(
     // Trial старт:
     // - для существующих аккаунтов может быть проставлен pro_trial_started_at (с момента включения системы)
     // - для новых аккаунтов fallback на created_at (момент регистрации)
-    const trialStartRaw = (profile as any)?.pro_trial_started_at || (profile as any)?.created_at
-    const trialStart = trialStartRaw ? new Date(trialStartRaw) : new Date()
-    const base = Number.isNaN(trialStart.getTime()) ? new Date() : trialStart
-    const trialEnds = new Date(base.getTime() + 7 * 24 * 60 * 60 * 1000)
-    const proUntil = (profile as any)?.pro_until ? new Date((profile as any).pro_until) : null
-    const isPro = (profile as any)?.is_pro === true || (proUntil && proUntil.getTime() > Date.now())
+    const trialStartAt = getTrialStartAt(profile)
+    const trialEnds = getTrialEndsAt(trialStartAt)
+    const isPro = isProActive(profile)
     const isTrial = Date.now() < trialEnds.getTime()
 
     const disableMasters = await getBoolSetting('pro_disable_master_restrictions')
@@ -240,6 +243,8 @@ export async function POST(
         console.error('notify client on response', e)
       }
     }
+
+    await insertFunnelEvent(supabaseAdmin, 'respond', user.id, { orderId })
 
     return NextResponse.json({ data: response }, { status: 201 })
   } catch (error: any) {

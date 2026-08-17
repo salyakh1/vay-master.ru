@@ -19,6 +19,7 @@ import type { AdBanner } from '@/lib/supabase'
 import StoriesCircle from '@/components/StoriesCircle'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs, getProductCategoriesForCategorySlugs } from '@/lib/specialization-product-mapping'
 import { getCategoryEmoji } from '@/lib/categoryEmoji'
+import { trackFunnel } from '@/lib/track-funnel'
 
 const RadiusPickerModal = dynamic(() => import('@/components/RadiusPickerModal'), { ssr: false })
 
@@ -110,6 +111,10 @@ function SearchContent({
     setSelectedServiceIds(svc ? svc.split(',').map((id) => id.trim()).filter(Boolean) : [])
     setCityFilter(searchParams.get('city') || '')
   }, [searchParamsKey, searchParams])
+
+  useEffect(() => {
+    void trackFunnel('view_search')
+  }, [])
 
   // Коротко ждём геолокацию, чтобы сразу отсортировать по расстоянию (без двойной загрузки)
   useEffect(() => {
@@ -617,13 +622,15 @@ function SearchContent({
         </span>
       </div>
 
-      {/* Скроллер: топ мастера рядом */}
+      {/* Скроллер: топ по рейтингу — только если есть реальные оценки */}
+      {listMasters.some((m) => (m.master_rating ?? 0) > 0) && (
       <MastersScrollerSection
         title="Топ мастера рядом"
         label="Рекомендуем"
         labelVariant="red"
         {...scrollerFilters}
       />
+      )}
 
       {/* Блок «Все мастера» — сетка 2×2 */}
       <div className="bg-white">
@@ -752,7 +759,7 @@ function SearchContent({
                         value={cityFilter}
                         onChange={(e) => setCityFilter(e.target.value)}
                         onFocus={() => citySuggestions.length > 0 && setShowCitySuggestions(true)}
-                        placeholder="Москва, Грозный, Санкт-Петербург…"
+                        placeholder="Ваш город"
                         className="input w-full h-11 text-sm pr-9"
                         autoComplete="off"
                       />

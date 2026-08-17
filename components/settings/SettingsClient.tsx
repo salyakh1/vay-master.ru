@@ -472,7 +472,7 @@ export default function SettingsClient() {
             <SettingsAccordionItem icon="🔒" title="Сменить пароль" subtitle="Обновить пароль входа" expanded={openPanel === 'password'} onToggle={() => togglePanel('password')}>
               <PasswordPanel forms={forms} />
             </SettingsAccordionItem>
-            <SettingsRow icon="🛡" title="Двухфакторная аутентификация" right={<><SettingsBadge variant="gray">Выкл</SettingsBadge></>} />
+            <SettingsRow icon="🛡" title="Двухфакторная аутентификация" right={<SettingsBadge variant="gray">Скоро</SettingsBadge>} />
           </SettingsSection>
 
           <SettingsSection title={role === 'seller' ? undefined : 'Прочее'}>

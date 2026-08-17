@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getBearerUser } from '@/lib/api-auth'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -15,7 +16,7 @@ const welcomeMessages = {
 Вы зарегистрировались как клиент.
 
 Здесь вы можете:
-• находить проверенных мастеров
+• находить мастеров рядом
 • заказывать услуги и материалы
 • общаться напрямую без посредников
 
@@ -69,20 +70,11 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { userId, role } = body
-
-    console.log('[welcome-message] Received request:', { userId, role })
-
-    if (!userId || !role) {
-      console.error('[welcome-message] Missing userId or role:', { userId, role })
-      return NextResponse.json({ error: 'userId и role обязательны' }, { status: 400 })
+    const authUser = await getBearerUser(request)
+    if (!authUser) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
-
-    if (!['client', 'master', 'seller'].includes(role)) {
-      console.error('[welcome-message] Invalid role:', role)
-      return NextResponse.json({ error: 'Неверная роль' }, { status: 400 })
-    }
+    const userId = authUser.id
 
     if (!supabaseServiceRoleKey) {
       console.error('[welcome-message] SUPABASE_SERVICE_ROLE_KEY не настроен')
@@ -92,14 +84,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('[welcome-message] Using ADMIN_SYSTEM_USER_ID:', ADMIN_SYSTEM_USER_ID)
-
     const supabaseAdmin = createClient(supabaseUrl!, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+      auth: { autoRefreshToken: false, persistSession: false },
     })
+    const { data: callerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .maybeSingle()
+    const role = callerProfile?.role as string | undefined
+
+    console.log('[welcome-message] Received request:', { userId, role })
+
+    if (!role || !['client', 'master', 'seller'].includes(role)) {
+      console.error('[welcome-message] Invalid role:', role)
+      return NextResponse.json({ error: 'Неверная роль' }, { status: 400 })
+    }
+
+    console.log('[welcome-message] Using ADMIN_SYSTEM_USER_ID:', ADMIN_SYSTEM_USER_ID)
 
     // Проверяем, что системный пользователь существует
     let systemUserId = ADMIN_SYSTEM_USER_ID

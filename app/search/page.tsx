@@ -1,7 +1,12 @@
 import SearchClient from './SearchClient'
 import { getBannersForPage } from '@/lib/server-data'
 import { getInitialMastersForSearch } from './getInitialSearchData'
-import type { Viewport } from 'next'
+import type { Metadata, Viewport } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Поиск мастеров',
+  description: 'Найдите мастера рядом: услуги, цены и портфолио. VayMaster — мастера и материалы рядом.',
+}
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

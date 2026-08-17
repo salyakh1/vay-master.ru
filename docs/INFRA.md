@@ -43,19 +43,38 @@ SENTRY_PROJECT=
 
 ## 3. Фоновая очередь admin-рассылки (High)
 
-`POST /api/admin/messages` при тысячах получателей рискует таймаутом.
+Cron `/api/cron/admin-broadcast` **удалён** из `vercel.json` — маршрута не было, он давал 404.
 
-### Рекомендованная схема (Vercel Cron + Supabase)
-1. Таблица `admin_broadcast_jobs` / `admin_broadcast_recipients` (миграция — отдельный PR в supabase/).
-2. API создаёт job `pending` и сразу отвечает `{ jobId }`.
-3. Cron раз в сутки (Hobby) → `/api/cron/admin-broadcast` обрабатывает пачку N получателей.
-   - Сейчас в `vercel.json`: `0 10 * * *` (10:00 UTC) — лимит Hobby: **не чаще 1 раза в день**.
-   - На Pro можно вернуть `*/5 * * * *` для очереди каждые 5 минут.
-4. В `vercel.json` уже добавлен placeholder cron (см. файл).
-
-Пока endpoint cron можно вернуть 501, пока таблица не создана.
+Очередь рассылок — отдельная задача: таблица jobs + новый cron, когда endpoint будет готов.
 
 ## 4. Цена публикации заказа
 
-Фактическое значение по умолчанию в коде: **200 ₽** (`lib/payment-settings-server.ts`).  
-Документация должна указывать 200 ₽, не 199 ₽.
+Фактическое значение по умолчанию в коде: **200 ₽** (`lib/payment-settings-server.ts`). Seed: `supabase/payment_settings_seed.sql`.
+
+## 5. Preview / staging (Vercel)
+
+Отдельного staging-кластера нет. Де-факто staging — **Vercel Preview Deployments** на каждый PR (`vay-master-ru-*.vercel.app`).
+
+Прод: production branch `main` → https://vay-master-ru.vercel.app / https://vay-master.ru
+
+E2E полного заказа гонять только на Preview + отдельная staging-БД (не прод). Env: `E2E_CLIENT_EMAIL`, `E2E_MASTER_EMAIL`, `E2E_PASSWORD`.
+
+## 6. SQL на проде (обязательно руками)
+
+Порядок в Supabase SQL Editor:
+
+1. `payment_sessions.sql`
+2. `backend_security_critical.sql`
+3. `complete_loop_and_review_rls.sql`
+4. `profile_services_price.sql`
+5. `funnel_events.sql`
+
+Проверка: админка `/admin/security` → блок «SQL status». Без этих скриптов `POST /api/orders/[id]/complete` вернёт 500.
+
+## 7. ESLint в билде
+
+`eslint.ignoreDuringBuilds: true` в `next.config.js` **оставлен** — не блокируем релиз complete-loop. Тикет: вычистить `next lint` и снять флаг отдельным PR.
+
+## 8. Security-status в CI
+
+Живой вызов `/api/admin/security-status` требует admin JWT и прод/preview БД. В CI — контракт исходников (`tests/unit/security-sql-contracts.test.ts`). Live-проверка — вручную в админке после прогона SQL.

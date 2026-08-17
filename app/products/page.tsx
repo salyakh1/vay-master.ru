@@ -1,7 +1,12 @@
 import ProductsClient from './ProductsClient'
 import { getBannersForPage } from '@/lib/server-data'
 import { getInitialProductsForCatalog } from '../search/getInitialSearchData'
-import type { Viewport } from 'next'
+import type { Metadata, Viewport } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Каталог материалов',
+  description: 'Инструменты и строительные материалы от продавцов рядом. VayMaster.',
+}
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

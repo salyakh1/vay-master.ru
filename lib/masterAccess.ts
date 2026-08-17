@@ -18,15 +18,11 @@ export function getTrialStartAt(profile: any, now: Date = new Date()): Date {
 }
 
 export function isProActive(profile: any, now: Date = new Date()): boolean {
-  // поддержим оба варианта, чтобы было удобно админить:
-  // - profiles.pro_until (timestamp)
-  // - profiles.is_pro (boolean)
-  if (profile?.is_pro === true) return true
-  if (profile?.pro_until) {
-    const until = new Date(profile.pro_until)
-    if (!Number.isNaN(until.getTime())) return until.getTime() > now.getTime()
-  }
-  return false
+  if (profile?.is_pro !== true) return false
+  if (!profile?.pro_until) return false
+  const until = new Date(profile.pro_until)
+  if (Number.isNaN(until.getTime())) return false
+  return until.getTime() > now.getTime()
 }
 
 export function getMasterAccess(profile: any, now: Date = new Date()): MasterAccess {

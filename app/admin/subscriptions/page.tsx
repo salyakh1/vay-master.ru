@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/app/providers'
 import { supabase, User } from '@/lib/supabase'
 import { getAdminRole, logAdminAction, type AdminRole } from '@/lib/admin'
+import { isProActive as isProActiveLib } from '@/lib/masterAccess'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { FiSearch, FiZap, FiXCircle, FiCheckCircle, FiToggleLeft, FiToggleRight } from 'react-icons/fi'
@@ -11,9 +12,7 @@ import { FiSearch, FiZap, FiXCircle, FiCheckCircle, FiToggleLeft, FiToggleRight 
 type RoleFilter = '' | 'master' | 'seller'
 
 function isProActive(u: User): boolean {
-  if ((u as any).is_pro === true) return true
-  const until = (u as any).pro_until ? new Date((u as any).pro_until) : null
-  return !!until && !Number.isNaN(until.getTime()) && until.getTime() > Date.now()
+  return isProActiveLib(u)
 }
 
 function trialEndsAt(u: User): Date | null {

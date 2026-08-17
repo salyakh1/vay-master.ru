@@ -97,22 +97,18 @@ export default function ProfilePage() {
   const [showStoreLocationMap, setShowStoreLocationMap] = useState(false)
   const [showServicesSheet, setShowServicesSheet] = useState(false)
 
-  // Гости не могут открывать профили — редирект на вход с returnTo
+  // Гостевая витрина: профиль открыт без логина
   useEffect(() => {
-    if (authLoading || currentUser || !profileId) return
-    router.replace(profileLoginUrl(profileId))
-  }, [authLoading, currentUser, profileId, router])
-
-  useEffect(() => {
-    if (!params.id || !currentUser) return
+    if (!params.id) return
+    if (authLoading) return
     setPortfolioFetched(false)
     setReviewsFetched(false)
     setPortfolioItems([])
     setMasterReviews([])
     setProductReviews([])
     fetchProfile()
-    checkFollowing()
-  }, [params.id, currentUser])
+    if (currentUser) checkFollowing()
+  }, [params.id, currentUser, authLoading])
 
   // canReview: кнопка отзыва только после завершённой сделки (API part 1)
   useEffect(() => {
@@ -308,6 +304,9 @@ export default function ProfilePage() {
       }
       
       const userData = data as User
+      if (!currentUser) {
+        userData.phone = undefined as unknown as string
+      }
       setProfile(userData)
 
 
@@ -880,14 +879,6 @@ export default function ProfilePage() {
     )
   }
 
-  if (!authLoading && !currentUser) {
-    return (
-      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-        <p className="text-text-secondary">Перенаправление на вход…</p>
-      </div>
-    )
-  }
-
   if (!profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -979,6 +970,8 @@ export default function ProfilePage() {
                 onFollowersClick={() => setShowFollowModal('followers')}
                 onEdit={() => router.push('/settings')}
                 backHref={returnTo || null}
+                requireAuth={!currentUser}
+                loginHref={profileLoginUrl(profile.id)}
               />
 
               {(profile.role === 'master' || profile.role === 'seller') &&

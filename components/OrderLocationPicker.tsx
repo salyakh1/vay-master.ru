@@ -44,7 +44,7 @@ export default function OrderLocationPicker({
             onChange={handleCityChange}
             required
             className="input"
-            placeholder="Например: Москва"
+            placeholder="Ваш город"
           />
         </div>
 

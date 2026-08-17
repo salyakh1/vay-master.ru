@@ -1,9 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/app/providers'
-import { profileLoginUrl } from '@/lib/guest-access'
 
 interface GuestAwareProfileLinkProps {
   profileId: string
@@ -12,33 +9,16 @@ interface GuestAwareProfileLinkProps {
   onClick?: () => void
 }
 
+/** Профиль публичный: гости идут на витрину, не на логин. */
 export default function GuestAwareProfileLink({
   profileId,
   children,
   className,
   onClick,
 }: GuestAwareProfileLinkProps) {
-  const { user } = useAuth()
-  const router = useRouter()
-
-  if (user) {
-    return (
-      <Link href={`/profile/${profileId}`} className={className} onClick={onClick}>
-        {children}
-      </Link>
-    )
-  }
-
   return (
-    <button
-      type="button"
-      className={className}
-      onClick={() => {
-        onClick?.()
-        router.push(profileLoginUrl(profileId))
-      }}
-    >
+    <Link href={`/profile/${profileId}`} className={className} onClick={onClick}>
       {children}
-    </button>
+    </Link>
   )
 }

@@ -6,6 +6,7 @@ import { supabase, UserRole } from '@/lib/supabase'
 import Link from 'next/link'
 import AuthBrandHero from '@/components/auth/AuthBrandHero'
 import { localizeAuthError } from '@/components/auth/localizeAuthError'
+import { trackFunnel } from '@/lib/track-funnel'
 
 const VALID_ROLES: UserRole[] = ['master', 'seller', 'client']
 
@@ -107,10 +108,14 @@ function RegisterForm() {
         await new Promise((resolve) => setTimeout(resolve, 1000))
 
         try {
+          const { data: { session } } = await supabase.auth.getSession()
           const welcomeResponse = await fetch('/api/welcome-message', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: authData.user.id, role: role }),
+            headers: {
+              'Content-Type': 'application/json',
+              ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+            },
+            body: JSON.stringify({}),
           })
           const welcomeData = await welcomeResponse.json()
           if (!welcomeResponse.ok) {
@@ -119,6 +124,8 @@ function RegisterForm() {
         } catch (welcomeError: unknown) {
           console.error('[register] Error sending welcome message:', welcomeError)
         }
+
+        void trackFunnel('register_role', { role })
 
         if (role === 'master') {
           router.push('/onboarding/specializations')
@@ -219,7 +226,7 @@ function RegisterForm() {
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="input w-full"
-                  placeholder="Москва"
+                  placeholder="Ваш город"
                   autoComplete="address-level2"
                 />
               </div>

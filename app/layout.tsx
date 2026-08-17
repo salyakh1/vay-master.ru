@@ -16,8 +16,11 @@ const manrope = Manrope({
 })
 
 export const metadata: Metadata = {
-  title: 'VayMaster - Социальная сеть для мастеров и продавцов',
-  description: 'Платформа для строителей, автомехаников и продавцов строительных материалов',
+  title: {
+    default: 'VayMaster — мастера и материалы рядом',
+    template: '%s | VayMaster',
+  },
+  description: 'Найдите мастера или материалы рядом. Заказы, чат и каталог в одном сервисе.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,

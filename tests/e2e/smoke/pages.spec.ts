@@ -21,4 +21,16 @@ test.describe('Smoke pages', () => {
     expect(res?.status()).toBeLessThan(500)
     await expect(page.locator('body')).toBeVisible()
   })
+
+  test('search markup has no 11-digit phone numbers', async ({ page }) => {
+    await page.goto('/search')
+    const html = await page.locator('body').innerText()
+    expect(html).not.toMatch(/(?:^|[^\d])\d{11}(?:[^\d]|$)/)
+  })
+
+  test('rules is public', async ({ page }) => {
+    const res = await page.goto('/rules')
+    expect(res?.status()).toBeLessThan(500)
+    await expect(page.locator('body')).toContainText(/Правила/i)
+  })
 })

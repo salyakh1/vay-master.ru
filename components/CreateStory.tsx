@@ -130,11 +130,16 @@ export default function CreateStory({ userId, onClose, onSuccess }: CreateStoryP
       }
 
       // Создаем историю через API
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Не авторизован')
       const response = await fetch('/api/stories', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
-          userId,
           media: mediaUrls,
           mediaType,
           description: description.trim() || null,

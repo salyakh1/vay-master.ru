@@ -51,8 +51,13 @@ export default function NewProductPage() {
   }
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (authLoading) return
+    if (!user) {
       router.push('/products')
+      return
+    }
+    if (user.role !== 'seller') {
+      router.replace('/products')
     }
   }, [user, authLoading, router])
 
@@ -159,10 +164,17 @@ export default function NewProductPage() {
         }
       }
 
-      const { error } = await supabase
-        .from('products')
-        .insert({
-          seller_id: user.id,
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Не авторизован')
+
+      const createRes = await fetch('/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
           name: name.trim(),
           description: description.trim(),
           price: priceNum,
@@ -172,11 +184,11 @@ export default function NewProductPage() {
           in_stock: inStock,
           stock_count: stockCount ? parseInt(stockCount) : null,
           images: imageUrls,
-        })
-
-      if (error) {
-        console.error('Error creating product:', error)
-        throw new Error(`Ошибка при создании товара: ${error.message}`)
+        }),
+      })
+      const created = await createRes.json().catch(() => ({}))
+      if (!createRes.ok) {
+        throw new Error(created.error || 'Ошибка при создании товара')
       }
 
       // Show warning about images if any, but don't block success
@@ -194,7 +206,7 @@ export default function NewProductPage() {
     }
   }
 
-  if (authLoading || !user) {
+  if (authLoading || !user || user.role !== 'seller') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg">Загрузка...</div>

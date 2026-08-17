@@ -14,13 +14,42 @@ export default function AdminSecurityPage() {
   const [loading, setLoading] = useState(true)
   const [severityFilter, setSeverityFilter] = useState<string>('')
   const [resolvedFilter, setResolvedFilter] = useState<string>('')
+  const [sqlStatus, setSqlStatus] = useState<{
+    ok: boolean
+    checks: Array<{ id: string; ok: boolean; detail: string }>
+    runInSupabase?: string[]
+  } | null>(null)
+  const [sqlStatusLoading, setSqlStatusLoading] = useState(true)
 
   useEffect(() => {
     fetchAlerts()
+    fetchSqlStatus()
     if (currentUser) {
       logAdminAction(currentUser.id, 'view_security', 'security')
     }
   }, [currentUser, severityFilter, resolvedFilter])
+
+  const fetchSqlStatus = async () => {
+    try {
+      setSqlStatusLoading(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) {
+        setSqlStatus(null)
+        return
+      }
+      const res = await fetch('/api/admin/security-status', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json().catch(() => null)
+      if (res.ok && data?.checks) setSqlStatus(data)
+      else setSqlStatus(null)
+    } catch {
+      setSqlStatus(null)
+    } finally {
+      setSqlStatusLoading(false)
+    }
+  }
 
   const fetchAlerts = async () => {
     try {
@@ -121,6 +150,38 @@ export default function AdminSecurityPage() {
       <div>
         <h1 className="text-2xl font-semibold text-text-primary mb-2">Безопасность и антиспам</h1>
         <p className="text-text-secondary">Мониторинг алертов безопасности и подозрительной активности</p>
+      </div>
+
+      <div className="card">
+        <h2 className="text-lg font-semibold text-text-primary mb-2">SQL status (прод)</h2>
+        <p className="text-sm text-text-secondary mb-3">
+          Без ручного прогона SQL в Supabase Editor защита не активна, даже если код задеплоен.
+        </p>
+        {sqlStatusLoading ? (
+          <p className="text-sm text-text-secondary">Проверяем БД…</p>
+        ) : !sqlStatus ? (
+          <p className="text-sm text-red-600">Не удалось получить статус. Нужны права администратора.</p>
+        ) : (
+          <ul className="space-y-2">
+            {sqlStatus.checks.map((c) => (
+              <li key={c.id} className="flex items-start gap-2 text-sm">
+                {c.ok ? (
+                  <FiCheckCircle className="text-green-600 mt-0.5 flex-shrink-0" />
+                ) : (
+                  <FiAlertTriangle className="text-red-600 mt-0.5 flex-shrink-0" />
+                )}
+                <span>
+                  <strong>{c.id}</strong>: {c.detail}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {sqlStatus?.runInSupabase && (
+          <p className="text-xs text-text-muted mt-3">
+            Порядок: {sqlStatus.runInSupabase.join(' → ')}
+          </p>
+        )}
       </div>
 
       {/* Stats */}

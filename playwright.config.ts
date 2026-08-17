@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000'
 
+const enableWebServer =
+  process.env.PLAYWRIGHT_WEB_SERVER === '1' || process.env.npm_lifecycle_event === 'test:e2e:smoke'
+
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: true,
@@ -25,10 +28,9 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  /* Smoke поднимает next при PLAYWRIGHT_WEB_SERVER=1. Critical — без сервера. */
-  webServer:
-    process.env.PLAYWRIGHT_WEB_SERVER === '1'
-      ? {
+  /* Smoke поднимает next. Critical — контракты исходников без сервера. */
+  webServer: enableWebServer
+    ? {
           command: 'npm run start',
           url: baseURL,
           reuseExistingServer: !process.env.CI,
@@ -40,5 +42,5 @@ export default defineConfig({
               process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key',
           },
         }
-      : undefined,
+    : undefined,
 })

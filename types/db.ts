@@ -250,6 +250,8 @@ export interface Order {
   updated_at?: string
   client?: User
   selected_master?: User
+  complete_requested_by?: string | null
+  complete_requested_at?: string | null
 }
 
 export interface OrderResponse {

@@ -14,6 +14,7 @@ import {
   MIN_ORDER_TITLE_LENGTH,
   validateOrderFields,
 } from '@/lib/order-validation'
+import { trackFunnel } from '@/lib/track-funnel'
 
 const MIN_DESCRIPTION_LENGTH = MIN_ORDER_DESCRIPTION_LENGTH
 
@@ -214,6 +215,7 @@ function NewOrderForm() {
 
       if (orderError) throw orderError
 
+      void trackFunnel('create_order', { orderId: newOrder.id })
       router.push(`/orders/${newOrder.id}`)
     } catch (error: unknown) {
       console.error('Error creating order:', error)
@@ -278,6 +280,8 @@ function NewOrderForm() {
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Не удалось создать сессию оплаты')
+
+        void trackFunnel('pay_publish', { sessionId: data.sessionId })
 
         const res2 = await fetch('/api/payments/tinkoff/init', {
           method: 'POST',

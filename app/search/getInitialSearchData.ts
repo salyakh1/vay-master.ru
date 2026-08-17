@@ -22,7 +22,7 @@ export async function getInitialMastersForSearch(opts?: {
     let query = supabase
       .from('profiles')
       .select(
-        'id, full_name, avatar_url, role, city, specialization, description, is_pro, pro_until, master_rating, master_reviews_count, phone, master_lat, master_lng, profile_subcategories(subcategory:subcategories(name))',
+        'id, full_name, avatar_url, role, city, specialization, description, is_pro, pro_until, master_rating, master_reviews_count, master_lat, master_lng, profile_subcategories(subcategory:subcategories(name))',
         { count: 'exact' }
       )
       .eq('role', 'master')
@@ -39,9 +39,14 @@ export async function getInitialMastersForSearch(opts?: {
       console.error('getInitialMastersForSearch', error)
       return { items: [], total: 0 }
     }
+    const items = (data || []).map((row) => {
+      const { phone: _phone, ...rest } = row as Record<string, unknown> & { phone?: string | null }
+      void _phone
+      return rest
+    }) as unknown as MasterScrollerItem[]
     return {
-      items: (data || []) as unknown as MasterScrollerItem[],
-      total: count ?? (data?.length || 0),
+      items,
+      total: count ?? items.length,
     }
   } catch (e) {
     console.error('getInitialMastersForSearch', e)

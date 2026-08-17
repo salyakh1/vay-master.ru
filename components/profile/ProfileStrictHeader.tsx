@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FiMessageCircle, FiShare2 } from 'react-icons/fi'
 import type { User } from '@/lib/supabase'
@@ -20,6 +21,8 @@ type ProfileStrictHeaderProps = {
   onFollowersClick: () => void
   onEdit?: () => void
   backHref?: string | null
+  requireAuth?: boolean
+  loginHref?: string
 }
 
 export default function ProfileStrictHeader({
@@ -36,6 +39,8 @@ export default function ProfileStrictHeader({
   onFollowersClick,
   onEdit,
   backHref,
+  requireAuth = false,
+  loginHref = '/auth/login',
 }: ProfileStrictHeaderProps) {
   const router = useRouter()
   const isMaster = profile.role === 'master'
@@ -158,22 +163,33 @@ export default function ProfileStrictHeader({
 
         {!isOwnProfile && profile.role !== 'client' && (
           <div className="flex gap-1.5 items-center">
-            <button
-              type="button"
-              onClick={onMessage}
-              className="flex-1 bg-brand-accent text-white text-[12px] font-medium py-2.5 rounded-[10px] flex items-center justify-center gap-1.5"
-            >
-              <FiMessageCircle size={14} />
-              Написать
-            </button>
-            <button
-              type="button"
-              onClick={onFollow}
-              disabled={followLoading}
-              className="flex-1 bg-[#f4f4f4] border border-[#e5e7eb] text-[#111111] text-[12px] font-medium py-2.5 rounded-[10px]"
-            >
-              {followLoading ? '…' : isFollowing ? 'Отписаться' : 'Подписка'}
-            </button>
+            {requireAuth ? (
+              <Link
+                href={loginHref}
+                className="flex-1 bg-brand-accent text-white text-[12px] font-medium py-2.5 rounded-[10px] flex items-center justify-center gap-1.5"
+              >
+                Войти, чтобы написать
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={onMessage}
+                className="flex-1 bg-brand-accent text-white text-[12px] font-medium py-2.5 rounded-[10px] flex items-center justify-center gap-1.5"
+              >
+                <FiMessageCircle size={14} />
+                Написать
+              </button>
+            )}
+            {!requireAuth && (
+              <button
+                type="button"
+                onClick={onFollow}
+                disabled={followLoading}
+                className="flex-1 bg-[#f4f4f4] border border-[#e5e7eb] text-[#111111] text-[12px] font-medium py-2.5 rounded-[10px]"
+              >
+                {followLoading ? '…' : isFollowing ? 'Отписаться' : 'Подписка'}
+              </button>
+            )}
             <button
               type="button"
               onClick={handleShare}

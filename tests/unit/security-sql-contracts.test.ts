@@ -49,3 +49,32 @@ describe('SQL security contracts (Critical-1,2,5 from CURSOR_01)', () => {
     expect(route).toMatch(/eq\('status',\s*'pending'\)/)
   })
 })
+
+describe('complete-loop SQL (CURSOR_04)', () => {
+  it('request_order_complete is two-sided and idempotent', () => {
+    const sql = readSql('supabase', 'complete_loop_and_review_rls.sql')
+    expect(sql).toMatch(/request_order_complete/)
+    expect(sql).toMatch(/complete_requested_by/)
+    expect(sql).toMatch(/status = 'completed'/)
+    expect(sql).toMatch(/already/)
+    expect(sql).toMatch(/GRANT EXECUTE[\s\S]*service_role/i)
+  })
+
+  it('reviews INSERT requires completed deal helper', () => {
+    const sql = readSql('supabase', 'complete_loop_and_review_rls.sql')
+    expect(sql).toMatch(/has_completed_deal_with/)
+    expect(sql).toMatch(/master_reviews_insert_completed_deal/)
+    expect(sql).toMatch(/p\.role = 'seller'/)
+  })
+
+  it('funnel_events table exists in repo', () => {
+    const sql = readSql('supabase', 'funnel_events.sql')
+    expect(sql).toMatch(/funnel_events/)
+  })
+
+  it('seed price is 200', () => {
+    const sql = readSql('supabase', 'payment_settings_seed.sql')
+    expect(sql).toMatch(/order_publication_price_rub',\s*'200'/)
+    expect(sql).not.toMatch(/'199'/)
+  })
+})
