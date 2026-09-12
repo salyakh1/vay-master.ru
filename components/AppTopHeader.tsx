@@ -13,6 +13,7 @@ import {
   FiMap,
   FiUser,
   FiSettings,
+  FiBriefcase,
 } from 'react-icons/fi'
 
 export const APP_TOP_HEADER_HEIGHT = 52
@@ -84,7 +85,14 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
         {rightSlot ?? (
           <>
             {!authLoading && !user && (
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex gap-2 flex-shrink-0 items-center">
+                <Link
+                  href="/planner"
+                  aria-label="Планировщик сметы"
+                  className="w-9 h-9 rounded-lg text-[#1c1c1e] flex items-center justify-center"
+                >
+                  <FiMap size={18} />
+                </Link>
                 <Link
                   href="/auth/login"
                   className="text-xs font-semibold px-3.5 py-1.5 rounded-full border border-[#e0e0e0] text-[#333]"
@@ -134,6 +142,17 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                     >
                       <FiSettings size={18} />
                       <span>Настройки</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false)
+                        router.push('/orders')
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f2f2f7] transition-colors text-left text-[#1c1c1e] font-medium text-sm"
+                    >
+                      <FiBriefcase size={18} />
+                      <span>Заказы</span>
                     </button>
                     <button
                       type="button"

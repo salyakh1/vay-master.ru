@@ -123,13 +123,14 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(limit)
 
-    // Фильтрация по категориям
-    if (uniqueCategoryIds.length > 0) {
+    // Фильтрация по задаче: категория ИЛИ подкатегория (иначе подходящие товары отсекаются)
+    if (uniqueCategoryIds.length > 0 && uniqueSubcategoryIds.length > 0) {
+      query = query.or(
+        `category_id.in.(${uniqueCategoryIds.join(',')}),subcategory_id.in.(${uniqueSubcategoryIds.join(',')})`
+      )
+    } else if (uniqueCategoryIds.length > 0) {
       query = query.in('category_id', uniqueCategoryIds)
-    }
-
-    // Фильтрация по подкатегориям
-    if (uniqueSubcategoryIds.length > 0) {
+    } else if (uniqueSubcategoryIds.length > 0) {
       query = query.in('subcategory_id', uniqueSubcategoryIds)
     }
 

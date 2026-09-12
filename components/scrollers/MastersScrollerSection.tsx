@@ -20,7 +20,7 @@ type MastersScrollerSectionProps = {
   service?: string
   lat?: number | null
   lng?: number | null
-  radiusKm?: number
+  radiusKm?: number | null
   showRadius?: boolean
 }
 

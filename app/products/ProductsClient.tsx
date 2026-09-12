@@ -19,6 +19,7 @@ import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSu
 import { ProductsScrollerSection } from '@/components/scrollers/ProductsScrollerSection'
 import { MastersScrollerSection } from '@/components/scrollers/MastersScrollerSection'
 import { useUserLocation } from '@/hooks/useUserLocation'
+import RadiusSetupBanner from '@/components/RadiusSetupBanner'
 import { LIST_PAGE_SIZE } from '@/lib/scrollerApi'
 import { getProductCategoryEmoji } from '@/lib/categoryEmoji'
 
@@ -87,7 +88,7 @@ function ProductsContent({
   })
   const [nearbyGeoloading, setNearbyGeoloading] = useState(false)
 
-  const { lat: userLat, lng: userLng, radiusKm: userRadiusKm, setRadiusKm } = useUserLocation()
+  const { lat: userLat, lng: userLng, radiusKm: userRadiusKm, radiusConfigured, radiusReady, setRadiusKm, setOrigin } = useUserLocation()
   const [showRadiusModal, setShowRadiusModal] = useState(false)
 
   const hasMasterZone =
@@ -96,11 +97,13 @@ function ProductsContent({
     user.master_lng != null &&
     user.service_radius_km != null
 
-  const nearbyCenter = hasMasterZone
-    ? { lat: user!.master_lat!, lng: user!.master_lng!, radiusKm: userRadiusKm }
-    : nearbyViewLocation
-      ? { lat: nearbyViewLocation.lat, lng: nearbyViewLocation.lng, radiusKm: userRadiusKm }
-      : null
+  const nearbyCenter = nearbyViewLocation
+    ? { lat: nearbyViewLocation.lat, lng: nearbyViewLocation.lng, radiusKm: userRadiusKm }
+    : hasMasterZone
+      ? { lat: user!.master_lat!, lng: user!.master_lng!, radiusKm: userRadiusKm }
+      : userLat != null && userLng != null
+        ? { lat: userLat, lng: userLng, radiusKm: userRadiusKm }
+        : null
 
   const requestNearbyGeolocation = () => {
     if (!navigator.geolocation) return
@@ -583,6 +586,8 @@ function ProductsContent({
 
       <CompactPageBanner page="products" buttonLabel="Смотреть" initialBanners={initialBanners} />
 
+      <RadiusSetupBanner visible={radiusReady && !radiusConfigured} onSetup={() => setShowRadiusModal(true)} />
+
       {(stories.length > 0 ||
         (!!user && (user.role === 'master' || user.role === 'seller'))) && (
         <div className="bg-white border-b border-[#efefef] px-3 py-2.5">
@@ -596,17 +601,17 @@ function ProductsContent({
       )}
 
       <div className="flex items-center gap-2 px-3.5 py-2">
-        {nearbyCenter && (
-          <button
-            type="button"
-            onClick={() => setShowRadiusModal(true)}
-            className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium active:scale-95 transition-transform"
-          >
-            <span aria-hidden>📍</span>
-            <strong className="text-[#1c1c1e] font-bold">{nearbyCenter.radiusKm} км</strong>
-            <span aria-hidden className="text-[8px] text-[#8e8e93]">▾</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setShowRadiusModal(true)}
+          className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium active:scale-95 transition-transform"
+        >
+          <span aria-hidden>📍</span>
+          <strong className="text-[#1c1c1e] font-bold">
+            {radiusConfigured && userRadiusKm != null ? `${userRadiusKm} км` : 'Все'}
+          </strong>
+          <span aria-hidden className="text-[8px] text-[#8e8e93]">▾</span>
+        </button>
         <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
           Найдено: <strong className="text-[#1c1c1e] font-bold">{totalCount || products.length}</strong>
         </div>
@@ -919,13 +924,19 @@ function ProductsContent({
 
       <RadiusPickerModal
         isOpen={showRadiusModal}
-        currentRadiusKm={nearbyCenter?.radiusKm ?? userRadiusKm}
+        currentRadiusKm={nearbyCenter?.radiusKm ?? userRadiusKm ?? 50}
         lat={nearbyCenter?.lat ?? userLat}
         lng={nearbyCenter?.lng ?? userLng}
         city={user?.city}
         resultsCount={totalCount || products.length}
         resultsUnit="товаров"
-        onSelect={setRadiusKm}
+        onSelect={(km, origin) => {
+          setRadiusKm(km)
+          if (origin) {
+            setOrigin(origin.lat, origin.lng)
+            setNearbyViewLocation({ lat: origin.lat, lng: origin.lng })
+          }
+        }}
         onClose={() => setShowRadiusModal(false)}
       />
     </div>

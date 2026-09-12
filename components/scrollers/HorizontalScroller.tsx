@@ -52,14 +52,15 @@ export function ScrollerSectionHeader({
   )
 }
 
-export function ScrollerRadiusRow({ radiusKm, city }: { radiusKm: number; city?: string | null }) {
+export function ScrollerRadiusRow({ radiusKm, city }: { radiusKm?: number | null; city?: string | null }) {
   return (
     <div className="flex items-center gap-1.5 mx-3.5 mb-1.5 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 w-fit">
       <span className="text-xs" aria-hidden>
         📍
       </span>
       <span className="text-[10px] text-[#8e8e93] font-medium">
-        Радиус: <span className="text-brand-accent font-bold">{radiusKm} км</span>
+        Радиус:{' '}
+        <span className="text-brand-accent font-bold">{radiusKm != null ? `${radiusKm} км` : 'все'}</span>
         {city ? ` · ${city}` : ''}
       </span>
     </div>

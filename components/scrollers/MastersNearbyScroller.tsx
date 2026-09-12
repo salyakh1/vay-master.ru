@@ -10,7 +10,7 @@ const DISPLAY_LIMIT = 15
 type MastersNearbyScrollerProps = {
   lat: number
   lng: number
-  radiusKm?: number
+  radiusKm?: number | null
   city?: string | null
   limit?: number
 }
@@ -18,7 +18,7 @@ type MastersNearbyScrollerProps = {
 export default function MastersNearbyScroller({
   lat,
   lng,
-  radiusKm = 50,
+  radiusKm,
   city,
   limit = DISPLAY_LIMIT,
 }: MastersNearbyScrollerProps) {
@@ -30,7 +30,8 @@ export default function MastersNearbyScroller({
     const params = new URLSearchParams()
     params.set('lat', String(lat))
     params.set('lng', String(lng))
-    params.set('radius_km', String(radiusKm))
+    if (radiusKm != null) params.set('radius_km', String(radiusKm))
+    else params.set('unbounded', '1')
     params.set('page', '1')
     return `/api/search/masters-nearby?${params.toString()}`
   }, [lat, lng, radiusKm])

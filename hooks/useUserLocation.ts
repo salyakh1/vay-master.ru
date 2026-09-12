@@ -4,12 +4,15 @@ import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/app/providers'
 
 const RADIUS_STORAGE_KEY = 'vay_search_radius_km'
+export const DEFAULT_RADIUS_KM = 50
 
 export function useUserLocation() {
   const { user } = useAuth()
   const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null)
+  const [originOverride, setOriginOverride] = useState<{ lat: number; lng: number } | null>(null)
   const [locationReady, setLocationReady] = useState(false)
   const [radiusOverride, setRadiusOverride] = useState<number | null>(null)
+  const [radiusReady, setRadiusReady] = useState(false)
 
   useEffect(() => {
     try {
@@ -21,6 +24,19 @@ export function useUserLocation() {
     } catch {
       /* ignore */
     }
+    try {
+      const savedView = localStorage.getItem('vay_nearby_view')
+      if (savedView) {
+        const { lat, lng } = JSON.parse(savedView) as { lat?: number; lng?: number }
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          setOriginOverride({ lat, lng })
+          setGeo({ lat, lng })
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    setRadiusReady(true)
   }, [])
 
   useEffect(() => {
@@ -83,10 +99,22 @@ export function useUserLocation() {
     }
   }, [])
 
-  const lat = user?.master_lat ?? geo?.lat ?? null
-  const lng = user?.master_lng ?? geo?.lng ?? null
-  const radiusKm = radiusOverride ?? user?.service_radius_km ?? 50
+  const setOrigin = useCallback((nextLat: number, nextLng: number) => {
+    setGeo({ lat: nextLat, lng: nextLng })
+    setOriginOverride({ lat: nextLat, lng: nextLng })
+    try {
+      localStorage.setItem('vay_nearby_view', JSON.stringify({ lat: nextLat, lng: nextLng }))
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const lat = originOverride?.lat ?? user?.master_lat ?? geo?.lat ?? null
+  const lng = originOverride?.lng ?? user?.master_lng ?? geo?.lng ?? null
+  const radiusConfigured =
+    radiusOverride != null || (user?.service_radius_km != null && user.service_radius_km > 0)
+  const radiusKm = radiusConfigured ? radiusOverride ?? user?.service_radius_km ?? null : null
   const city = user?.city ?? null
 
-  return { lat, lng, radiusKm, city, locationReady, setRadiusKm }
+  return { lat, lng, radiusKm, radiusConfigured, radiusReady, city, locationReady, setRadiusKm, setOrigin }
 }

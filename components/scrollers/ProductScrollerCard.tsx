@@ -14,7 +14,13 @@ export default function ProductScrollerCard({ product, badge }: ProductScrollerC
   const seller = product.seller as { full_name?: string; city?: string; store_address?: string } | undefined
   const img = product.images?.[0]
   const shopLine = seller?.full_name
-    ? `${seller.full_name}${product.distance_km != null ? ` · ${product.distance_km} км` : ''}`
+    ? `${seller.full_name}${
+        product.distance_km != null
+          ? ` · ${product.distance_km} км`
+          : seller.city
+            ? ` · ${seller.city}`
+            : ''
+      }`
     : product.distance_km != null
       ? `${product.distance_km} км`
       : seller?.city || ''

@@ -1,35 +1,44 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useMap } from 'react-leaflet'
 
 type Props = {
   center: [number, number]
   zoom: number
-  /** Когда задан — карта подгоняется так, чтобы был виден весь круг радиуса (50 км, 100 км и т.д.) */
   radiusKm?: number
+  /** Меняйте, когда нужно подогнать карту под круг (кнопки км). Не меняйте при pinch. */
+  fitToken?: number
 }
 
-/** Подгоняет вид карты: при radiusKm — fitBounds по кругу, иначе setView(center, zoom) */
-export default function ChangeMapView({ center, zoom, radiusKm }: Props) {
+export default function ChangeMapView({ center, zoom, radiusKm, fitToken = 0 }: Props) {
   const map = useMap()
+  const centerRef = useRef(center)
+  const radiusRef = useRef(radiusKm)
+  const zoomRef = useRef(zoom)
+  centerRef.current = center
+  radiusRef.current = radiusKm
+  zoomRef.current = zoom
+
   useEffect(() => {
-    if (radiusKm != null && radiusKm > 0) {
-      // Границы круга: ~111 км на 1° широты, по долготе зависит от широты
-      const lat = center[0]
-      const lng = center[1]
+    const [lat, lng] = centerRef.current
+    const r = radiusRef.current
+    if (r != null && r > 0) {
       const kmPerDegLat = 111
       const kmPerDegLng = 111 * Math.cos((lat * Math.PI) / 180)
-      const dLat = radiusKm / kmPerDegLat
-      const dLng = radiusKm / kmPerDegLng
-      const bounds: [[number, number], [number, number]] = [
-        [lat - dLat, lng - dLng],
-        [lat + dLat, lng + dLng],
-      ]
-      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14 })
+      const dLat = r / kmPerDegLat
+      const dLng = r / Math.max(0.2, kmPerDegLng)
+      map.fitBounds(
+        [
+          [lat - dLat, lng - dLng],
+          [lat + dLat, lng + dLng],
+        ],
+        { padding: [28, 28], maxZoom: 15, animate: true }
+      )
     } else {
-      map.setView(center, zoom)
+      map.setView([lat, lng], zoomRef.current)
     }
-  }, [center, zoom, radiusKm, map])
+  }, [fitToken, map])
+
   return null
 }

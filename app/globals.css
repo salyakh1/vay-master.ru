@@ -58,6 +58,14 @@ body {
   letter-spacing: -0.01em;          /* Строгий, инженерный стиль */
 }
 
+/* SVG user units ≠ CSS px: body letter-spacing схлопывает цифры на чертеже. */
+.planner-svg text {
+  letter-spacing: 0 !important;
+  word-spacing: 0 !important;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Фиксированная ширина под устройство — страница не увеличивается/не уменьшается */
 html {
   scroll-behavior: smooth;

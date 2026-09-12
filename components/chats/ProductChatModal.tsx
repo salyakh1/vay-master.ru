@@ -8,11 +8,12 @@ import { ru } from 'date-fns/locale'
 import { FiX, FiSend, FiExternalLink } from 'react-icons/fi'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
+import { findOrCreateChat } from '@/lib/chatHelpers'
 import {
   buildProductInterestMessage,
-  findOrCreateChat,
   hasProductContextMessage,
-} from '@/lib/chatHelpers'
+  stripProductPathFromContent,
+} from '@/components/chats/chat-utils'
 
 type ProductChatProduct = {
   id: string
@@ -53,7 +54,8 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const contextSentRef = useRef(false)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const draftTouchedRef = useRef(false)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const cover = product.images?.[0] || null
@@ -137,17 +139,29 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
     if (!isOpen || !user) return
 
     let cancelled = false
-    contextSentRef.current = false
+    draftTouchedRef.current = false
     setLoading(true)
     setError(null)
     setChatId(null)
     setMessages([])
-    setNewMessage('')
 
     const productId = product.id
     const productName = product.name
     const productPrice = product.price
-    const productCover = product.images?.[0] || null
+    const draft = buildProductInterestMessage({
+      name: productName,
+      price: productPrice,
+    })
+    setNewMessage(draft)
+
+    requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      const el = inputRef.current
+      if (el) {
+        const len = el.value.length
+        el.setSelectionRange(len, len)
+      }
+    })
 
     ;(async () => {
       try {
@@ -155,26 +169,18 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
         if (cancelled) return
         setChatId(id)
 
-        let list = await loadMessages(id)
+        const list = await loadMessages(id)
         if (cancelled) return
 
-        if (!hasProductContextMessage(list, productId) && !contextSentRef.current) {
-          contextSentRef.current = true
-          const text = buildProductInterestMessage({
-            id: productId,
-            name: productName,
-            price: productPrice,
-          })
-          const created = await insertMessage(id, text, productCover)
-          if (created && !cancelled) {
-            list = [...list, created]
-          }
+        if (hasProductContextMessage(list, productId, productName) && !draftTouchedRef.current) {
+          setNewMessage('')
         }
 
         if (!cancelled) {
           setMessages(list)
           setLoading(false)
           scrollToBottom()
+          inputRef.current?.focus()
         }
       } catch (e) {
         console.error('ProductChatModal init:', e)
@@ -188,18 +194,7 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
     return () => {
       cancelled = true
     }
-  }, [
-    isOpen,
-    user,
-    seller.id,
-    product.id,
-    product.name,
-    product.price,
-    product.images,
-    loadMessages,
-    insertMessage,
-    scrollToBottom,
-  ])
+  }, [isOpen, user, seller.id, product.id, product.name, product.price, loadMessages, scrollToBottom])
 
   useEffect(() => {
     if (!isOpen || !chatId) return
@@ -269,7 +264,7 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[110] flex items-end justify-center" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/45" onClick={onClose} aria-hidden />
 
       <div className="relative w-full max-w-lg h-[min(88vh,640px)] bg-white rounded-t-2xl flex flex-col animate-slide-up shadow-xl">
@@ -324,6 +319,7 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
           ) : (
             messages.map((message) => {
               const isOwn = message.sender_id === user?.id
+              const visibleText = stripProductPathFromContent(message.content || '')
               return (
                 <div
                   key={message.id}
@@ -340,7 +336,7 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
                       />
                     </div>
                   )}
-                  {message.content?.trim() && (
+                  {visibleText ? (
                     <div
                       className={`px-3 py-2 text-[12px] leading-relaxed rounded-2xl whitespace-pre-wrap break-words ${
                         isOwn
@@ -348,9 +344,9 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
                           : 'bg-white text-[#111] border border-[#f0f0f0] rounded-bl-md'
                       }`}
                     >
-                      {message.content}
+                      {visibleText}
                     </div>
-                  )}
+                  ) : null}
                   <span className="text-[9px] text-[#bbb] mt-0.5 px-0.5">
                     {format(new Date(message.created_at), 'HH:mm', { locale: ru })}
                   </span>
@@ -360,23 +356,32 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
           )}
         </div>
 
-        {/* Инпут */}
         <form
           onSubmit={handleSend}
-          className="flex items-center gap-2 px-3.5 py-2.5 border-t border-[#f0f0f0] bg-white flex-shrink-0 pb-[max(0.625rem,env(safe-area-inset-bottom))]"
+          className="flex items-end gap-2 px-3.5 py-2.5 border-t border-[#f0f0f0] bg-white flex-shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         >
-          <input
-            type="text"
+          <textarea
+            ref={inputRef}
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Сообщение…"
-            disabled={!chatId || loading || sending}
-            className="flex-1 min-w-0 bg-[#f5f5f7] border border-[#ececec] rounded-xl px-3 py-2.5 text-[13px] text-[#111] outline-none placeholder:text-[#bbb]"
+            onChange={(e) => {
+              draftTouchedRef.current = true
+              setNewMessage(e.target.value)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void handleSend()
+              }
+            }}
+            placeholder="Напишите продавцу…"
+            rows={2}
+            disabled={sending}
+            className="flex-1 min-w-0 max-h-28 resize-none bg-[#f5f5f7] border border-[#ececec] rounded-xl px-3 py-2.5 text-[13px] text-[#111] outline-none placeholder:text-[#bbb] leading-snug"
           />
           <button
             type="submit"
-            disabled={!chatId || loading || sending || !newMessage.trim()}
-            className="w-10 h-10 rounded-xl bg-[#e63946] text-white flex items-center justify-center disabled:opacity-40 flex-shrink-0"
+            disabled={!chatId || sending || !newMessage.trim()}
+            className="w-10 h-10 rounded-xl bg-[#e63946] text-white flex items-center justify-center disabled:opacity-40 flex-shrink-0 mb-0.5"
             aria-label="Отправить"
           >
             <FiSend size={16} />

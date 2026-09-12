@@ -15,6 +15,8 @@ import {
   validateOrderFields,
 } from '@/lib/order-validation'
 import { trackFunnel } from '@/lib/track-funnel'
+import { loginUrl } from '@/lib/guest-access'
+import { PLANNER_ORDER_STORAGE_KEY } from '@/components/planner/planner-estimate'
 
 const MIN_DESCRIPTION_LENGTH = MIN_ORDER_DESCRIPTION_LENGTH
 
@@ -108,8 +110,22 @@ function NewOrderForm() {
   }, [])
 
   useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(PLANNER_ORDER_STORAGE_KEY)
+      if (!raw) return
+      const data = JSON.parse(raw) as { title?: string; description?: string; budget?: number }
+      if (data.title && !prefilledTitle) setTitle(data.title)
+      if (typeof data.description === 'string' && data.description.trim()) setDescription(data.description)
+      if (typeof data.budget === 'number' && data.budget > 0) setBudget(String(data.budget))
+      sessionStorage.removeItem(PLANNER_ORDER_STORAGE_KEY)
+    } catch {
+      /* ignore */
+    }
+  }, [prefilledTitle])
+
+  useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/auth/login')
+      router.push(loginUrl('/orders/new'))
     }
   }, [authLoading, user, router])
 

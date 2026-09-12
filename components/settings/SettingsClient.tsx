@@ -269,9 +269,10 @@ export default function SettingsClient() {
   }
 
   const role = user.role
-  const radius = user.service_radius_km ?? 50
   const locationSub =
-    user.city && user.master_lat != null ? `${user.city} · радиус ${radius} км` : user.city || 'Не указано'
+    user.service_radius_km != null
+      ? `${user.city ? `${user.city} · ` : ''}радиус ${user.service_radius_km} км`
+      : user.city || 'Радиус не указан — показываем всех'
 
   const proTitle = access?.isPro ? 'PRO активен' : access?.isTrial ? 'Пробный PRO' : 'Подключите PRO'
   const proSubtitle =
@@ -393,6 +394,20 @@ export default function SettingsClient() {
                   <StoreAddressPanel onSaved={onSaved} />
                 </SettingsAccordionItem>
                 <SettingsAccordionItem
+                  icon="📡"
+                  iconBg="#fff1f2"
+                  title="Радиус поиска"
+                  subtitle={
+                    user.service_radius_km
+                      ? `${user.service_radius_km} км`
+                      : 'Не указан — показываем всех и всё'
+                  }
+                  expanded={openPanel === 'location'}
+                  onToggle={() => togglePanel('location')}
+                >
+                  <LocationPanel />
+                </SettingsAccordionItem>
+                <SettingsAccordionItem
                   icon="🏪"
                   iconBg="#fff1f2"
                   title="Настройки магазина"
@@ -424,6 +439,20 @@ export default function SettingsClient() {
                   onToggle={() => togglePanel('profile')}
                 >
                   <ProfileEditPanel forms={forms} />
+                </SettingsAccordionItem>
+                <SettingsAccordionItem
+                  icon="📡"
+                  iconBg="#fff1f2"
+                  title="Радиус поиска"
+                  subtitle={
+                    user.service_radius_km
+                      ? `${user.service_radius_km} км`
+                      : 'Не указан — показываем всех и всё'
+                  }
+                  expanded={openPanel === 'location'}
+                  onToggle={() => togglePanel('location')}
+                >
+                  <LocationPanel />
                 </SettingsAccordionItem>
                 <SettingsAccordionItem icon="📧" iconBg="#fff1f2" title="Email" subtitle={user.email} expanded={openPanel === 'email'} onToggle={() => togglePanel('email')}>
                   <EmailPanel email={user.email} />

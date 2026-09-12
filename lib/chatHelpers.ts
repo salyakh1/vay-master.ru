@@ -26,25 +26,3 @@ export async function findOrCreateChat(currentUserId: string, otherUserId: strin
   if (!data?.id) throw new Error('Не удалось создать чат')
   return data.id
 }
-
-export function productChatPath(productId: string): string {
-  return `/products/${productId}`
-}
-
-export function buildProductInterestMessage(product: {
-  id: string
-  name: string
-  price: number
-}): string {
-  const price = Number(product.price || 0).toLocaleString('ru-RU')
-  return `Здравствуйте! Интересует товар «${product.name}» за ${price} ₽\n${productChatPath(product.id)}`
-}
-
-/** Было ли уже авто-сообщение про этот товар (по ссылке в content). */
-export function hasProductContextMessage(
-  messages: Array<{ content?: string | null }>,
-  productId: string
-): boolean {
-  const marker = productChatPath(productId)
-  return messages.some((m) => (m.content || '').includes(marker))
-}

@@ -1,50 +1,98 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import Image from 'next/image'
-import { useAuth } from '@/app/providers'
-import { supabase, ProductComment, User } from '@/lib/supabase'
-import { FiSend, FiEdit2, FiTrash2, FiMessageCircle } from 'react-icons/fi'
-import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import Link from 'next/link'
+import { formatDistanceToNow } from 'date-fns'
+import { ru } from 'date-fns/locale'
+import { FiSend } from 'react-icons/fi'
+import { supabase, ProductComment, User } from '@/lib/supabase'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
+import { loginUrl } from '@/lib/guest-access'
 
-const INITIAL_REPLIES_VISIBLE = 10
+type CommentNode = ProductComment & { author?: User; replies?: CommentNode[] }
 
-function collectDescendants(c: { replies?: any[] }): any[] {
-  if (!c.replies?.length) return []
-  return c.replies.flatMap((r: any) => [r, ...collectDescendants(r)])
+function pluralComments(n: number) {
+  const n10 = n % 10
+  const n100 = n % 100
+  if (n10 === 1 && n100 !== 11) return 'комментарий'
+  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return 'комментария'
+  return 'комментариев'
 }
 
-function pluralReplies(x: number) {
-  return x === 1 ? 'ответ' : x >= 2 && x <= 4 ? 'ответа' : 'ответов'
+function collectDescendants(c: CommentNode): CommentNode[] {
+  if (!c.replies?.length) return []
+  return c.replies.flatMap((r) => [r, ...collectDescendants(r)])
+}
+
+function countAll(nodes: CommentNode[]): number {
+  return nodes.reduce((sum, n) => sum + 1 + countAll(n.replies || []), 0)
+}
+
+function addReplyToTree(nodes: CommentNode[], parentId: string, reply: CommentNode): CommentNode[] {
+  return nodes.map((n) => {
+    if (n.id === parentId) return { ...n, replies: [...(n.replies || []), reply] }
+    if (n.replies?.length) return { ...n, replies: addReplyToTree(n.replies, parentId, reply) }
+    return n
+  })
+}
+
+async function authHeaders() {
+  const token = (await supabase.auth.getSession()).data.session?.access_token
+  if (!token) throw new Error('Войдите, чтобы комментировать')
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  }
 }
 
 interface ProductCommentsProps {
   productId: string
   currentUser: User | null
+  sellerId?: string | null
   openReplyToId?: string | null
 }
 
-export default function ProductComments({ productId, currentUser, openReplyToId }: ProductCommentsProps) {
-  const [comments, setComments] = useState<(ProductComment & { author?: User; replies?: ProductComment[] })[]>([])
+export default function ProductComments({
+  productId,
+  currentUser,
+  sellerId,
+  openReplyToId,
+}: ProductCommentsProps) {
+  const [comments, setComments] = useState<CommentNode[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
   const [commentText, setCommentText] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
-  const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
-  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({})
-  const [showAllReplies, setShowAllReplies] = useState<Record<string, boolean>>({})
+  const [replyingToId, setReplyingToId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const composerRef = useRef<HTMLTextAreaElement>(null)
+  const replyRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
-    fetchComments()
+  const total = useMemo(() => countAll(comments), [comments])
+
+  const fetchComments = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      const response = await fetch(`/api/products/${productId}/comments`)
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Не удалось загрузить комментарии')
+      setComments(data.comments || [])
+      setError(null)
+    } catch (e) {
+      console.error('Error fetching comments:', e)
+      if (!silent) setError('Не удалось загрузить комментарии')
+    } finally {
+      setLoading(false)
+    }
   }, [productId])
 
   useEffect(() => {
-    if (openReplyToId) setReplyingToCommentId(openReplyToId)
+    fetchComments()
+  }, [fetchComments])
+
+  useEffect(() => {
+    if (openReplyToId) setReplyingToId(openReplyToId)
   }, [openReplyToId])
 
   useEffect(() => {
@@ -56,408 +104,395 @@ export default function ProductComments({ productId, currentUser, openReplyToId 
     if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200)
   }, [loading, comments.length, openReplyToId])
 
-  const fetchComments = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/products/${productId}/comments`)
-      if (!response.ok) throw new Error('Failed to fetch comments')
-      const data = await response.json()
-      setComments(data.comments || [])
-    } catch (error) {
-      console.error('Error fetching comments:', error)
-      setComments([])
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => {
+    if (replyingToId) replyRef.current?.focus()
+  }, [replyingToId])
 
-  const handleSubmitComment = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!currentUser || !commentText.trim()) return
-
-    setSaving(true)
-    try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token
-      if (!token) throw new Error('Not authenticated')
-
+  const postComment = async (content: string, parentCommentId?: string) => {
+    const postOnce = async () => {
+      const headers = await authHeaders()
       const response = await fetch(`/api/products/${productId}/comments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          content: commentText.trim(),
-        }),
+        headers,
+        body: JSON.stringify({ content, parentCommentId: parentCommentId || null }),
       })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Не удалось отправить комментарий')
+      return data.comment as CommentNode
+    }
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create comment')
-      }
-
-      setCommentText('')
-      setShowForm(false)
-      fetchComments()
-    } catch (error: any) {
-      console.error('Error creating comment:', error)
-      alert(error.message || 'Ошибка при создании комментария')
-    } finally {
-      setSaving(false)
+    try {
+      return await postOnce()
+    } catch {
+      return await postOnce()
     }
   }
 
-  const handleSubmitReply = async (parentCommentId: string) => {
-    if (!currentUser || !replyText.trim()) return
+  const handleSubmitComment = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    const text = commentText.trim()
+    if (!currentUser || !text || saving) return
+
+    const tempId = `temp-${Date.now()}`
+    const optimistic: CommentNode = {
+      id: tempId,
+      product_id: productId,
+      author_id: currentUser.id,
+      content: text,
+      created_at: new Date().toISOString(),
+      author: currentUser,
+      replies: [],
+    }
 
     setSaving(true)
+    setError(null)
+    setComments((prev) => [optimistic, ...prev])
+    setCommentText('')
+
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token
-      if (!token) throw new Error('Not authenticated')
-
-      const response = await fetch(`/api/products/${productId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          content: replyText.trim(),
-          parentCommentId,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create reply')
-      }
-
-      setReplyText('')
-      setReplyingToCommentId(null)
-      fetchComments()
-    } catch (error: any) {
-      console.error('Error creating reply:', error)
-      alert(error.message || 'Ошибка при создании ответа')
+      const created = await postComment(text)
+      setComments((prev) => prev.map((c) => (c.id === tempId ? { ...created, replies: [] } : c)))
+    } catch (err: unknown) {
+      setComments((prev) => prev.filter((c) => c.id !== tempId))
+      setCommentText(text)
+      const message = err instanceof Error ? err.message : 'Ошибка при отправке комментария'
+      setError(message)
     } finally {
       setSaving(false)
+      composerRef.current?.focus()
     }
   }
 
-  const handleEditComment = async (commentId: string, newContent: string) => {
-    if (!currentUser || !newContent.trim()) return
+  const handleSubmitReply = async (parentId: string) => {
+    const text = replyText.trim()
+    if (!currentUser || !text || saving) return
+
+    const tempId = `temp-reply-${Date.now()}`
+    const optimistic: CommentNode = {
+      id: tempId,
+      product_id: productId,
+      author_id: currentUser.id,
+      content: text,
+      created_at: new Date().toISOString(),
+      parent_comment_id: parentId,
+      author: currentUser,
+      replies: [],
+    }
 
     setSaving(true)
+    setError(null)
+    setComments((prev) => addReplyToTree(prev, parentId, optimistic))
+    setReplyText('')
+    setReplyingToId(null)
+
     try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token
-      if (!token) throw new Error('Not authenticated')
-
-      const response = await fetch(`/api/products/${productId}/comments/${commentId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          content: newContent.trim(),
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to update comment')
-      }
-
-      setEditingCommentId(null)
-      fetchComments()
-    } catch (error: any) {
-      console.error('Error updating comment:', error)
-      alert(error.message || 'Ошибка при обновлении комментария')
+      const created = await postComment(text, parentId)
+      setComments((prev) =>
+        addReplyToTree(
+          prev.map((c) => stripTemp(c, tempId)),
+          parentId,
+          { ...created, replies: [] }
+        )
+      )
+    } catch (err: unknown) {
+      setComments((prev) => prev.map((c) => stripTemp(c, tempId)))
+      setReplyText(text)
+      setReplyingToId(parentId)
+      const message = err instanceof Error ? err.message : 'Ошибка при отправке ответа'
+      setError(message)
     } finally {
       setSaving(false)
     }
-  }
-
-  const handleDeleteComment = async (commentId: string) => {
-    if (!currentUser || !confirm('Вы уверены, что хотите удалить комментарий?')) return
-
-    try {
-      const token = (await supabase.auth.getSession()).data.session?.access_token
-      if (!token) throw new Error('Not authenticated')
-
-      const response = await fetch(`/api/products/${productId}/comments/${commentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to delete comment')
-      }
-
-      fetchComments()
-    } catch (error: any) {
-      console.error('Error deleting comment:', error)
-      alert(error.message || 'Ошибка при удалении комментария')
-    }
-  }
-
-  const CommentItem = ({ comment, level = 0, isInFlatRepliesList = false }: { comment: ProductComment & { author?: User; replies?: ProductComment[] }; level?: number; isInFlatRepliesList?: boolean }) => {
-    const [isEditing, setIsEditing] = useState(false)
-    const [editText, setEditText] = useState(comment.content)
-
-    const isOwnComment = currentUser?.id === comment.author_id
-    const timeAgo = format(new Date(comment.created_at), 'd MMMM yyyy в HH:mm', { locale: ru })
-
-    return (
-      <div id={`comment-${comment.id}`} className={`${level > 0 ? 'ml-8 mt-3 border-l-2 border-border-light/40 pl-4' : ''}`}>
-        <div className="flex gap-3">
-          <GuestAwareProfileLink profileId={comment.author_id} className="flex-shrink-0 block">
-            <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-border-light/60">
-              {comment.author?.avatar_url ? (
-                <Image
-                  src={comment.author.avatar_url}
-                  alt={comment.author.full_name}
-                  fill
-                  className="object-cover rounded-full"
-                  sizes="40px"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-graphite-primary to-graphite-tertiary flex items-center justify-center text-white text-sm font-semibold">
-                  {comment.author?.full_name?.[0]?.toUpperCase() || '?'}
-                </div>
-              )}
-            </div>
-          </GuestAwareProfileLink>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between mb-1">
-              <div className="flex-1 min-w-0">
-                <GuestAwareProfileLink
-                  profileId={comment.author_id}
-                  className="font-semibold text-graphite-secondary hover:text-brand-accent transition-colors"
-                >
-                  {comment.author?.full_name || 'Пользователь'}
-                </GuestAwareProfileLink>
-                <span className="text-xs text-text-secondary ml-2">{timeAgo}</span>
-              </div>
-              {isOwnComment && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setIsEditing(true)
-                      setEditText(comment.content)
-                    }}
-                    className="p-1.5 text-text-secondary hover:text-brand-accent transition-colors"
-                    title="Редактировать"
-                  >
-                    <FiEdit2 size={14} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteComment(comment.id)}
-                    className="p-1.5 text-text-secondary hover:text-red-500 transition-colors"
-                    title="Удалить"
-                  >
-                    <FiTrash2 size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
-            {isEditing ? (
-              <div className="space-y-2">
-                <textarea
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  rows={2}
-                  className="input w-full resize-none text-sm"
-                  maxLength={1000}
-                />
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="px-3 py-1.5 text-sm text-text-secondary hover:text-graphite-secondary"
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleEditComment(comment.id, editText)
-                      setIsEditing(false)
-                    }}
-                    disabled={!editText.trim() || saving}
-                    className="btn btn-primary text-sm px-4 py-1.5 disabled:opacity-50"
-                  >
-                    Сохранить
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap mb-2">
-                  {comment.content}
-                </p>
-                {currentUser && (
-                  <button
-                    onClick={() => setReplyingToCommentId(replyingToCommentId === comment.id ? null : comment.id)}
-                    className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-brand-accent transition-colors"
-                  >
-                    <FiMessageCircle size={12} />
-                    <span>Ответить</span>
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Форма ответа — под комментарием с тем же отступом, что и ответы */}
-        {replyingToCommentId === comment.id && currentUser && (
-          <div className="mt-3 ml-8 pl-4 border-l-2 border-border-light/40">
-            <textarea
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              rows={2}
-              className="input w-full resize-none text-sm mb-2"
-              placeholder="Написать ответ..."
-              maxLength={500}
-            />
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => {
-                  setReplyingToCommentId(null)
-                  setReplyText('')
-                }}
-                className="px-3 py-1.5 text-sm text-text-secondary hover:text-graphite-secondary"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={() => handleSubmitReply(comment.id)}
-                disabled={!replyText.trim() || saving}
-                className="btn btn-primary text-sm px-4 py-1.5 disabled:opacity-50 flex items-center gap-1.5"
-              >
-                <FiSend size={14} />
-                Отправить
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Ответы в стиле Instagram: один уровень отступа, «Показать N» / «Посмотреть ещё X» / «Скрыть» */}
-        {!isInFlatRepliesList &&
-        (() => {
-          const flatReplies = collectDescendants(comment).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-          const n = flatReplies.length
-          if (n === 0) return null
-          const isExpanded = !!expandedReplies[comment.id]
-          const toShow = showAllReplies[comment.id] ? flatReplies : flatReplies.slice(0, INITIAL_REPLIES_VISIBLE)
-          const moreCount = n - INITIAL_REPLIES_VISIBLE
-          return (
-            <div className="mt-3">
-              {!isExpanded ? (
-                <button
-                  type="button"
-                  onClick={() => setExpandedReplies((prev) => ({ ...prev, [comment.id]: true }))}
-                  className="text-xs text-text-secondary hover:text-brand-accent transition-colors"
-                >
-                  Показать {n} {pluralReplies(n)}
-                </button>
-              ) : (
-                <>
-                  {toShow.map((reply) => (
-                    <CommentItem key={reply.id} comment={reply as ProductComment & { author?: User; replies?: ProductComment[] }} level={1} isInFlatRepliesList />
-                  ))}
-                  {moreCount > 0 && !showAllReplies[comment.id] && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllReplies((prev) => ({ ...prev, [comment.id]: true }))}
-                      className="text-xs text-text-secondary hover:text-brand-accent transition-colors mt-1"
-                    >
-                      Посмотреть ещё {moreCount} {pluralReplies(moreCount)}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setExpandedReplies((prev) => ({ ...prev, [comment.id]: false }))}
-                    className="text-xs text-text-secondary hover:text-brand-accent transition-colors mt-2"
-                  >
-                    Скрыть ответы
-                  </button>
-                </>
-              )}
-            </div>
-          )
-        })()}
-      </div>
-    )
   }
 
   return (
-    <div className="card mt-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
-        <div>
-          <h2 className="text-xl font-semibold mb-1">Комментарии</h2>
-          {productId && (
-            <p className="text-sm text-gray-500">
-              {comments.length} {comments.length === 1 ? 'комментарий' : comments.length < 5 ? 'комментария' : 'комментариев'}
-            </p>
-          )}
-        </div>
-        {currentUser && (
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="btn btn-primary text-sm w-full sm:w-auto"
-          >
-            {showForm ? 'Отмена' : 'Написать комментарий'}
-          </button>
-        )}
+    <div className="mt-8 bg-[#f7f9fc] border border-[#dbe7f3] rounded-2xl px-4 py-4">
+      <div className="mb-3">
+        <h2 className="text-[18px] font-extrabold text-[#111] leading-tight">Комментарии</h2>
+        <p className="text-[12px] text-[#8e8e93] mt-0.5">
+          {total} {pluralComments(total)}
+        </p>
       </div>
 
-      {/* Форма создания комментария */}
-      {showForm && currentUser && (
-        <form onSubmit={handleSubmitComment} className="mb-6">
-          <textarea
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            rows={3}
-            className="input w-full resize-none mb-3"
-            placeholder="Написать комментарий..."
-            maxLength={1000}
-            required
-          />
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-text-secondary">
-              {commentText.length}/1000
-            </div>
+      {currentUser ? (
+        <form onSubmit={handleSubmitComment} className="mb-4">
+          <div className="flex items-end gap-2">
+            <Avatar user={currentUser} size={32} />
+            <textarea
+              ref={composerRef}
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  void handleSubmitComment()
+                }
+              }}
+              rows={2}
+              maxLength={1000}
+              placeholder="Добавить комментарий…"
+              className="flex-1 min-w-0 resize-none bg-white border border-[#e5e5ea] rounded-xl px-3 py-2 text-[13px] text-[#111] outline-none placeholder:text-[#bbb] leading-snug"
+            />
             <button
               type="submit"
               disabled={!commentText.trim() || saving}
-              className="btn btn-primary text-sm px-4 py-2 disabled:opacity-50 flex items-center gap-2"
+              className="h-10 px-3 rounded-xl bg-[#e63946] text-white text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-40 flex-shrink-0"
             >
-              <FiSend size={16} />
-              {saving ? 'Отправка...' : 'Отправить'}
+              <FiSend size={14} />
+              {saving && !replyingToId ? '…' : 'Отправить'}
             </button>
           </div>
+          <p className="text-[10px] text-[#bbb] mt-1 ml-10">{commentText.length}/1000</p>
         </form>
+      ) : (
+        <Link
+          href={loginUrl(`/products/${productId}`)}
+          className="block mb-4 text-[13px] text-[#8e8e93] bg-white border border-[#ececec] rounded-xl px-3 py-2.5"
+        >
+          Войдите, чтобы написать комментарий
+        </Link>
       )}
 
-      {/* Список комментариев */}
+      {error && (
+        <p className="text-[12px] text-[#e63946] mb-3">{error}</p>
+      )}
+
       {loading ? (
-        <div className="text-center text-gray-500 py-10">
-          Загрузка комментариев...
-        </div>
+        <p className="text-center text-[12px] text-[#8e8e93] py-8">Загрузка комментариев…</p>
       ) : comments.length === 0 ? (
-        <div className="text-center text-gray-500 py-10">
-          Пока нет комментариев
-        </div>
+        <p className="text-center text-[12px] text-[#8e8e93] py-8">Пока нет комментариев</p>
       ) : (
         <div className="space-y-4">
           {comments.map((comment) => (
-            <CommentItem key={comment.id} comment={comment} />
+            <CommentThread
+              key={comment.id}
+              comment={comment}
+              currentUser={currentUser}
+              sellerId={sellerId}
+              replyingToId={replyingToId}
+              replyText={replyText}
+              replyRef={replyRef}
+              saving={saving}
+              onReply={(id) => {
+                setReplyingToId((prev) => (prev === id ? null : id))
+                setReplyText('')
+              }}
+              onReplyText={setReplyText}
+              onSubmitReply={handleSubmitReply}
+              onCancelReply={() => {
+                setReplyingToId(null)
+                setReplyText('')
+              }}
+            />
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function stripTemp(node: CommentNode, tempId: string): CommentNode {
+  return {
+    ...node,
+    replies: (node.replies || []).filter((r) => r.id !== tempId).map((r) => stripTemp(r, tempId)),
+  }
+}
+
+function Avatar({ user, size }: { user?: User | null; size: number }) {
+  const name = user?.full_name || 'Пользователь'
+  return (
+    <div
+      className="relative rounded-full overflow-hidden bg-[#e63946] flex-shrink-0 flex items-center justify-center text-white font-semibold"
+      style={{ width: size, height: size, fontSize: size * 0.38 }}
+    >
+      {user?.avatar_url ? (
+        <Image src={user.avatar_url} alt="" fill className="object-cover" sizes={`${size}px`} />
+      ) : (
+        name[0]?.toUpperCase() || '?'
+      )}
+    </div>
+  )
+}
+
+function RoleBadge({ authorId, sellerId, currentUserId }: { authorId: string; sellerId?: string | null; currentUserId?: string }) {
+  if (sellerId && authorId === sellerId) {
+    return <span className="inline-block ml-1 mr-1 text-[10px] font-bold text-[#e63946] align-middle">Продавец</span>
+  }
+  if (currentUserId && authorId === currentUserId) {
+    return <span className="inline-block ml-1 mr-1 text-[10px] font-semibold text-[#8e8e93] align-middle">Вы</span>
+  }
+  return null
+}
+
+function CommentThread({
+  comment,
+  currentUser,
+  sellerId,
+  replyingToId,
+  replyText,
+  replyRef,
+  saving,
+  onReply,
+  onReplyText,
+  onSubmitReply,
+  onCancelReply,
+}: {
+  comment: CommentNode
+  currentUser: User | null
+  sellerId?: string | null
+  replyingToId: string | null
+  replyText: string
+  replyRef: RefObject<HTMLTextAreaElement | null>
+  saving: boolean
+  onReply: (id: string) => void
+  onReplyText: (v: string) => void
+  onSubmitReply: (parentId: string) => void
+  onCancelReply: () => void
+}) {
+  const replies = collectDescendants(comment).sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  )
+
+  return (
+    <div>
+      <CommentRow
+        comment={comment}
+        currentUser={currentUser}
+        sellerId={sellerId}
+        onReply={() => onReply(comment.id)}
+      />
+      {replyingToId === comment.id && currentUser && (
+        <ReplyComposer
+          replyRef={replyRef}
+          value={replyText}
+          saving={saving}
+          onChange={onReplyText}
+          onSubmit={() => onSubmitReply(comment.id)}
+          onCancel={onCancelReply}
+        />
+      )}
+      {replies.length > 0 && (
+        <div className="mt-2 ml-10 space-y-2.5 border-l border-[#ececec] pl-3">
+          {replies.map((reply) => (
+            <div key={reply.id}>
+              <CommentRow
+                comment={reply}
+                currentUser={currentUser}
+                sellerId={sellerId}
+                compact
+                onReply={() => onReply(reply.id)}
+              />
+              {replyingToId === reply.id && currentUser && (
+                <ReplyComposer
+                  replyRef={replyRef}
+                  value={replyText}
+                  saving={saving}
+                  onChange={onReplyText}
+                  onSubmit={() => onSubmitReply(reply.id)}
+                  onCancel={onCancelReply}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CommentRow({
+  comment,
+  currentUser,
+  sellerId,
+  compact,
+  onReply,
+}: {
+  comment: CommentNode
+  currentUser: User | null
+  sellerId?: string | null
+  compact?: boolean
+  onReply: () => void
+}) {
+  const timeAgo = formatDistanceToNow(new Date(comment.created_at), { addSuffix: true, locale: ru })
+
+  return (
+    <div id={`comment-${comment.id}`} className="flex gap-2.5">
+      <GuestAwareProfileLink profileId={comment.author_id} className="flex-shrink-0">
+        <Avatar user={comment.author} size={compact ? 28 : 32} />
+      </GuestAwareProfileLink>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] text-[#111] leading-snug">
+          <GuestAwareProfileLink
+            profileId={comment.author_id}
+            className="font-bold mr-1.5 hover:text-[#e63946]"
+          >
+            {comment.author?.full_name || 'Пользователь'}
+          </GuestAwareProfileLink>
+          <RoleBadge authorId={comment.author_id} sellerId={sellerId} currentUserId={currentUser?.id} />
+          <span className="font-normal whitespace-pre-wrap break-words"> {comment.content}</span>
+        </p>
+        <div className="flex items-center gap-3 mt-1">
+          <span className="text-[11px] text-[#8e8e93]">{timeAgo}</span>
+          {currentUser && (
+            <button
+              type="button"
+              onClick={onReply}
+              className="text-[11px] font-semibold text-[#8e8e93] hover:text-[#e63946]"
+            >
+              Ответить
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReplyComposer({
+  replyRef,
+  value,
+  saving,
+  onChange,
+  onSubmit,
+  onCancel,
+}: {
+  replyRef: RefObject<HTMLTextAreaElement | null>
+  value: string
+  saving: boolean
+  onChange: (v: string) => void
+  onSubmit: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="mt-2 ml-10">
+      <textarea
+        ref={replyRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            onSubmit()
+          }
+        }}
+        rows={2}
+        maxLength={500}
+        placeholder="Ответ…"
+        className="w-full resize-none bg-white border border-[#e5e5ea] rounded-xl px-3 py-2 text-[13px] text-[#111] outline-none placeholder:text-[#bbb]"
+      />
+      <div className="flex items-center justify-end gap-2 mt-1.5">
+        <button type="button" onClick={onCancel} className="text-[11px] font-semibold text-[#8e8e93] px-2 py-1">
+          Отмена
+        </button>
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!value.trim() || saving}
+          className="h-8 px-3 rounded-lg bg-[#e63946] text-white text-[11px] font-semibold disabled:opacity-40"
+        >
+          Ответить
+        </button>
+      </div>
     </div>
   )
 }

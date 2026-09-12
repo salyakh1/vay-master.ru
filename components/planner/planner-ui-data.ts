@@ -44,6 +44,8 @@ export const FLOOR_MATS: MaterialOption[] = [
   { id: 'concrete', icon: '🪨', name: 'Бетон', sub: 'от 4500 ₽/м³', keywords: ['бетон'], surface: 'floor', unit: 'm3', materialPrice: 4500, workPrice: 2200 },
   { id: 'parquet', icon: '🪵', name: 'Паркет', sub: 'от 2800 ₽/м²', keywords: ['паркет'], surface: 'floor', unit: 'm2', materialPrice: 2800, workPrice: 1200 },
   { id: 'linoleum', icon: '🟥', name: 'Линолеум', sub: 'от 650 ₽/м²', keywords: ['линолеум'], surface: 'floor', unit: 'm2', materialPrice: 650, workPrice: 350 },
+  { id: 'spc', icon: '⬛', name: 'SPC / кварцвинил', sub: 'от 1400 ₽/м²', keywords: ['spc', 'кварц', 'винилов'], surface: 'floor', unit: 'm2', materialPrice: 1400, workPrice: 550 },
+  { id: 'cork', icon: '🟨', name: 'Пробка', sub: 'от 1900 ₽/м²', keywords: ['пробк'], surface: 'floor', unit: 'm2', materialPrice: 1900, workPrice: 700 },
 ]
 
 export const WALL_MATS: MaterialOption[] = [
@@ -52,6 +54,7 @@ export const WALL_MATS: MaterialOption[] = [
   { id: 'wall-tile', icon: '🟦', name: 'Плитка', sub: 'от 1100 ₽/м²', keywords: ['плитк'], surface: 'walls', unit: 'm2', materialPrice: 1100, workPrice: 950 },
   { id: 'plaster', icon: '⬜', name: 'Штукатурка', sub: 'от 2800 ₽/м³', keywords: ['штукатур', 'шпакл'], surface: 'walls', unit: 'm3', materialPrice: 2800, workPrice: 1600 },
   { id: 'panel', icon: '🟫', name: 'Панели', sub: 'от 900 ₽/м²', keywords: ['панел'], surface: 'walls', unit: 'm2', materialPrice: 900, workPrice: 550 },
+  { id: 'wall-brick', icon: '🧱', name: 'Декор. кирпич', sub: 'от 980 ₽/м²', keywords: ['кирпич'], surface: 'walls', unit: 'm2', materialPrice: 980, workPrice: 850 },
 ]
 
 export const CEIL_MATS: MaterialOption[] = [
@@ -64,6 +67,7 @@ export const ROOF_MATS: MaterialOption[] = [
   { id: 'metal-tile', icon: '🏠', name: 'Металлочерепица', sub: 'от 580 ₽/м²', keywords: ['металл'], surface: 'roof', unit: 'm2', materialPrice: 580, workPrice: 420 },
   { id: 'soft-roof', icon: '🟫', name: 'Мягкая кровля', sub: 'от 720 ₽/м²', keywords: ['кровл'], surface: 'roof', unit: 'm2', materialPrice: 720, workPrice: 480 },
   { id: 'slate', icon: '⬛', name: 'Шифер', sub: 'от 320 ₽/м²', keywords: ['шифер'], surface: 'roof', unit: 'm2', materialPrice: 320, workPrice: 350 },
+  { id: 'profnastil', icon: '⬜', name: 'Профнастил', sub: 'от 450 ₽/м²', keywords: ['профнастил', 'металл'], surface: 'roof', unit: 'm2', materialPrice: 450, workPrice: 380 },
 ]
 
 export const FACADE_MATS: MaterialOption[] = [
@@ -72,6 +76,7 @@ export const FACADE_MATS: MaterialOption[] = [
   { id: 'clinker', icon: '🟥', name: 'Клинкер', sub: 'по размеру', keywords: ['клинкер'], surface: 'facade', unit: 'pcs', materialPrice: 42, workPrice: 65, countMode: 'brick' },
   { id: 'siding', icon: '📐', name: 'Сайдинг', sub: 'от 420 ₽/м²', keywords: ['сайдинг'], surface: 'facade', unit: 'm2', materialPrice: 420, workPrice: 380 },
   { id: 'plaster-facade', icon: '🖌️', name: 'Штукатурка', sub: 'от 380 ₽/м²', keywords: ['штукатур'], surface: 'facade', unit: 'm2', materialPrice: 380, workPrice: 450 },
+  { id: 'insulation', icon: '🧊', name: 'Утепление', sub: 'от 890 ₽/м²', keywords: ['утепл', 'изоляц'], surface: 'facade', unit: 'm2', materialPrice: 890, workPrice: 650 },
 ]
 
 export const PAVING_MATS: MaterialOption[] = [
@@ -79,6 +84,7 @@ export const PAVING_MATS: MaterialOption[] = [
   { id: 'tile-yard', icon: '⬜', name: 'Трот. плитка', sub: 'от 720 ₽/м²', keywords: ['плитк'], surface: 'paving', unit: 'm2', materialPrice: 720, workPrice: 520 },
   { id: 'asphalt', icon: '⬛', name: 'Асфальт', sub: 'от 850 ₽/м²', keywords: ['асфальт'], surface: 'paving', unit: 'm2', materialPrice: 850, workPrice: 480 },
   { id: 'gravel', icon: '🪨', name: 'Щебень', sub: 'от 320 ₽/м²', keywords: ['щебень'], surface: 'paving', unit: 'm2', materialPrice: 320, workPrice: 280 },
+  { id: 'decking', icon: '🪵', name: 'Терраса / декинг', sub: 'от 2100 ₽/м²', keywords: ['террас', 'декинг', 'доска'], surface: 'paving', unit: 'm2', materialPrice: 2100, workPrice: 900 },
 ]
 
 export const MATS_BY_SURFACE: Record<SurfaceId, MaterialOption[]> = {

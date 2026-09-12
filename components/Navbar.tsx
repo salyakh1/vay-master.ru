@@ -7,11 +7,11 @@ import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import AppTopHeader from '@/components/AppTopHeader'
 import {
+  FiHome,
   FiShoppingBag,
   FiMessageCircle,
   FiUser,
   FiSearch,
-  FiBriefcase,
 } from 'react-icons/fi'
 
 type NavbarProps = {
@@ -88,73 +88,71 @@ export default function Navbar({ bottomOnly = false, topOnly = false }: NavbarPr
     }
   }, [user])
 
-  const bottomNav = user ? (() => {
-    const role = user.role
-    const profileHref = `/profile/${user.id}`
-    const tabs =
-      role === 'master'
-        ? ([
-            { href: '/orders', label: 'Заказы', icon: FiBriefcase, match: (p: string) => p.startsWith('/orders') },
-            { href: '/chats', label: 'Отклики', icon: FiMessageCircle, match: (p: string) => p.startsWith('/chats'), badge: unreadChatsCount },
-            { href: profileHref, label: 'Профиль', icon: FiUser, match: (p: string) => p.startsWith('/profile') || p.startsWith('/settings') },
-          ] as const)
-        : role === 'seller'
-          ? ([
-              { href: '/products', label: 'Товары', icon: FiShoppingBag, match: (p: string) => p.startsWith('/products') },
-              { href: '/orders', label: 'Заказы', icon: FiBriefcase, match: (p: string) => p.startsWith('/orders') },
-              { href: profileHref, label: 'Профиль', icon: FiUser, match: (p: string) => p.startsWith('/profile') || p.startsWith('/settings') },
-            ] as const)
-          : ([
-              { href: '/search', label: 'Поиск', icon: FiSearch, match: (p: string) => p === '/search' || p.startsWith('/search') },
-              { href: '/orders', label: 'Заказы', icon: FiBriefcase, match: (p: string) => p.startsWith('/orders') },
-              { href: '/chats', label: 'Чаты', icon: FiMessageCircle, match: (p: string) => p.startsWith('/chats'), badge: unreadChatsCount },
-              { href: profileHref, label: 'Профиль', icon: FiUser, match: (p: string) => p.startsWith('/profile') || p.startsWith('/settings') },
-            ] as const)
+  const feedHref = '/feed'
+  const chatsHref = '/chats'
+  const profileHref = user ? `/profile/${user.id}` : '/auth/login'
+  const feedActive = pathname === '/feed' || pathname?.startsWith('/feed/')
+  const sellersActive = Boolean(pathname?.startsWith('/products'))
+  const mastersActive = pathname === '/search' || Boolean(pathname?.startsWith('/search/'))
+  const chatsActive = Boolean(pathname?.startsWith('/chats'))
+  const profileActive = Boolean(pathname?.startsWith('/profile') || pathname?.startsWith('/settings'))
+  const itemClass = (active: boolean) =>
+    `flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 min-w-0 transition-colors ${
+      active ? 'text-brand-accent' : 'text-[#8e8e93] hover:text-[#1c1c1e]'
+    }`
 
-    const cols = tabs.length
-
-    return (
+  const bottomNav = user ? (
     <nav
       className="fixed bottom-0 left-0 right-0 w-full max-w-[100vw] bg-white border-t border-[#e5e5ea] z-[100] pointer-events-auto"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
     >
       <div className="max-w-lg mx-auto w-full">
-        <div
-          className="grid gap-0 min-h-[52px] sm:min-h-[56px] w-full"
-          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-        >
-          {tabs.map((tab) => {
-            const active = tab.match(pathname || '')
-            const Icon = tab.icon
-            const badge = 'badge' in tab ? tab.badge : 0
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 min-w-0 transition-colors relative ${
-                  active ? 'text-brand-accent' : 'text-[#8e8e93] hover:text-[#1c1c1e]'
-                }`}
-                prefetch={false}
-              >
-                <div className="relative flex-shrink-0">
-                  <Icon className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={active ? 2.5 : 2} />
-                  {!active && typeof badge === 'number' && badge > 0 && (
-                    <span className="absolute -top-0.5 -right-1.5 bg-brand-accent text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] h-3.5 flex items-center justify-center px-0.5">
-                      {badge > 99 ? '99+' : badge}
-                    </span>
-                  )}
-                </div>
-                <span className={`text-[9px] sm:text-[10px] leading-tight truncate w-full text-center ${active ? 'font-semibold' : 'font-medium'}`}>
-                  {tab.label}
+        <div className="grid grid-cols-5 gap-0 min-h-[52px] sm:min-h-[56px] w-full">
+          <Link href={feedHref} className={itemClass(feedActive)} prefetch={false}>
+            <FiHome className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={feedActive ? 2.5 : 2} />
+            <span className={`text-[10px] leading-tight truncate w-full text-center ${feedActive ? 'font-semibold' : 'font-medium'}`}>
+              Лента
+            </span>
+          </Link>
+
+          <Link href="/products" className={itemClass(sellersActive)} prefetch={false}>
+            <FiShoppingBag className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={sellersActive ? 2.5 : 2} />
+            <span className={`text-[10px] leading-tight truncate w-full text-center ${sellersActive ? 'font-semibold' : 'font-medium'}`}>
+              Продавцы
+            </span>
+          </Link>
+
+          <Link href="/search" className={itemClass(mastersActive)} prefetch={false}>
+            <FiSearch className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={mastersActive ? 2.5 : 2} />
+            <span className={`text-[10px] leading-tight truncate w-full text-center ${mastersActive ? 'font-semibold' : 'font-medium'}`}>
+              Мастера
+            </span>
+          </Link>
+
+          <Link href={chatsHref} className={`${itemClass(chatsActive)} relative`} prefetch={false}>
+            <div className="relative flex-shrink-0">
+              <FiMessageCircle className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={chatsActive ? 2.5 : 2} />
+              {!chatsActive && unreadChatsCount > 0 && (
+                <span className="absolute -top-0.5 -right-1.5 bg-brand-accent text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] h-3.5 flex items-center justify-center px-0.5">
+                  {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
                 </span>
-              </Link>
-            )
-          })}
+              )}
+            </div>
+            <span className={`text-[10px] leading-tight truncate w-full text-center ${chatsActive ? 'font-semibold' : 'font-medium'}`}>
+              Чаты
+            </span>
+          </Link>
+
+          <Link href={profileHref} className={itemClass(profileActive)} prefetch={false}>
+            <FiUser className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={profileActive ? 2.5 : 2} />
+            <span className={`text-[10px] leading-tight truncate w-full text-center ${profileActive ? 'font-semibold' : 'font-medium'}`}>
+              Профиль
+            </span>
+          </Link>
         </div>
       </div>
     </nav>
-    )
-  })() : null
+  ) : null
 
   if (bottomOnly) return bottomNav
   if (topOnly) return <AppTopHeader />

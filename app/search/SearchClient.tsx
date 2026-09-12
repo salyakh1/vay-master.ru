@@ -17,6 +17,7 @@ import { useUserLocation } from '@/hooks/useUserLocation'
 import { Story } from '@/lib/supabase'
 import type { AdBanner } from '@/lib/supabase'
 import StoriesCircle from '@/components/StoriesCircle'
+import RadiusSetupBanner from '@/components/RadiusSetupBanner'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs, getProductCategoriesForCategorySlugs } from '@/lib/specialization-product-mapping'
 import { getCategoryEmoji } from '@/lib/categoryEmoji'
 import { trackFunnel } from '@/lib/track-funnel'
@@ -68,7 +69,7 @@ function SearchContent({
   const autocompleteAbortRef = useRef<AbortController | null>(null)
   const cityAutocompleteAbortRef = useRef<AbortController | null>(null)
 
-  const { lat, lng, radiusKm, city: userLocCity, locationReady, setRadiusKm } = useUserLocation()
+  const { lat, lng, radiusKm, radiusConfigured, radiusReady, city: userLocCity, locationReady, setRadiusKm, setOrigin } = useUserLocation()
   const [showRadiusModal, setShowRadiusModal] = useState(false)
   const [listMasters, setListMasters] = useState<MasterScrollerItem[]>(() => initialMasters || [])
   const [listPage, setListPage] = useState(1)
@@ -118,18 +119,17 @@ function SearchContent({
 
   // Коротко ждём геолокацию, чтобы сразу отсортировать по расстоянию (без двойной загрузки)
   useEffect(() => {
-    if (locationReady) {
+    if (locationReady && radiusReady) {
       setReadyToSearch(true)
       return
     }
-    // Если уже есть SSR-данные — не блокируем экран ожиданием гео
     if (ssrHydratedRef.current) {
       setReadyToSearch(true)
       return
     }
     const t = setTimeout(() => setReadyToSearch(true), 800)
     return () => clearTimeout(t)
-  }, [locationReady])
+  }, [locationReady, radiusReady])
   // Синхронизация фильтров в URL
   useEffect(() => {
     const params = new URLSearchParams()
@@ -231,7 +231,7 @@ function SearchContent({
   const [masterCategorySlugs, setMasterCategorySlugs] = useState<string[]>([])
   const [loadingMasterCategories, setLoadingMasterCategories] = useState(false)
 
-  // Подкатегории мастера — отложенно (для блока «Рекомендации под ваши услуги»)
+  // Подкатегории мастера — сразу, чтобы «товары для задачи» не показывали чужой каталог
   useEffect(() => {
     if (user?.role !== 'master' || !user.id) {
       setMasterSubcategorySlugs([])
@@ -240,46 +240,38 @@ function SearchContent({
       return
     }
     let cancelled = false
-    const run = () => {
-      if (cancelled) return
-      setLoadingMasterCategories(true)
-      void Promise.resolve(
-        supabase
-          .from('profile_subcategories')
-          .select('subcategory:subcategories(id, slug, category:categories(id, slug))')
-          .eq('profile_id', user.id)
-      )
-        .then(({ data, error }) => {
-          if (cancelled) return
-          if (!error && data) {
-            const subSlugs = (data as any[])
-              .map((item: any) => item.subcategory?.slug)
-              .filter(Boolean) as string[]
-            const catSlugs = (data as any[])
-              .map((item: any) => item.subcategory?.category?.slug)
-              .filter(Boolean) as string[]
-            setMasterSubcategorySlugs(Array.from(new Set(subSlugs)))
-            setMasterCategorySlugs(Array.from(new Set(catSlugs)))
-          } else {
-            setMasterSubcategorySlugs([])
-            setMasterCategorySlugs([])
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setMasterSubcategorySlugs([])
-            setMasterCategorySlugs([])
-          }
-        })
-        .finally(() => { if (!cancelled) setLoadingMasterCategories(false) })
-    }
-    const id = typeof requestIdleCallback !== 'undefined'
-      ? requestIdleCallback(run, { timeout: 4000 })
-      : setTimeout(run, 4000)
+    setLoadingMasterCategories(true)
+    void supabase
+      .from('profile_subcategories')
+      .select('subcategory:subcategories(id, slug, category:categories(id, slug))')
+      .eq('profile_id', user.id)
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (!error && data) {
+          const subSlugs = (data as any[])
+            .map((item: any) => item.subcategory?.slug)
+            .filter(Boolean) as string[]
+          const catSlugs = (data as any[])
+            .map((item: any) => item.subcategory?.category?.slug)
+            .filter(Boolean) as string[]
+          setMasterSubcategorySlugs(Array.from(new Set(subSlugs)))
+          setMasterCategorySlugs(Array.from(new Set(catSlugs)))
+        } else {
+          setMasterSubcategorySlugs([])
+          setMasterCategorySlugs([])
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMasterSubcategorySlugs([])
+          setMasterCategorySlugs([])
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingMasterCategories(false)
+      })
     return () => {
       cancelled = true
-      if (typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(id as number)
-      else clearTimeout(id as ReturnType<typeof setTimeout>)
     }
   }, [user])
 
@@ -584,6 +576,8 @@ function SearchContent({
 
       <CompactPageBanner page="search" initialBanners={initialBanners} />
 
+      <RadiusSetupBanner visible={radiusReady && !radiusConfigured} onSetup={() => setShowRadiusModal(true)} />
+
       {(stories.length > 0 ||
         (!!user && (user.role === 'master' || user.role === 'seller'))) && (
         <div className="bg-white border-b border-[#efefef] px-3 py-2.5">
@@ -610,7 +604,7 @@ function SearchContent({
             className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium active:scale-95 transition-transform"
           >
             <span aria-hidden>📍</span>
-            <strong className="text-[#1c1c1e] font-bold">{radiusKm} км</strong>
+            <strong className="text-[#1c1c1e] font-bold">{radiusConfigured && radiusKm != null ? `${radiusKm} км` : 'Все'}</strong>
             <span aria-hidden className="text-[8px] text-[#8e8e93]">▾</span>
           </button>
         )}
@@ -690,7 +684,8 @@ function SearchContent({
 
       <div className="h-2 bg-[#f2f2f7]" aria-hidden />
 
-      {/* Скроллер: товары для задачи */}
+      {/* Скроллер: товары только под выбранную задачу / специализацию мастера */}
+      {(productScrollerSlugs?.categorySlugs?.length || productScrollerSlugs?.subcategorySlugs?.length) ? (
       <ProductsScrollerSection
         title="Товары для вашей задачи"
         label="Вам понадобится"
@@ -702,8 +697,11 @@ function SearchContent({
         lat={lat}
         lng={lng}
         radiusKm={radiusKm}
+        city={userLocCity || cityFilter || undefined}
         showRadius={false}
+        requireTaskMatch
       />
+      ) : null}
 
       <div className="h-2 bg-[#f2f2f7]" aria-hidden />
 
@@ -977,13 +975,16 @@ function SearchContent({
 
       <RadiusPickerModal
         isOpen={showRadiusModal}
-        currentRadiusKm={radiusKm}
+        currentRadiusKm={radiusKm ?? 50}
         lat={lat}
         lng={lng}
         city={userLocCity}
         resultsCount={listTotal}
         resultsUnit="мастеров"
-        onSelect={setRadiusKm}
+        onSelect={(km, origin) => {
+          setRadiusKm(km)
+          if (origin) setOrigin(origin.lat, origin.lng)
+        }}
         onClose={() => setShowRadiusModal(false)}
       />
 

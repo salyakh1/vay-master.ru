@@ -24,10 +24,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const lat = Number(searchParams.get('lat'))
     const lng = Number(searchParams.get('lng'))
-    const radiusKm = Math.min(
-      MAX_RADIUS_KM,
-      Math.max(1, Number(searchParams.get('radius_km')) || DEFAULT_RADIUS_KM)
-    )
+    const unbounded = searchParams.get('unbounded') === '1'
+    const radiusKm = unbounded
+      ? Number.POSITIVE_INFINITY
+      : Math.min(
+          MAX_RADIUS_KM,
+          Math.max(1, Number(searchParams.get('radius_km')) || DEFAULT_RADIUS_KM)
+        )
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
     const limit = Math.min(
       50,
@@ -41,15 +44,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Грубая bounding box (~1° ≈ 111 km) чтобы не тянуть всех мастеров
-    const deg = radiusKm / 111
-    const degLng = radiusKm / (111 * Math.max(0.3, Math.cos((lat * Math.PI) / 180)))
-    const minLat = lat - deg
-    const maxLat = lat + deg
-    const minLng = lng - degLng
-    const maxLng = lng + degLng
-
-    const { data: list, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('profiles')
       .select(
         `
@@ -69,10 +64,18 @@ export async function GET(request: NextRequest) {
       .eq('role', 'master')
       .not('master_lat', 'is', null)
       .not('master_lng', 'is', null)
-      .gte('master_lat', minLat)
-      .lte('master_lat', maxLat)
-      .gte('master_lng', minLng)
-      .lte('master_lng', maxLng)
+
+    if (Number.isFinite(radiusKm)) {
+      const deg = radiusKm / 111
+      const degLng = radiusKm / (111 * Math.max(0.3, Math.cos((lat * Math.PI) / 180)))
+      query = query
+        .gte('master_lat', lat - deg)
+        .lte('master_lat', lat + deg)
+        .gte('master_lng', lng - degLng)
+        .lte('master_lng', lng + degLng)
+    }
+
+    const { data: list, error } = await query
 
     if (error) throw error
 
@@ -80,7 +83,9 @@ export async function GET(request: NextRequest) {
       const dist = haversineKm(lat, lng, Number(m.master_lat), Number(m.master_lng))
       return { ...m, _distance_km: dist }
     })
-    const inRadius = withDistance.filter((m) => m._distance_km <= radiusKm)
+    const inRadius = Number.isFinite(radiusKm)
+      ? withDistance.filter((m) => m._distance_km <= radiusKm)
+      : withDistance
     inRadius.sort((a, b) => a._distance_km - b._distance_km)
 
     const from = (page - 1) * limit

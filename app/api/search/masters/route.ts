@@ -58,7 +58,10 @@ export async function GET(request: NextRequest) {
     const lat = Number(searchParams.get('lat'))
     const lng = Number(searchParams.get('lng'))
     const hasLocation = Number.isFinite(lat) && Number.isFinite(lng)
-    const radiusKm = Math.min(200, Math.max(1, Number(searchParams.get('radius_km')) || 50))
+    const unbounded = searchParams.get('unbounded') === '1'
+    const radiusKm = unbounded
+      ? Number.POSITIVE_INFINITY
+      : Math.min(200, Math.max(1, Number(searchParams.get('radius_km')) || 50))
     const hasTextOrFilters = !!(q || city || category || subcategory || serviceIds.length > 0)
 
     const from = (page - 1) * limit
@@ -212,7 +215,7 @@ export async function GET(request: NextRequest) {
         return { ...m, distance_km }
       })
 
-      if (!hasTextOrFilters) {
+      if (!hasTextOrFilters && Number.isFinite(radiusKm)) {
         list = list.filter((m) => m.distance_km == null || m.distance_km <= radiusKm)
       }
 

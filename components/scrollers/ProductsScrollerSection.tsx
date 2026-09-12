@@ -18,8 +18,10 @@ type ProductsScrollerSectionProps = {
   subcategorySlugs?: string[]
   lat?: number | null
   lng?: number | null
-  radiusKm?: number
+  radiusKm?: number | null
   showRadius?: boolean
+  requireTaskMatch?: boolean
+  city?: string | null
 }
 
 export function ProductsScrollerSection({
@@ -35,16 +37,18 @@ export function ProductsScrollerSection({
   lng: lngProp,
   radiusKm: radiusProp,
   showRadius = true,
+  requireTaskMatch = false,
+  city: cityProp,
 }: ProductsScrollerSectionProps) {
   const location = useUserLocation()
   const lat = latProp ?? location.lat
   const lng = lngProp ?? location.lng
   const radiusKm = radiusProp ?? location.radiusKm
-  const cityLabel = location.city
+  const cityLabel = cityProp ?? location.city
 
   const deps = useMemo(
-    () => [q, categorySlugs?.join(','), subcategorySlugs?.join(','), lat, lng, radiusKm],
-    [q, categorySlugs, subcategorySlugs, lat, lng, radiusKm]
+    () => [q, categorySlugs?.join(','), subcategorySlugs?.join(','), lat, lng, radiusKm, requireTaskMatch, cityLabel],
+    [q, categorySlugs, subcategorySlugs, lat, lng, radiusKm, requireTaskMatch, cityLabel]
   )
 
   const fetcher = useCallback(
@@ -55,10 +59,12 @@ export function ProductsScrollerSection({
         lat,
         lng,
         radiusKm,
+        city: cityLabel,
         categorySlugs,
         subcategorySlugs,
+        requireTaskMatch,
       }),
-    [q, lat, lng, radiusKm, categorySlugs, subcategorySlugs]
+    [q, lat, lng, radiusKm, cityLabel, categorySlugs, subcategorySlugs, requireTaskMatch]
   )
 
   const { items, total, loading, loadMore, remaining, hasMore } = useScrollerData(

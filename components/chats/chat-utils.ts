@@ -2,6 +2,44 @@ import { format, isToday, isYesterday, differenceInHours, differenceInDays } fro
 import { ru } from 'date-fns/locale'
 import type { UserRole } from '@/types/db'
 
+const PRODUCT_PATH_RE =
+  /\/products\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g
+
+export function productChatPath(productId: string): string {
+  return `/products/${productId}`
+}
+
+/** Черновик для поля ввода — без ссылки на товар. */
+export function buildProductInterestMessage(product: { name: string; price: number }): string {
+  const price = Number(product.price || 0).toLocaleString('ru-RU')
+  return `Здравствуйте! Интересует товар «${product.name}» за ${price} ₽`
+}
+
+/** Убрать /products/<uuid> из текста (старые автосообщения и превью). */
+export function stripProductPathFromContent(content: string): string {
+  return content
+    .replace(PRODUCT_PATH_RE, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/** Уже писали про этот товар (старые сообщения со ссылкой или текст интереса). */
+export function hasProductContextMessage(
+  messages: Array<{ content?: string | null }>,
+  productId: string,
+  productName?: string
+): boolean {
+  const marker = productChatPath(productId)
+  const nameMarker = productName ? `«${productName}»` : ''
+  return messages.some((m) => {
+    const c = m.content || ''
+    if (c.includes(marker)) return true
+    if (nameMarker && c.includes('Интересует товар') && c.includes(nameMarker)) return true
+    return false
+  })
+}
+
 export const ROLE_CONFIG: Record<UserRole, { label: string; className: string }> = {
   master: { label: 'Мастер', className: 'bg-[#fff1f2] text-[#e63946]' },
   seller: { label: 'Продавец', className: 'bg-[#e6f1fb] text-[#185fa5]' },
@@ -46,7 +84,9 @@ export function formatMessagePreview(
   hasImage?: boolean
 ): string {
   if (!content?.trim() && hasImage) return isOwn ? 'Вы: Фото' : 'Фото'
-  const text = content?.trim() || ''
+  const text = stripProductPathFromContent(content?.trim() || '')
+  if (!text && hasImage) return isOwn ? 'Вы: Фото' : 'Фото'
+  if (!text) return isOwn ? 'Вы: Сообщение' : 'Сообщение'
   if (text.length > 80) return `${isOwn ? 'Вы: ' : ''}${text.slice(0, 80)}…`
   return isOwn ? `Вы: ${text}` : text
 }

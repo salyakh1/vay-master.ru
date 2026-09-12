@@ -79,7 +79,7 @@ export function buildCalcLines(input: {
   enabledSurfaces: Record<SurfaceId, boolean>
   selections: Partial<Record<SurfaceId, string>>
   matsBySurface: Record<SurfaceId, MaterialOption[]>
-  areas: { floor: number; walls: number; ceiling: number; perimeter: number }
+  areas: { floor: number; walls: number; ceiling: number; perimeter: number; roof?: number }
   wallHeight: number
   floorThick: number
   wallThick: number
@@ -94,7 +94,7 @@ export function buildCalcLines(input: {
     if (s === 'floor' || s === 'paving') return areas.floor
     if (s === 'walls' || s === 'facade') return areas.walls
     if (s === 'ceiling') return areas.ceiling
-    if (s === 'roof') return areas.floor
+    if (s === 'roof') return areas.roof && areas.roof > 0 ? areas.roof : areas.floor
     return 0
   }
 

@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Circle } from '@/components/maps/leaflet'
+import { useEffect, useState } from 'react'
+import { MapContainer, TileLayer, Circle } from '@/components/maps/leaflet'
 import { supabase } from '@/lib/supabase'
 import { configureLeafletIcons } from '@/lib/leaflet'
 import { useAuth } from '@/app/providers'
 import { FiCheck, FiMapPin, FiEdit2 } from 'react-icons/fi'
 import ChangeMapView from '@/components/ChangeMapView'
+import RadiusMapGestures from '@/components/maps/RadiusMapGestures'
 import 'leaflet/dist/leaflet.css'
 
 const DEFAULT_CENTER: [number, number] = [55.751244, 37.618423] // Москва
@@ -15,7 +16,7 @@ const DEFAULT_ZOOM = 11
 const RADIUS_OPTIONS = [5, 10, 25, 50, 100] // км
 
 export default function MasterRadiusPicker() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const [radius, setRadius] = useState<number>(50)
   const [position, setPosition] = useState<[number, number] | null>(null)
   const [address, setAddress] = useState('')
@@ -24,8 +25,7 @@ export default function MasterRadiusPicker() {
   const [saved, setSaved] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const mapRef = useRef<any>(null)
-  const [mapReady, setMapReady] = useState(false)
+  const [fitToken, setFitToken] = useState(0)
 
   useEffect(() => {
     if (user?.service_radius_km) {
@@ -35,14 +35,9 @@ export default function MasterRadiusPicker() {
       const pos: [number, number] = [user.master_lat, user.master_lng]
       setPosition(pos)
       setMapCenter(pos)
+      setFitToken((n) => n + 1)
     }
-  }, [user])
-
-  // Всегда подгонять вид карты под текущую точку (маркер в Москве — карта тоже в Москве)
-  useEffect(() => {
-    if (!position || !mapRef.current) return
-    mapRef.current.setView(position, 14)
-  }, [position, mapReady])
+  }, [user?.service_radius_km, user?.master_lat, user?.master_lng])
 
   useEffect(() => {
     configureLeafletIcons()
@@ -69,7 +64,7 @@ export default function MasterRadiusPicker() {
       const pos: [number, number] = [data.lat, data.lng]
       setPosition(pos)
       setMapCenter(pos)
-      // Вид карты обновится в useEffect по [position]
+      setFitToken((n) => n + 1)
     } catch (error) {
       console.error('Geocoding error:', error)
       alert('Ошибка при поиске адреса')
@@ -79,18 +74,22 @@ export default function MasterRadiusPicker() {
   }
 
   const handleSave = async () => {
-    if (!user || user.role !== 'master') return
+    if (!user) return
 
     setLoading(true)
     setSaved(false)
 
     try {
-      const payload: { service_radius_km: number; master_lat?: number; master_lng?: number } = {
+      const origin = position ?? mapCenter
+      const payload: { service_radius_km: number; master_lat: number; master_lng: number } = {
         service_radius_km: radius,
+        master_lat: origin[0],
+        master_lng: origin[1],
       }
-      if (position) {
-        payload.master_lat = position[0]
-        payload.master_lng = position[1]
+      try {
+        localStorage.setItem('vay_nearby_view', JSON.stringify({ lat: origin[0], lng: origin[1] }))
+      } catch {
+        /* ignore */
       }
 
       const { error } = await supabase
@@ -100,33 +99,47 @@ export default function MasterRadiusPicker() {
 
       if (error) throw error
 
+      try {
+        localStorage.setItem('vay_search_radius_km', String(radius))
+      } catch {
+        /* ignore */
+      }
+
+      await refreshUser()
       setSaved(true)
       setIsCollapsed(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (error) {
-      console.error('Error saving radius:', error)
+      console.error('Error saving radius', error)
       alert('Ошибка при сохранении')
     } finally {
       setLoading(false)
     }
   }
 
-  if (!user || user.role !== 'master') {
+  if (!user) {
     return null
   }
 
+  const isMaster = user.role === 'master'
   const radiusMeters = radius * 1000
-  const hasSavedData = position !== null
+  const hasSavedData = isMaster ? position !== null : (user.service_radius_km != null && user.service_radius_km > 0)
+  const title = isMaster ? 'Геолокация и радиус' : 'Радиус поиска'
+  const subtitle = isMaster
+    ? 'Точка выезда и максимальное расстояние для заказов и поиска'
+    : 'На каком расстоянии показывать мастеров и товары. Если не указать — видны все.'
 
   if (isCollapsed && hasSavedData) {
     return (
       <div className="card p-4">
         <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
           <FiMapPin className="text-brand-accent" />
-          Радиус выполнения услуг
+          {title}
         </h3>
         <p className="text-sm text-text-secondary mb-3">
-          Радиус {radius} км от точки выезда настроен
+          {isMaster
+            ? `Радиус ${radius} км от точки выезда настроен`
+            : `Радиус поиска ${radius} км`}
         </p>
         <button
           type="button"
@@ -144,25 +157,30 @@ export default function MasterRadiusPicker() {
     <div className="card p-4">
       <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
         <FiMapPin className="text-brand-accent" />
-        Радиус выполнения услуг
+        {title}
       </h3>
       <p className="text-sm text-text-secondary mb-4">
-        Выберите максимальное расстояние, на которое вы готовы выезжать для выполнения услуг
+        {subtitle}
       </p>
 
-      {/* Точка выезда + карта */}
+      <p className="text-[11px] text-text-secondary mb-3">
+        Перетащите метку пальцем. Радиус меняется щипком (зумом) по карте.
+      </p>
+
       <div className="space-y-3 mb-4">
         <div>
-          <label className="block text-sm font-medium text-text-primary mb-1.5">Точка выезда</label>
+          <label className="block text-sm font-medium text-text-primary mb-1.5">Точка на карте</label>
           <p className="text-xs text-text-secondary mb-2">
-            Укажите адрес, от которого считается радиус (мастерская, дом, офис)
+            {isMaster
+              ? 'Адрес выезда или просто передвиньте метку'
+              : 'Передвиньте метку туда, откуда считать поиск'}
           </p>
           <div className="flex gap-2">
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="Например: Москва, ул. Ленина, д. 10"
+              placeholder="Например: Урус-Мартан, ул. Ленина"
               className="input flex-1"
               disabled={geocoding || loading}
             />
@@ -177,53 +195,57 @@ export default function MasterRadiusPicker() {
           </div>
         </div>
 
-        <div className="relative rounded-lg overflow-hidden border border-border-light/60 bg-bg-secondary" style={{ height: 320 }}>
+        <div className="relative rounded-lg overflow-hidden border border-border-light/60 bg-bg-secondary touch-none" style={{ height: 320 }}>
           {typeof window !== 'undefined' && (
             <MapContainer
-              center={mapCenter}
+              center={position ?? mapCenter}
               zoom={position ? 11 : DEFAULT_ZOOM}
               style={{ height: '100%', width: '100%' }}
               className="z-0"
-              whenCreated={(map: any) => {
-                mapRef.current = map
-                setMapReady(true)
-              }}
+              zoomControl={false}
+              dragging
+              scrollWheelZoom
+              doubleClickZoom={false}
+              touchZoom
+              bounceAtZoomLimits={false}
+              zoomSnap={0.25}
+              zoomDelta={0.5}
             >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <ChangeMapView center={position ?? mapCenter} zoom={14} radiusKm={position ? radius : undefined} />
-              {position && (
-                <>
-                  <Marker position={position} />
-                  <Circle
-                    center={position}
-                    radius={radiusMeters}
-                    pathOptions={{
-                      color: 'var(--brand-accent, #e11d48)',
-                      fillColor: 'var(--brand-accent, #e11d48)',
-                      fillOpacity: 0.15,
-                      weight: 2,
-                    }}
-                  />
-                </>
-              )}
+              <ChangeMapView
+                center={position ?? mapCenter}
+                zoom={14}
+                radiusKm={radius}
+                fitToken={fitToken}
+              />
+              <RadiusMapGestures
+                center={position ?? mapCenter}
+                onCenterChange={(lat, lng) => {
+                  const pos: [number, number] = [lat, lng]
+                  setPosition(pos)
+                  setMapCenter(pos)
+                }}
+                onRadiusChange={setRadius}
+              />
+              <Circle
+                center={position ?? mapCenter}
+                radius={radiusMeters}
+                pathOptions={{
+                  color: 'var(--brand-accent, #e11d48)',
+                  fillColor: 'var(--brand-accent, #e11d48)',
+                  fillOpacity: 0.15,
+                  weight: 2,
+                }}
+              />
             </MapContainer>
           )}
-          {!position && (
-            <div className="absolute inset-0 flex items-center justify-center bg-bg-secondary/90 pointer-events-none z-10">
-              <p className="text-sm text-text-secondary text-center px-4">
-                Укажите адрес выезда и нажмите «На карте», чтобы показать зону обслуживания
-              </p>
-            </div>
-          )}
         </div>
-        {position && (
-          <p className="text-xs text-text-secondary">
-            Зона {radius} км от точки выезда отмечена на карте
-          </p>
-        )}
+        <p className="text-xs text-text-secondary">
+          Зона {radius} км{position ? ` · ${position[0].toFixed(4)}, ${position[1].toFixed(4)}` : ''}
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -231,7 +253,10 @@ export default function MasterRadiusPicker() {
           <button
             type="button"
             key={option}
-            onClick={() => setRadius(option)}
+            onClick={() => {
+              setRadius(option)
+              setFitToken((n) => n + 1)
+            }}
             disabled={loading}
             className={`px-4 py-2 rounded-lg font-medium transition-all ${
               radius === option

@@ -10,7 +10,7 @@ import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
 import { FiPlus, FiImage, FiMoreVertical, FiTrash2, FiAlertCircle, FiSend } from 'react-icons/fi'
-import { formatDateDivider, getInitials, isSystemStyleMessage } from '@/components/chats/chat-utils'
+import { formatDateDivider, getInitials, isSystemStyleMessage, stripProductPathFromContent } from '@/components/chats/chat-utils'
 import { getCategoryIcon } from '@/components/orders/order-utils'
 
 // Dynamic imports для модальных окон - загружаются только при открытии
@@ -532,7 +532,7 @@ export default function ChatPage() {
   if (!user || !otherUser) return null
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full flex flex-col h-[100dvh]">
+    <div className="min-h-screen bg-[#f5f5f7] max-w-lg mx-auto w-full flex flex-col h-[100dvh] pb-[calc(60px+env(safe-area-inset-bottom,0px))]">
       <div className="bg-white border-b border-[#f0f0f0] px-3.5 py-2.5 flex items-center gap-2.5 flex-shrink-0 relative z-10">
         <Link href="/chats" className="text-[#e63946] text-xl leading-none flex-shrink-0" aria-label="Назад">
           ←
@@ -644,13 +644,14 @@ export default function ChatPage() {
             </div>
             {group.items.map((message) => {
               const isOwn = message.sender_id === user.id
-              const isSystem = !isOwn && message.content && isSystemStyleMessage(message.content)
+              const visibleText = stripProductPathFromContent(message.content || '')
+              const isSystem = !isOwn && visibleText && isSystemStyleMessage(visibleText)
 
               if (isSystem) {
                 return (
                   <div key={message.id} className="bg-[#f5f5f7] rounded-xl px-3 py-2 my-1 text-center">
                     <p className="text-[10px] text-[#888] leading-relaxed whitespace-pre-wrap">
-                      {message.content.replace(/\*\*/g, '')}
+                      {visibleText.replace(/\*\*/g, '')}
                     </p>
                   </div>
                 )
@@ -672,20 +673,20 @@ export default function ChatPage() {
                       />
                     </div>
                   )}
-                  {message.content?.trim() && (
+                  {visibleText ? (
                     <div
-                      className={`px-3 py-2 text-[12px] leading-relaxed rounded-2xl ${
+                      className={`px-3 py-2 text-[12px] leading-relaxed rounded-2xl whitespace-pre-wrap break-words ${
                         isOwn
                           ? 'bg-[#e63946] text-white rounded-br-md'
                           : 'bg-white text-[#111] border border-[#f0f0f0] rounded-bl-md'
                       }`}
                     >
-                      {message.content}
+                      {visibleText}
                       {isOwn && message.read && (
                         <span className="text-[9px] text-white/70 ml-1">✓✓</span>
                       )}
                     </div>
-                  )}
+                  ) : null}
                   <span className="text-[9px] text-[#bbb] mt-0.5 px-0.5">
                     {format(new Date(message.created_at), 'HH:mm', { locale: ru })}
                   </span>

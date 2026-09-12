@@ -11,7 +11,7 @@ import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import { sanitizeProductsForGuest } from '@/lib/guest-access'
 import type { AdBanner } from '@/lib/supabase'
 import type { MasterCategoryWithCount } from '@/lib/server-data'
-import { FiSearch, FiStar, FiArrowRight, FiUser, FiShoppingBag, FiTag, FiX } from 'react-icons/fi'
+import { FiSearch, FiStar, FiArrowRight, FiUser, FiShoppingBag, FiTag, FiX, FiMap } from 'react-icons/fi'
 import { getCategoryEmoji } from '@/lib/categoryEmoji'
 import { isProActive } from '@/lib/masterAccess'
 import StoriesCircle from '@/components/StoriesCircle'
@@ -477,6 +477,22 @@ export default function HomeClient({
       )}
 
       <CompactPageBanner page="home" initialBanners={initialBanners} />
+
+      {DIVIDER}
+
+      <Link
+        href="/planner"
+        className="mx-4 mb-1 flex items-center gap-3 rounded-[18px] bg-white border border-[#f0f0f0] p-3.5 active:bg-[#fafafa]"
+      >
+        <div className="w-11 h-11 rounded-2xl bg-[#fff8f8] text-brand-accent flex items-center justify-center flex-shrink-0">
+          <FiMap size={20} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-bold text-[#111]">Смета за 2 минуты</p>
+          <p className="text-[11px] text-[#888] leading-snug">Размеры комнаты → материалы → мастера рядом</p>
+        </div>
+        <FiArrowRight className="text-[#c7362f] flex-shrink-0" size={18} />
+      </Link>
 
       {DIVIDER}
 

@@ -650,6 +650,7 @@ export default function ProductPage() {
           <ProductComments
             productId={product.id}
             currentUser={user}
+            sellerId={seller?.id}
             openReplyToId={replyTo || undefined}
           />
         )}

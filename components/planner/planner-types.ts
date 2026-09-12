@@ -1,3 +1,16 @@
+export type PlannerStep = 0 | 1 | 2 | 3
+export type PlannerInputMode = 'size' | 'draw'
+export type DrawTool = 'draw' | 'door' | 'window' | 'rect'
+
+export type PlannerOpening = {
+  id: string
+  type: 'door' | 'window'
+  segmentIndex: number
+  t: number
+  width: number
+  height: number
+}
+
 export type RecommendedMaster = {
   id: string
   full_name: string

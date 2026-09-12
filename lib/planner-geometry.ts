@@ -154,3 +154,229 @@ export function segmentIndexNearPoint(
 
 export const PLANNER_GRID_STEP = GRID_10_CM
 export const MIN_AREA_M2 = 2
+/** Стабильное поле в метрах: чуть больше комнаты, чтобы цифры не липли к краю. */
+export const PLANNER_WORKSPACE = { x: 0, y: 0, w: 14, h: 14 }
+
+/** Стена только горизонталь или вертикаль — иначе на телефоне контур неуправляем. */
+export function snapToAxis(from: Point, to: Point): Point {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  if (Math.abs(dx) >= Math.abs(dy)) return { x: to.x, y: from.y }
+  return { x: from.x, y: to.y }
+}
+
+export function segmentLength(a: Point, b: Point): number {
+  return Math.hypot(b.x - a.x, b.y - a.y)
+}
+
+/** Живая подпись стены: см до 1 м, иначе метры. */
+export function formatWallLength(meters: number, live = false): string {
+  if (!Number.isFinite(meters) || meters < 0.005) return live ? '0 см' : ''
+  if (meters < 1) return `${Math.round(meters * 100)} см`
+  const digits = live ? 2 : 1
+  return `${meters.toFixed(digits).replace('.', ',')} м`
+}
+
+export function wallLengths(points: Point[], closed: boolean): number[] {
+  if (points.length < 2) return []
+  const count = closed ? points.length : points.length - 1
+  const out: number[] = []
+  for (let i = 0; i < count; i++) {
+    out.push(segmentLength(points[i], points[(i + 1) % points.length]))
+  }
+  return out
+}
+
+/** Растягивает ортогональную стену, двигая все вершины с «той» стороны. */
+export function stretchOrthogonalSegment(points: Point[], index: number, length: number): Point[] {
+  if (points.length < 2) return points
+  const n = points.length
+  const a = points[index]
+  const b = points[(index + 1) % n]
+  const L = Math.max(0.3, length)
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const horizontal = Math.abs(dx) >= Math.abs(dy)
+  const dir = horizontal ? (Math.sign(dx) || 1) : (Math.sign(dy) || 1)
+  const newB = horizontal ? { x: a.x + dir * L, y: a.y } : { x: a.x, y: a.y + dir * L }
+  const ddx = newB.x - b.x
+  const ddy = newB.y - b.y
+  return points.map((p) => {
+    if (horizontal) {
+      const onBSide = dir >= 0 ? p.x > a.x + 1e-6 : p.x < a.x - 1e-6
+      return onBSide ? { x: p.x + ddx, y: p.y } : { ...p }
+    }
+    const onBSide = dir >= 0 ? p.y > a.y + 1e-6 : p.y < a.y - 1e-6
+    return onBSide ? { x: p.x, y: p.y + ddy } : { ...p }
+  })
+}
+
+/** Перетаскивание угла: новые стены остаются ортогональными. */
+export function dragOrthogonalVertex(points: Point[], index: number, raw: Point, closed: boolean): Point[] {
+  if (points.length === 0) return points
+  const n = points.length
+  const next = points.map((p) => ({ ...p }))
+  const prev = next[(index - 1 + n) % n]
+  next[index] = snapToAxis(prev, raw)
+  if (closed && n >= 3) {
+    const i = index
+    const nxtI = (i + 1) % n
+    const nxt = next[nxtI]
+    const cur = next[i]
+    if (Math.abs(nxt.x - cur.x) >= Math.abs(nxt.y - cur.y)) {
+      next[nxtI] = { x: nxt.x, y: cur.y }
+    } else {
+      next[nxtI] = { x: cur.x, y: nxt.y }
+    }
+  }
+  return next
+}
+
+/** Ось-выровненный прямоугольник: длина по X, ширина по Y, с отступом. */
+export function rectanglePoints(length: number, width: number, origin: Point = { x: 1.5, y: 1.5 }): Point[] {
+  const l = Math.max(0.3, length)
+  const w = Math.max(0.3, width)
+  const { x, y } = origin
+  return [
+    { x, y },
+    { x: x + l, y },
+    { x: x + l, y: y + w },
+    { x, y: y + w },
+  ]
+}
+
+export function boundingBox(points: Point[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  if (points.length === 0) return null
+  let minX = points[0].x
+  let minY = points[0].y
+  let maxX = points[0].x
+  let maxY = points[0].y
+  for (const p of points) {
+    if (p.x < minX) minX = p.x
+    if (p.y < minY) minY = p.y
+    if (p.x > maxX) maxX = p.x
+    if (p.y > maxY) maxY = p.y
+  }
+  return { minX, minY, maxX, maxY }
+}
+
+/** viewBox под контур, чтобы комната 3×4 не терялась в пустом поле 10×10. */
+export function viewBoxFromPoints(points: Point[], padding = 0.7): { x: number; y: number; w: number; h: number } {
+  const box = boundingBox(points)
+  if (!box) return { x: 0, y: 0, w: 8, h: 8 }
+  const w = Math.max(1.2, box.maxX - box.minX)
+  const h = Math.max(1.2, box.maxY - box.minY)
+  const pad = Math.max(padding, Math.max(w, h) * 0.12)
+  return {
+    x: box.minX - pad,
+    y: box.minY - pad,
+    w: w + pad * 2,
+    h: h + pad * 2,
+  }
+}
+
+/** Квадратный кадр: комната крупная, вокруг запас под цифры. */
+export function squareViewBoxFromPoints(
+  points: Point[],
+  minSide = 5,
+  padding = 1.8
+): { x: number; y: number; w: number; h: number } {
+  if (points.length === 0) return { ...PLANNER_WORKSPACE }
+  const box = boundingBox(points)
+  if (!box) return { ...PLANNER_WORKSPACE }
+  const w = box.maxX - box.minX
+  const h = box.maxY - box.minY
+  const size = Math.max(w, h, minSide)
+  const pad = Math.max(padding, size * 0.22)
+  const side = size + pad * 2
+  const cx = (box.minX + box.maxX) / 2
+  const cy = (box.minY + box.maxY) / 2
+  return { x: cx - side / 2, y: cy - side / 2, w: side, h: side }
+}
+
+/** Подпись длины снаружи стены, не на линии. */
+export function wallLabelAnchor(start: Point, end: Point, centroid: Point | null, offset: number): Point {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const len = Math.hypot(dx, dy) || 1
+  let nx = -dy / len
+  let ny = dx / len
+  const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }
+  if (centroid) {
+    const inwardX = centroid.x - mid.x
+    const inwardY = centroid.y - mid.y
+    if (nx * inwardX + ny * inwardY > 0) {
+      nx = -nx
+      ny = -ny
+    }
+  }
+  return { x: mid.x + nx * offset, y: mid.y + ny * offset }
+}
+
+/** Раздвигает подписи, чтобы они не наезжали друг на друга. */
+export function separatePoints(points: Point[], minDist: number): Point[] {
+  const out = points.map((p) => ({ ...p }))
+  for (let iter = 0; iter < 8; iter += 1) {
+    for (let i = 0; i < out.length; i += 1) {
+      for (let j = i + 1; j < out.length; j += 1) {
+        const dx = out[j].x - out[i].x
+        const dy = out[j].y - out[i].y
+        const d = Math.hypot(dx, dy)
+        if (d < 1e-6) {
+          out[j].x += minDist * 0.5
+          continue
+        }
+        if (d >= minDist) continue
+        const push = (minDist - d) / 2
+        const ux = dx / d
+        const uy = dy / d
+        out[i].x -= ux * push
+        out[i].y -= uy * push
+        out[j].x += ux * push
+        out[j].y += uy * push
+      }
+    }
+  }
+  return out
+}
+
+/** Тянет стену вдоль её текущего направления — для свободного контура. */
+export function stretchWall(points: Point[], index: number, length: number): Point[] {
+  if (points.length < 2) return points
+  const a = points[index]
+  const b = points[(index + 1) % points.length]
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const nearlyAxis = Math.abs(dx) < 0.08 || Math.abs(dy) < 0.08
+  if (nearlyAxis) return stretchOrthogonalSegment(points, index, length)
+  const cur = Math.hypot(dx, dy)
+  if (cur < 1e-6) return points
+  const L = Math.max(0.3, length)
+  const s = L / cur
+  const next = points.map((p) => ({ ...p }))
+  next[(index + 1) % points.length] = { x: a.x + dx * s, y: a.y + dy * s }
+  return next
+}
+
+export function pointOnSegment(a: Point, b: Point, t: number): Point {
+  const tt = Math.max(0, Math.min(1, t))
+  return { x: a.x + (b.x - a.x) * tt, y: a.y + (b.y - a.y) * tt }
+}
+
+export function polygonCentroid(points: Point[]): Point | null {
+  if (points.length < 3) return null
+  let cx = 0
+  let cy = 0
+  let area = 0
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    const cross = a.x * b.y - b.x * a.y
+    area += cross
+    cx += (a.x + b.x) * cross
+    cy += (a.y + b.y) * cross
+  }
+  if (area === 0) return null
+  const factor = 1 / (3 * area)
+  return { x: cx * factor, y: cy * factor }
+}
