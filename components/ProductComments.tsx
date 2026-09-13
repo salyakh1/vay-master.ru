@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
@@ -342,7 +342,7 @@ function CommentThread({
   sellerId?: string | null
   replyingToId: string | null
   replyText: string
-  replyRef: RefObject<HTMLTextAreaElement | null>
+  replyRef: React.Ref<HTMLTextAreaElement>
   saving: boolean
   onReply: (id: string) => void
   onReplyText: (v: string) => void
@@ -456,7 +456,7 @@ function ReplyComposer({
   onSubmit,
   onCancel,
 }: {
-  replyRef: RefObject<HTMLTextAreaElement | null>
+  replyRef: React.Ref<HTMLTextAreaElement>
   value: string
   saving: boolean
   onChange: (v: string) => void
@@ -466,7 +466,7 @@ function ReplyComposer({
   return (
     <div className="mt-2 ml-10">
       <textarea
-        ref={replyRef}
+        ref={replyRef as React.Ref<HTMLTextAreaElement>}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {

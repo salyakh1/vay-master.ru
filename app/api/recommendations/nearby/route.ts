@@ -28,6 +28,13 @@ type SellerRow = {
   city: string | null
 }
 
+type RankedNearbyItem = Record<string, unknown> & {
+  created_at?: unknown
+  city_match: boolean
+  distance_km: number | undefined
+  category_ref?: { slug?: string | null } | { slug?: string | null }[] | null
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -162,16 +169,17 @@ export async function GET(request: NextRequest) {
     const { data: products, error: productsError } = await query
     if (productsError) throw productsError
 
-    const ranked = (products || [])
-      .map((product: Record<string, unknown>) => {
-        const sellerId = product.seller_id as string
-        const distance = distanceBySeller.get(sellerId)
-        return {
-          ...product,
-          distance_km: distance != null ? Math.round(distance * 10) / 10 : undefined,
-          city_match: cityMatchBySeller.get(sellerId) === true,
-        }
-      })
+    const ranked: RankedNearbyItem[] = (products || []).map((product: Record<string, unknown>) => {
+      const sellerId = product.seller_id as string
+      const distance = distanceBySeller.get(sellerId)
+      return {
+        ...product,
+        created_at: product.created_at,
+        category_ref: product.category_ref as RankedNearbyItem['category_ref'],
+        distance_km: distance != null ? Math.round(distance * 10) / 10 : undefined,
+        city_match: cityMatchBySeller.get(sellerId) === true,
+      }
+    })
       .sort((a, b) => {
         const aDist = a.distance_km
         const bDist = b.distance_km

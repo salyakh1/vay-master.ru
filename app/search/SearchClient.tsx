@@ -241,10 +241,12 @@ function SearchContent({
     }
     let cancelled = false
     setLoadingMasterCategories(true)
-    void supabase
-      .from('profile_subcategories')
-      .select('subcategory:subcategories(id, slug, category:categories(id, slug))')
-      .eq('profile_id', user.id)
+    void Promise.resolve(
+      supabase
+        .from('profile_subcategories')
+        .select('subcategory:subcategories(id, slug, category:categories(id, slug))')
+        .eq('profile_id', user.id)
+    )
       .then(({ data, error }) => {
         if (cancelled) return
         if (!error && data) {

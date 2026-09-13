@@ -60,10 +60,10 @@ export default function RadiusMapGestures({
 
   useMapEvents({
     zoom(e) {
-      applyViewportRadius(e.originalEvent)
+      applyViewportRadius((e as { originalEvent?: Event }).originalEvent)
     },
     zoomend(e) {
-      applyViewportRadius(e.originalEvent)
+      applyViewportRadius((e as { originalEvent?: Event }).originalEvent)
     },
     click(e) {
       if (draggingPin.current) return

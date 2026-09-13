@@ -188,14 +188,15 @@ export default function PlannerPage() {
       fetch(mastersUrl)
         .then((r) => (r.ok ? r.json() : { masters: [] }))
         .catch(() => ({ masters: [] })),
-      supabase
-        .from('products')
-        .select('id, name, price, images')
-        .eq('in_stock', true)
-        .order('created_at', { ascending: false })
-        .limit(24)
-        .then(({ data, error }) => (error ? [] : data || []))
-        .catch(() => []),
+      Promise.resolve(
+        supabase
+          .from('products')
+          .select('id, name, price, images')
+          .eq('in_stock', true)
+          .order('created_at', { ascending: false })
+          .limit(24)
+          .then(({ data, error }) => (error ? [] : data || []))
+      ).catch(() => [] as RecommendedProduct[]),
     ])
       .then(([mastersRes, products]) => {
         if (cancelled) return
