@@ -153,11 +153,10 @@ export default function EditProductPage() {
   if (!user || !product) return null
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-white pb-20 overflow-x-hidden">
       <Navbar />
-      <div className="container mx-auto px-4 py-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="card">
+      <div className="mx-auto w-full max-w-2xl px-3 py-4 sm:px-4">
+        <div className="card !p-4 sm:!p-6 overflow-x-hidden">
             <h1 className="text-2xl font-bold mb-6">Редактировать товар</h1>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -187,7 +186,7 @@ export default function EditProductPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Цена (₽) *
@@ -283,34 +282,35 @@ export default function EditProductPage() {
                 </div>
               )}
 
-              <div className="flex gap-4">
+              <div className="flex flex-col gap-2 w-full min-w-0">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="btn btn-primary"
+                  className="btn btn-primary w-full min-w-0 !px-4"
                 >
                   {saving ? 'Сохранение...' : 'Сохранить'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => router.back()}
-                  className="btn btn-outline"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className="btn btn-outline text-red-600 hover:bg-red-50"
-                >
-                  Удалить
-                </button>
+                <div className="grid grid-cols-2 gap-2 w-full min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => router.back()}
+                    className="btn btn-outline w-full min-w-0 !px-3"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    className="btn btn-outline w-full min-w-0 !px-3 text-red-600 hover:bg-red-50"
+                  >
+                    Удалить
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       </div>
-    </div>
   )
 }
 

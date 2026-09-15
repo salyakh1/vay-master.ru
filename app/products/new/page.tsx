@@ -390,18 +390,18 @@ export default function NewProductPage() {
                 </div>
               )}
 
-              <div className="flex gap-4">
+              <div className="flex flex-col gap-2 w-full min-w-0 sm:flex-row">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="btn btn-primary"
+                  className="btn btn-primary w-full min-w-0 !px-4 sm:flex-1"
                 >
                   {saving ? 'Сохранение...' : 'Добавить товар'}
                 </button>
                 <button
                   type="button"
                   onClick={() => router.back()}
-                  className="btn btn-outline"
+                  className="btn btn-outline w-full min-w-0 !px-3 sm:w-auto"
                 >
                   Отмена
                 </button>
