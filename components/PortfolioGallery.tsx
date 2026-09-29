@@ -4,9 +4,11 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import { useAuth } from '@/app/providers'
 import { supabase, PortfolioItem, PortfolioLike, PortfolioComment, User } from '@/lib/supabase'
+import Link from 'next/link'
 import { FiX, FiChevronLeft, FiChevronRight, FiHeart, FiMessageCircle, FiSend } from 'react-icons/fi'
 import { formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { loginUrl } from '@/lib/guest-access'
 
 interface PortfolioGalleryProps {
   items: PortfolioItem[]
@@ -80,6 +82,7 @@ export default function PortfolioGallery({
   const commentsRef = useRef<HTMLDivElement>(null)
   const commentInputRef = useRef<HTMLInputElement>(null)
   const touchStartedInCommentsRef = useRef(false)
+  const mediaAreaRef = useRef<HTMLDivElement>(null)
 
   const currentItem = items[currentItemIndex]
 
@@ -299,13 +302,65 @@ export default function PortfolioGallery({
 
   const handlePreviousMedia = useCallback(() => {
     if (allMedia.length <= 1) return
-    setCurrentMediaIndex((prev) => (prev > 0 ? prev - 1 : allMedia.length - 1))
+    setCurrentMediaIndex((prev) => Math.max(0, prev - 1))
   }, [allMedia.length])
 
   const handleNextMedia = useCallback(() => {
     if (allMedia.length <= 1) return
-    setCurrentMediaIndex((prev) => (prev < allMedia.length - 1 ? prev + 1 : 0))
+    setCurrentMediaIndex((prev) => Math.min(allMedia.length - 1, prev + 1))
   }, [allMedia.length])
+
+  // Свайп пальцем по области фото (влево/вправо — следующая/предыдущая картинка)
+  const mediaTouchStart = useRef<{ x: number; y: number } | null>(null)
+  const mediaSwipeLocked = useRef<'h' | 'v' | null>(null)
+
+  const onMediaTouchStart = useCallback((e: React.TouchEvent) => {
+    if (allMedia.length <= 1) return
+    const t = e.touches[0]
+    mediaTouchStart.current = { x: t.clientX, y: t.clientY }
+    mediaSwipeLocked.current = null
+  }, [allMedia.length])
+
+  const onMediaTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!mediaTouchStart.current || allMedia.length <= 1) return
+    const t = e.touches[0]
+    const dx = t.clientX - mediaTouchStart.current.x
+    const dy = t.clientY - mediaTouchStart.current.y
+    if (mediaSwipeLocked.current === null) {
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        mediaSwipeLocked.current = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v'
+      }
+    }
+    if (mediaSwipeLocked.current === 'h') {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }, [allMedia.length])
+
+  const onMediaTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!mediaTouchStart.current) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - mediaTouchStart.current.x
+    const dy = t.clientY - mediaTouchStart.current.y
+    const wasHorizontal = mediaSwipeLocked.current === 'h' || Math.abs(dx) > Math.abs(dy)
+    mediaTouchStart.current = null
+    mediaSwipeLocked.current = null
+    if (!wasHorizontal || Math.abs(dx) < 28) return
+    e.stopPropagation()
+    if (dx < 0) handleNextMedia()
+    else handlePreviousMedia()
+  }, [handleNextMedia, handlePreviousMedia])
+
+  // non-passive: иначе браузер может перехватить горизонтальный свайп
+  useEffect(() => {
+    const el = mediaAreaRef.current
+    if (!el || allMedia.length <= 1) return
+    const onMove = (e: TouchEvent) => {
+      if (mediaSwipeLocked.current === 'h') e.preventDefault()
+    }
+    el.addEventListener('touchmove', onMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onMove)
+  }, [allMedia.length, currentItemIndex])
 
   // Keyboard handlers
   useEffect(() => {
@@ -582,7 +637,7 @@ export default function PortfolioGallery({
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 z-50 bg-gradient-to-br from-bg-primary to-bg-secondary flex flex-col"
+      className="fixed inset-0 z-[110] bg-gradient-to-br from-bg-primary to-bg-secondary flex flex-col"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -641,7 +696,14 @@ export default function PortfolioGallery({
       </div>
 
       {/* Main Content - Медиа */}
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden mt-14">
+      <div
+        ref={mediaAreaRef}
+        className="flex-1 flex items-center justify-center relative overflow-hidden mt-14"
+        onTouchStart={onMediaTouchStart}
+        onTouchMove={onMediaTouchMove}
+        onTouchEnd={onMediaTouchEnd}
+        style={{ touchAction: allMedia.length > 1 ? 'none' : 'pan-y' }}
+      >
         <div 
           key={`item-${currentItemIndex}-media-${currentMediaIndex}`}
           className={`w-full h-full flex items-center justify-center ${
@@ -653,7 +715,7 @@ export default function PortfolioGallery({
           }`}
         >
           {currentMedia.type === 'image' ? (
-            <div className="relative w-full h-full">
+            <div className="relative w-full h-full select-none">
               <Image
                 src={currentMedia.url}
                 alt={currentItem.title}
@@ -677,46 +739,46 @@ export default function PortfolioGallery({
           )}
         </div>
 
-        {/* Горизонтальные кнопки навигации между медиа */}
+        {/* Стрелки — только на широких экранах; на телефоне — свайп */}
         {allMedia.length > 1 && (
           <>
             <button
+              type="button"
               onClick={handlePreviousMedia}
-              className="absolute left-2 top-1/2 -translate-y-1/2 p-2 glass hover:bg-white/90 transition-all z-20 rounded-full backdrop-blur-md pointer-events-auto border border-white/30 shadow-glossy hover:scale-110"
+              disabled={currentMediaIndex === 0}
+              aria-label="Предыдущее фото"
+              className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 p-2 glass hover:bg-white/90 transition-all z-20 rounded-full backdrop-blur-md pointer-events-auto border border-white/30 shadow-glossy disabled:opacity-30"
             >
               <FiChevronLeft size={20} className="text-graphite-secondary" />
             </button>
             <button
+              type="button"
               onClick={handleNextMedia}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 glass hover:bg-white/90 transition-all z-20 rounded-full backdrop-blur-md pointer-events-auto border border-white/30 shadow-glossy hover:scale-110"
+              disabled={currentMediaIndex >= allMedia.length - 1}
+              aria-label="Следующее фото"
+              className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 p-2 glass hover:bg-white/90 transition-all z-20 rounded-full backdrop-blur-md pointer-events-auto border border-white/30 shadow-glossy disabled:opacity-30"
             >
               <FiChevronRight size={20} className="text-graphite-secondary" />
             </button>
           </>
         )}
 
-        {/* Индикатор медиа внутри работы */}
+        {/* Счётчик фото внизу картинки: 1/2 */}
         {allMedia.length > 1 && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-1 pointer-events-none z-30">
-            {allMedia.map((_, index) => (
-              <div
-                key={index}
-                className={`h-1 w-8 transition-all ${
-                  index === currentMediaIndex
-                    ? 'bg-gray-900'
-                    : 'bg-gray-300'
-                }`}
-              />
-            ))}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+            <span className="inline-flex items-center rounded-full bg-black/55 text-white text-[12px] font-semibold tracking-wide px-2.5 py-1 shadow-sm">
+              {currentMediaIndex + 1}/{allMedia.length}
+            </span>
           </div>
         )}
       </div>
 
-      {/* Bottom Section - Глянцевый фон */}
+      {/* Bottom Section - Глянцевый фон (выше нижней навигации) */}
       <div 
         className={`absolute bottom-0 left-0 right-0 z-40 glass-strong border-t border-white/30 transition-all duration-300 shadow-glass ${
-          showComments ? 'h-2/3 flex flex-col min-h-0' : 'h-auto'
+          showComments ? 'h-[70%] max-h-[70dvh] flex flex-col min-h-0' : 'h-auto'
         }`}
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
       >
         {/* Кнопки действий */}
         <div className="flex items-center gap-4 p-4 border-b border-gray-200 pointer-events-auto flex-shrink-0">
@@ -815,7 +877,7 @@ export default function PortfolioGallery({
               style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
             >
               {comments.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-8">
+                <p className="text-sm text-gray-500 text-center py-6">
                   Пока нет комментариев
                 </p>
               ) : (
@@ -836,47 +898,62 @@ export default function PortfolioGallery({
                 </>
               )}
             </div>
-
-            {/* Форма комментария — всегда внизу, не скроллится */}
-            {currentUser && (
-              <form onSubmit={handleSubmitComment} className="p-4 border-t border-gray-200 flex-shrink-0">
-                {replyingTo && (
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-gray-600">Ответ для {replyingTo.authorName}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReplyingTo(null)
-                        const a = commentText.replace(/^@[^\s]+\s?/, '')
-                        setCommentText(a)
-                      }}
-                      className="text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      Отмена
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={commentInputRef}
-                    type="text"
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    placeholder={replyingTo ? `Ответ для ${replyingTo.authorName}...` : 'Добавить комментарий...'}
-                    className="flex-1 bg-gray-50 border border-gray-300 rounded px-4 py-2 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:border-gray-400"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!commentText.trim() || submittingComment}
-                    className="p-2 text-gray-700 hover:text-gray-900 transition-colors disabled:opacity-40"
-                  >
-                    <FiSend size={20} />
-                  </button>
-                </div>
-              </form>
-            )}
           </div>
         )}
+
+        {/* Поле комментария — всегда видно, не перекрывается меню */}
+        <div className="border-t border-gray-200 flex-shrink-0 px-3 pt-3 pb-2 pointer-events-auto bg-white/90 backdrop-blur-sm">
+          {currentUser ? (
+            <form onSubmit={handleSubmitComment}>
+              {replyingTo && (
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-600">Ответ для {replyingTo.authorName}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReplyingTo(null)
+                      const a = commentText.replace(/^@[^\s]+\s?/, '')
+                      setCommentText(a)
+                    }}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  ref={commentInputRef}
+                  type="text"
+                  value={commentText}
+                  onFocus={() => {
+                    if (!showComments) setShowComments(true)
+                  }}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder={replyingTo ? `Ответ для ${replyingTo.authorName}...` : 'Написать комментарий...'}
+                  className="flex-1 min-w-0 bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:border-brand-accent"
+                  enterKeyHint="send"
+                  autoComplete="off"
+                />
+                <button
+                  type="submit"
+                  disabled={!commentText.trim() || submittingComment}
+                  aria-label="Отправить комментарий"
+                  className="shrink-0 p-2.5 rounded-full bg-brand-accent text-white disabled:opacity-40 active:scale-95 transition-transform"
+                >
+                  <FiSend size={18} />
+                </button>
+              </div>
+            </form>
+          ) : (
+            <Link
+              href={loginUrl(typeof window !== 'undefined' ? window.location.pathname : '/')}
+              className="flex items-center justify-center gap-2 w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-600"
+            >
+              Войдите, чтобы комментировать
+            </Link>
+          )}
+        </div>
 
       </div>
     </div>

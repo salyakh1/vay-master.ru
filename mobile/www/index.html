@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="viewport-fit=cover, width=device-width, initial-scale=1, maximum-scale=5"
+    />
+    <meta name="theme-color" content="#C7362F" />
+    <title>VayMaster</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #f4f4f4;
+        color: #1c1c1e;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .boot {
+        text-align: center;
+        padding: 24px;
+      }
+      .boot strong {
+        color: #c7362f;
+      }
+      .boot p {
+        margin: 8px 0 0;
+        font-size: 14px;
+        color: #8e8e93;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="boot">
+      <div><strong>VAY</strong>-MASTER</div>
+      <p>Загрузка…</p>
+    </div>
+    <script>
+      // Fallback if Capacitor server.url is not injected (local open of www/)
+      if (!window.Capacitor) {
+        window.location.replace('https://vay-master.ru')
+      }
+    </script>
+  </body>
+</html>

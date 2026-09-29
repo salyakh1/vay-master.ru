@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">VayMaster</string>
+    <string name="title_activity_main">VayMaster</string>
+    <string name="package_name">ru.vaymaster.app</string>
+    <string name="custom_url_scheme">ru.vaymaster.app</string>
+</resources>
