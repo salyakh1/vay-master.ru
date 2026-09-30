@@ -100,7 +100,7 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                   Войти
                 </Link>
                 <Link
-                  href="/auth/register"
+                  href="/auth/start"
                   className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-brand-accent text-white"
                 >
                   Начать

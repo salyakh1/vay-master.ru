@@ -8,6 +8,8 @@ const ALLOWED = new Set([
   'view_search',
   'click_master',
   'register_role',
+  'onboarding_step',
+  'onboarding_complete',
   'create_order',
   'pay_publish',
   'respond',

@@ -7,8 +7,16 @@ import Link from 'next/link'
 import AuthBrandHero from '@/components/auth/AuthBrandHero'
 import { localizeAuthError } from '@/components/auth/localizeAuthError'
 import { trackFunnel } from '@/lib/track-funnel'
+import { FiTool, FiShoppingBag, FiUser } from 'react-icons/fi'
+import type { IconType } from 'react-icons'
 
 const VALID_ROLES: UserRole[] = ['master', 'seller', 'client']
+
+const ROLE_META: Record<UserRole, { label: string; icon: IconType }> = {
+  master: { label: 'Мастер', icon: FiTool },
+  seller: { label: 'Продавец', icon: FiShoppingBag },
+  client: { label: 'Клиент', icon: FiUser },
+}
 
 function isUserRole(v: string | null): v is UserRole {
   return v != null && VALID_ROLES.includes(v as UserRole)
@@ -20,32 +28,25 @@ function RegisterForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState<UserRole | ''>('')
-  const [roleTouched, setRoleTouched] = useState(false)
   const [phone, setPhone] = useState('')
-  const [city, setCity] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const roleParam = searchParams.get('role')
+  const role: UserRole | null = isUserRole(roleParam) ? roleParam : null
+
   useEffect(() => {
-    const r = searchParams.get('role')
-    if (isUserRole(r)) {
-      setRole(r)
-      setRoleTouched(true)
-    }
-  }, [searchParams])
+    if (!role) router.replace('/auth/start')
+  }, [role, router])
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setLoading(true)
-
     if (!role) {
-      setRoleTouched(true)
-      setError('Пожалуйста, выберите роль')
-      setLoading(false)
+      router.replace('/auth/start')
       return
     }
+    setLoading(true)
 
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -56,7 +57,6 @@ function RegisterForm() {
             full_name: fullName,
             role: role,
             phone: phone || null,
-            city: city || null,
           },
         },
       })
@@ -90,7 +90,6 @@ function RegisterForm() {
               full_name: fullName,
               role,
               phone: phone || null,
-              city: city || null,
             })
 
             if (profileError) {
@@ -127,13 +126,7 @@ function RegisterForm() {
 
         void trackFunnel('register_role', { role })
 
-        if (role === 'master') {
-          router.push('/onboarding/specializations')
-        } else if (role === 'seller') {
-          router.push('/onboarding/seller')
-        } else {
-          router.push('/onboarding')
-        }
+        router.push('/onboarding')
       }
     } catch (err: unknown) {
       setError(localizeAuthError(err))
@@ -148,8 +141,25 @@ function RegisterForm() {
 
       <div className="flex-1 px-4 -mt-6 relative z-10 pb-10">
         <div className="bg-white rounded-2xl border border-[#e5e5ea] p-5 shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
-          <h2 className="text-lg font-bold text-[#1c1c1e] mb-1 text-center">Регистрация</h2>
-          <p className="text-center text-xs text-text-secondary mb-5">Выберите роль и заполните данные</p>
+          <h2 className="text-lg font-bold text-[#1c1c1e] mb-3 text-center">Регистрация</h2>
+
+          {role && (() => {
+            const { label, icon: RoleIcon } = ROLE_META[role]
+            return (
+              <div className="flex items-center gap-3 rounded-xl bg-[#fdf2f1] border border-[#f5c6cb] px-3 py-2.5 mb-5">
+                <span className="w-9 h-9 rounded-lg bg-brand-accent text-white flex items-center justify-center shrink-0">
+                  <RoleIcon size={17} />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[11px] text-text-secondary leading-tight">Вы регистрируетесь как</span>
+                  <span className="block text-[14px] font-bold text-[#1c1c1e] leading-tight">{label}</span>
+                </span>
+                <Link href="/auth/start" className="text-[13px] font-semibold text-brand-accent shrink-0">
+                  Изменить
+                </Link>
+              </div>
+            )
+          })()}
 
           <form onSubmit={handleRegister} className="space-y-3.5">
             <div>
@@ -201,94 +211,19 @@ function RegisterForm() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="reg-phone" className="block text-xs font-semibold text-text-secondary mb-1.5">
-                  Телефон
-                </label>
-                <input
-                  id="reg-phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="input w-full"
-                  placeholder="+7 999 123-45-67"
-                  autoComplete="tel"
-                />
-              </div>
-              <div>
-                <label htmlFor="reg-city" className="block text-xs font-semibold text-text-secondary mb-1.5">
-                  Город
-                </label>
-                <input
-                  id="reg-city"
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="input w-full"
-                  placeholder="Ваш город"
-                  autoComplete="address-level2"
-                />
-              </div>
-            </div>
-
-            <div className="pt-1">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <label className="block text-xs font-semibold text-text-secondary">Выберите роль *</label>
-                {roleTouched && !role && (
-                  <span className="text-[11px] font-semibold text-brand-accent">Роль не выбрана</span>
-                )}
-              </div>
-              <div
-                role="radiogroup"
-                aria-label="Роль пользователя"
-                aria-invalid={roleTouched && !role ? 'true' : 'false'}
-                className={[
-                  'grid grid-cols-3 gap-2',
-                  roleTouched && !role ? 'rounded-xl p-1 bg-[#fdf0f0] border border-[#f5c6cb]' : '',
-                ].join(' ')}
-              >
-                {(
-                  [
-                    { id: 'role-master', value: 'master' as const, label: 'Мастер', icon: '🔨' },
-                    { id: 'role-seller', value: 'seller' as const, label: 'Продавец', icon: '🛒' },
-                    { id: 'role-client', value: 'client' as const, label: 'Клиент', icon: '👤' },
-                  ] as const
-                ).map((item) => {
-                  const selected = role === item.value
-                  return (
-                    <label
-                      key={item.id}
-                      htmlFor={item.id}
-                      className={[
-                        'cursor-pointer select-none rounded-xl border px-2 py-2.5',
-                        'flex flex-col items-center justify-center gap-1',
-                        'transition-all duration-150 active:scale-[0.98]',
-                        selected
-                          ? 'bg-brand-accent border-brand-accent text-white shadow-sm'
-                          : 'bg-[#f5f5f7] border-[#e5e5ea] text-[#1c1c1e] hover:border-brand-accent/40',
-                      ].join(' ')}
-                    >
-                      <input
-                        id={item.id}
-                        type="radio"
-                        name="role"
-                        value={item.value}
-                        checked={selected}
-                        onChange={() => {
-                          setRoleTouched(true)
-                          setRole(item.value)
-                        }}
-                        className="sr-only"
-                      />
-                      <span className="text-xl leading-none" aria-hidden="true">
-                        {item.icon}
-                      </span>
-                      <span className="text-[11px] font-bold">{item.label}</span>
-                    </label>
-                  )
-                })}
-              </div>
+            <div>
+              <label htmlFor="reg-phone" className="block text-xs font-semibold text-text-secondary mb-1.5">
+                Телефон
+              </label>
+              <input
+                id="reg-phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="input w-full"
+                placeholder="+7 999 123-45-67"
+                autoComplete="tel"
+              />
             </div>
 
             {error && (

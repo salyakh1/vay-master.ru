@@ -86,7 +86,7 @@ const ROLES = [
   { icon: '🔨', title: 'Мастерам', desc: 'Заказы без комиссий, портфолио, PRO', href: '/auth/register?role=master', active: true },
   { icon: '🛒', title: 'Продавцам', desc: 'Продавайте инструменты и материалы', href: '/auth/register?role=seller' },
   { icon: '👤', title: 'Клиентам', desc: 'Мастера и материалы рядом', href: '/auth/register?role=client' },
-  { icon: '🆓', title: 'Бесплатно', desc: 'Регистрация без скрытых платежей', href: '/auth/register' },
+  { icon: '🆓', title: 'Бесплатно', desc: 'Регистрация без скрытых платежей', href: '/auth/start' },
 ]
 
 function SectionHeader({ title, linkLabel, href }: { title: string; linkLabel?: string; href?: string }) {

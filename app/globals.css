@@ -114,6 +114,21 @@ html {
   animation: fadeIn 0.2s ease-out;
 }
 
+@keyframes onbStepIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.onb-step-enter {
+  animation: onbStepIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 /* Карта заказов: скрываем атрибуцию Leaflet (иконку/префикс) */
 .orders-map .leaflet-control-attribution {
   display: none !important;

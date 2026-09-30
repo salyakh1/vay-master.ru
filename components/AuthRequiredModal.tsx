@@ -21,7 +21,7 @@ export default function AuthRequiredModal({ isOpen, onClose, type = 'master' }: 
 
   const handleRegister = () => {
     onClose()
-    router.push('/auth/register')
+    router.push('/auth/start')
   }
 
   return (

@@ -1,150 +1,91 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
-import type { UserRole } from '@/types/db'
+import { useAuth } from '@/app/providers'
+import { trackFunnel } from '@/lib/track-funnel'
+import {
+  ONBOARDING_FLOWS,
+  loadOnboardingStep,
+  markOnboardingDone,
+  saveOnboardingStep,
+  type OnboardingStepId,
+} from '@/lib/onboarding'
+import StepSpecializations from '@/components/onboarding/StepSpecializations'
+import StepLocation from '@/components/onboarding/StepLocation'
+import StepProfile from '@/components/onboarding/StepProfile'
+import StepSellerCategories from '@/components/onboarding/StepSellerCategories'
+import StepClientTask from '@/components/onboarding/StepClientTask'
+import StepDone from '@/components/onboarding/StepDone'
+import type { OnboardingStepProps } from '@/components/onboarding/types'
 
-const STEPS: Record<UserRole, Array<{ title: string; desc: string; action: string; href: string }>> = {
-  master: [
-    {
-      title: 'Добавьте фото профиля',
-      desc: 'Мастера с фото получают в 3 раза больше откликов',
-      action: 'Загрузить фото',
-      href: '/settings?open=profile',
-    },
-    {
-      title: 'Выберите специализации',
-      desc: 'Укажите чем именно занимаетесь — это влияет на поиск',
-      action: 'Добавить специализации',
-      href: '/onboarding/specializations',
-    },
-    {
-      title: 'Добавьте примеры работ',
-      desc: 'Портфолио с фото повышает доверие клиентов',
-      action: 'Открыть профиль',
-      href: '/portfolio/new',
-    },
-    {
-      title: 'Опубликуйте заказ',
-      desc: 'Нужна помощь другого мастера? Создайте заказ от своего имени',
-      action: 'Создать заказ',
-      href: '/orders/new',
-    },
-  ],
-  seller: [
-    {
-      title: 'Оформите профиль магазина',
-      desc: 'Название, описание и логотип увеличивают продажи',
-      action: 'Настроить магазин',
-      href: '/onboarding/seller',
-    },
-    {
-      title: 'Добавьте первый товар',
-      desc: 'Начните продавать прямо сейчас',
-      action: 'Добавить товар',
-      href: '/products/new',
-    },
-    {
-      title: 'Опубликуйте заказ',
-      desc: 'Нужен мастер для монтажа или доставки? Создайте заказ',
-      action: 'Создать заказ',
-      href: '/orders/new',
-    },
-  ],
-  client: [
-    {
-      title: 'Найдите мастера',
-      desc: 'Введите что нужно сделать и выберите специалиста',
-      action: 'Найти мастера',
-      href: '/search',
-    },
-    {
-      title: 'Создайте заказ',
-      desc: 'Опишите задачу и получите отклики от мастеров',
-      action: 'Создать заказ',
-      href: '/orders/new',
-    },
-  ],
+const STEP_COMPONENTS: Record<OnboardingStepId, (props: OnboardingStepProps) => JSX.Element> = {
+  specs: StepSpecializations,
+  location: StepLocation,
+  profile: StepProfile,
+  categories: StepSellerCategories,
+  task: StepClientTask,
+  done: StepDone,
 }
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const [role, setRole] = useState<UserRole | null>(null)
-  const [step, setStep] = useState(0)
+  const { user, loading } = useAuth()
+  const [index, setIndex] = useState<number | null>(null)
+
+  const role = user?.role
+  const flow = useMemo(() => (role ? ONBOARDING_FLOWS[role] ?? ONBOARDING_FLOWS.client : []), [role])
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) {
-        router.replace('/auth/login')
-        return
-      }
-      const metaRole = user.user_metadata?.role as UserRole | undefined
-      if (metaRole && STEPS[metaRole]) {
-        setRole(metaRole)
-        return
-      }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle()
-      setRole((profile?.role as UserRole) ?? 'client')
-    })
-  }, [router])
+    if (loading) return
+    if (!user) {
+      router.replace('/auth/login')
+      return
+    }
+    setIndex((prev) => prev ?? loadOnboardingStep(user.id, flow.length))
+  }, [loading, user, router, flow.length])
 
-  if (!role) {
+  const goTo = useCallback(
+    (next: number) => {
+      if (!user) return
+      setIndex(next)
+      saveOnboardingStep(user.id, next)
+      window.scrollTo({ top: 0 })
+      void trackFunnel('onboarding_step', { role: user.role, step: flow[next], index: next })
+    },
+    [user, flow]
+  )
+
+  const finish = useCallback(
+    (href: string) => {
+      if (!user) return
+      markOnboardingDone(user.id)
+      void trackFunnel('onboarding_complete', { role: user.role, target: href })
+      router.push(href)
+    },
+    [user, router]
+  )
+
+  if (loading || !user || index == null) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Загрузка...</div>
+      <div className="min-h-[100dvh] bg-[#f4f4f4] flex items-center justify-center">
+        <span className="w-8 h-8 rounded-full border-2 border-[#d1d1d6] border-t-brand-accent animate-spin" aria-label="Загрузка" />
       </div>
     )
   }
 
-  const steps = STEPS[role]
-  const current = steps[step]
+  const stepId = flow[index]
+  const Step = STEP_COMPONENTS[stepId]
+  const isLast = index === flow.length - 1
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-gray-50">
-      <div className="max-w-sm w-full">
-        <div className="flex gap-2 mb-8 justify-center">
-          {steps.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 rounded-full flex-1 transition-all ${
-                i <= step ? 'bg-brand-accent' : 'bg-gray-200'
-              }`}
-            />
-          ))}
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <p className="text-sm text-gray-400 mb-1">
-            Шаг {step + 1} из {steps.length}
-          </p>
-          <h2 className="text-xl font-semibold mb-2">{current.title}</h2>
-          <p className="text-gray-500 mb-6">{current.desc}</p>
-
-          <Link
-            href={current.href}
-            className="block w-full text-center bg-brand-accent text-white py-3 rounded-xl font-medium mb-3"
-          >
-            {current.action}
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (step < steps.length - 1) setStep((s) => s + 1)
-              else router.push('/feed')
-            }}
-            className="block w-full text-center text-gray-400 py-2 text-sm"
-          >
-            {step < steps.length - 1 ? 'Пропустить шаг →' : 'Перейти на платформу →'}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Step
+      user={user}
+      index={index}
+      total={flow.length}
+      onBack={index > 0 ? () => goTo(index - 1) : undefined}
+      onNext={() => (isLast ? finish('/feed') : goTo(index + 1))}
+      onFinish={finish}
+    />
   )
 }

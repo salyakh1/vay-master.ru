@@ -104,7 +104,7 @@ function LoginForm() {
 
           <p className="mt-5 text-center text-sm text-[#8e8e93]">
             Нет аккаунта?{' '}
-            <Link href="/auth/register" className="text-brand-accent font-semibold hover:underline">
+            <Link href="/auth/start" className="text-brand-accent font-semibold hover:underline">
               Зарегистрироваться бесплатно
             </Link>
           </p>
