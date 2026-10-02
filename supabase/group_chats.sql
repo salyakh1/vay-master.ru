@@ -1,4 +1,4 @@
--- Профессиональные групповые чаты (только PRO-мастера, 1 сообщение / 12 ч, TTL 72 ч)
+-- Профессиональные групповые чаты (только PRO-мастера, 1 сообщение / 12 ч, TTL 48 ч)
 -- Выполнить в Supabase → SQL Editor
 
 -- ══════════════════════════════════════════════
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS public.group_messages (
   sender_id     uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   content       text NOT NULL CHECK (char_length(content) > 0 AND char_length(content) <= 2000),
   reply_to_id   uuid REFERENCES public.group_messages(id) ON DELETE SET NULL,
-  expires_at    timestamptz NOT NULL DEFAULT (now() + interval '72 hours'),
+  expires_at    timestamptz NOT NULL DEFAULT (now() + interval '48 hours'),
   created_at    timestamptz DEFAULT now()
 );
 
@@ -58,6 +58,9 @@ CREATE INDEX IF NOT EXISTS idx_cooldowns_user_chat
   ON public.group_message_cooldowns(user_id, chat_id);
 CREATE INDEX IF NOT EXISTS idx_group_chats_spec
   ON public.group_chats(specialization_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_group_chats_specialization_unique
+  ON public.group_chats (specialization_id)
+  WHERE specialization_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_group_chats_city
   ON public.group_chats(city);
 
@@ -142,39 +145,48 @@ END $$;
 -- );
 
 -- ══════════════════════════════════════════════
--- 8. НАЧАЛЬНЫЕ ЧАТЫ + привязка к categories по имени
+-- 8. 1 ПРОФЧАТ НА КАЖДУЮ КАТЕГОРИЮ МАСТЕРОВ
 -- ══════════════════════════════════════════════
-INSERT INTO public.group_chats (name, icon, description, city)
-VALUES
-  ('Электрики · Москва',      '⚡', 'Профчат для мастеров-электриков', 'Москва'),
-  ('Сантехники · Москва',     '🚿', 'Профчат для сантехников', 'Москва'),
-  ('Строители · Москва',      '🏗️', 'Профчат для строителей', 'Москва'),
-  ('Кровельщики · Москва',    '🏠', 'Профчат для кровельщиков', 'Москва'),
-  ('Отделочники · Москва',    '🖌️', 'Профчат для отделочников', 'Москва'),
-  ('Паркетчики · Москва',     '🪵', 'Профчат для паркетчиков', 'Москва'),
-  ('Климат-мастера · Москва', '❄️', 'Кондиционеры и вентиляция', 'Москва'),
-  ('Автомастера · Москва',    '🚗', 'Профчат для автомехаников', 'Москва')
-ON CONFLICT (name, city) DO NOTHING;
-
--- Попытка привязать specialization_id к существующим категориям
-UPDATE public.group_chats gc
-SET specialization_id = c.id
+INSERT INTO public.group_chats (name, icon, description, city, specialization_id, is_active)
+SELECT
+  c.name,
+  CASE c.slug
+    WHEN 'stroika' THEN '🏗️'
+    WHEN 'otdelka-remont' THEN '🖌️'
+    WHEN 'autoservice' THEN '🚗'
+    WHEN 'gruzoperevozki' THEN '🚛'
+    WHEN 'spectehnika' THEN '🚜'
+    WHEN 'blagoustrojstvo' THEN '🌳'
+    WHEN 'hudozhestvennaya-kovka' THEN '⚒️'
+    WHEN 'prom-alpinizm' THEN '🧗'
+    WHEN 'otkachka-kanalizacii' THEN '🚽'
+    WHEN 'vodosnabzhenie' THEN '💧'
+    WHEN 'klining' THEN '✨'
+    WHEN 'master-na-chas' THEN '🔧'
+    WHEN 'ohrana-bezopasnost' THEN '🛡️'
+    WHEN 'vyvoz-musora' THEN '🗑️'
+    WHEN 'gruzchiki' THEN '📦'
+    WHEN 'avtoperevozki' THEN '🚐'
+    WHEN 'raznorabochye' THEN '🛠️'
+    WHEN 'avtopodbor' THEN '🔍'
+    WHEN 'remont-tehniki' THEN '🔌'
+    WHEN 'dizajn-proektirovanie' THEN '📐'
+    WHEN 'specoborudovanie' THEN '⚙️'
+    ELSE '💬'
+  END,
+  'Профчат для мастеров: ' || c.name,
+  NULL,
+  c.id,
+  true
 FROM public.categories c
-WHERE gc.specialization_id IS NULL
-  AND (
-    (gc.name ILIKE 'Электрик%' AND c.name ILIKE '%электр%')
-    OR (gc.name ILIKE 'Сантехник%' AND c.name ILIKE '%сантех%')
-    OR (gc.name ILIKE 'Строител%' AND (c.name ILIKE '%строител%' OR c.name ILIKE '%строительн%'))
-    OR (gc.name ILIKE 'Кровельщик%' AND c.name ILIKE '%кровл%')
-    OR (gc.name ILIKE 'Отделочник%' AND c.name ILIKE '%отдел%')
-    OR (gc.name ILIKE 'Паркетчик%' AND c.name ILIKE '%паркет%')
-    OR (gc.name ILIKE 'Климат%' AND (c.name ILIKE '%климат%' OR c.name ILIKE '%вентиля%' OR c.name ILIKE '%кондиц%'))
-    OR (gc.name ILIKE 'Автомастер%' AND (c.name ILIKE '%авто%' OR c.name ILIKE '%машина%'))
-  );
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.group_chats gc WHERE gc.specialization_id = c.id
+);
 
 -- ══════════════════════════════════════════════
--- 9. ПРОВЕРКА
+-- 9. ПРОВЕРКА ПОКРЫТИЯ
 -- ══════════════════════════════════════════════
--- SELECT table_name FROM information_schema.tables
--- WHERE table_name IN ('group_chats', 'group_messages', 'group_message_cooldowns');
--- SELECT id, name, specialization_id, city FROM public.group_chats;
+-- SELECT c.name, CASE WHEN gc.id IS NULL THEN 'MISSING' ELSE 'OK' END
+-- FROM categories c
+-- LEFT JOIN group_chats gc ON gc.specialization_id = c.id AND gc.is_active
+-- ORDER BY c.sort_order;

@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { isProActive } from '@/lib/masterAccess'
+import { GROUP_CHAT_COOLDOWN_MS, GROUP_CHAT_TTL_MS } from '@/lib/groupChats'
 
 export const dynamic = 'force-dynamic'
-
-const COOLDOWN_MS = 12 * 60 * 60 * 1000
-const TTL_MS = 72 * 60 * 60 * 1000
 
 function userClient(token: string) {
   return createClient(
@@ -45,9 +43,13 @@ type RouteCtx = { params: { id: string } }
 export async function GET(request: NextRequest, { params }: RouteCtx) {
   const auth = await requireProMaster(request)
   if ('error' in auth && auth.error) return auth.error
-  const { supabase } = auth as Exclude<Awaited<ReturnType<typeof requireProMaster>>, { error: NextResponse }>
+  const { supabase, user } = auth as Exclude<Awaited<ReturnType<typeof requireProMaster>>, { error: NextResponse }>
 
-  const { data: chat } = await supabase.from('group_chats').select('id, name, icon, description, city, members_count').eq('id', params.id).maybeSingle()
+  const { data: chat } = await supabase
+    .from('group_chats')
+    .select('id, name, icon, description, city, members_count, specialization_id')
+    .eq('id', params.id)
+    .maybeSingle()
   if (!chat) return NextResponse.json({ error: 'Chat not found' }, { status: 404 })
 
   const { data: messages, error } = await supabase
@@ -79,17 +81,16 @@ export async function GET(request: NextRequest, { params }: RouteCtx) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Кулдаун текущего пользователя
   const { data: cooldown } = await supabase
     .from('group_message_cooldowns')
     .select('last_message_at')
-    .eq('user_id', (auth as { user: { id: string } }).user.id)
+    .eq('user_id', user.id)
     .eq('chat_id', params.id)
     .maybeSingle()
 
   const lastMsg = cooldown?.last_message_at as string | undefined
-  const canWrite = !lastMsg || new Date(lastMsg).getTime() + COOLDOWN_MS < Date.now()
-  const nextAvailable = lastMsg ? new Date(new Date(lastMsg).getTime() + COOLDOWN_MS).toISOString() : null
+  const canWrite = !lastMsg || new Date(lastMsg).getTime() + GROUP_CHAT_COOLDOWN_MS < Date.now()
+  const nextAvailable = lastMsg ? new Date(new Date(lastMsg).getTime() + GROUP_CHAT_COOLDOWN_MS).toISOString() : null
 
   return NextResponse.json({
     chat,
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest, { params }: RouteCtx) {
   })
 }
 
-/** POST — отправить сообщение (кулдаун 12 ч) */
+/** POST — отправить сообщение (кулдаун 12 ч, TTL 48 ч) */
 export async function POST(request: NextRequest, { params }: RouteCtx) {
   const auth = await requireProMaster(request)
   if ('error' in auth && auth.error) return auth.error
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest, { params }: RouteCtx) {
     .maybeSingle()
 
   if (cooldown?.last_message_at) {
-    const nextAvailable = new Date(new Date(cooldown.last_message_at).getTime() + COOLDOWN_MS)
+    const nextAvailable = new Date(new Date(cooldown.last_message_at).getTime() + GROUP_CHAT_COOLDOWN_MS)
     if (nextAvailable > new Date()) {
       const secondsLeft = Math.ceil((nextAvailable.getTime() - Date.now()) / 1000)
       return NextResponse.json(
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest, { params }: RouteCtx) {
       sender_id: user.id,
       content,
       reply_to_id: replyToId,
-      expires_at: new Date(Date.now() + TTL_MS).toISOString(),
+      expires_at: new Date(Date.now() + GROUP_CHAT_TTL_MS).toISOString(),
     })
     .select(
       `
@@ -179,6 +180,6 @@ export async function POST(request: NextRequest, { params }: RouteCtx) {
   return NextResponse.json({
     message,
     canWrite: false,
-    nextAvailable: new Date(Date.now() + COOLDOWN_MS).toISOString(),
+    nextAvailable: new Date(Date.now() + GROUP_CHAT_COOLDOWN_MS).toISOString(),
   })
 }

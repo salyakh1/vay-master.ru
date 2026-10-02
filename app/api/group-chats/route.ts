@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { isProActive } from '@/lib/masterAccess'
+import { GROUP_CHAT_COOLDOWN_MS } from '@/lib/groupChats'
 
 export const dynamic = 'force-dynamic'
-
-const COOLDOWN_MS = 12 * 60 * 60 * 1000
 
 function userClient(token: string) {
   return createClient(
@@ -14,7 +13,7 @@ function userClient(token: string) {
   )
 }
 
-/** GET /api/group-chats — профчаты для PRO-мастера (макс. 3 по специализациям) */
+/** GET /api/group-chats — профчаты PRO-мастера по его категориям (макс. 3) */
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -42,12 +41,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ chats: [], isPro: false })
     }
 
-    // Категории мастера через подкатегории (максимум 3)
     const { data: subs } = await supabase
       .from('profile_subcategories')
       .select('subcategory_id, subcategories(category_id)')
       .eq('profile_id', user.id)
-      .limit(12)
+      .limit(24)
 
     const categoryIds = Array.from(
       new Set(
@@ -62,10 +60,15 @@ export async function GET(request: NextRequest) {
       )
     ).slice(0, 3)
 
+    if (categoryIds.length === 0) {
+      return NextResponse.json({ chats: [], isPro: true, noSpecs: true })
+    }
+
     const { data: chats, error: chatsError } = await supabase
       .from('group_chats')
       .select('*')
       .eq('is_active', true)
+      .in('specialization_id', categoryIds)
       .order('name', { ascending: true })
 
     if (chatsError) {
@@ -73,26 +76,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ chats: [], isPro: true, error: chatsError.message }, { status: 200 })
     }
 
-    const city = (profile.city || '').trim().toLowerCase()
-    let list = chats || []
-
-    // Приоритет: чаты своей категории; затем без specialization_id; город — мягкий фильтр
-    if (categoryIds.length > 0) {
-      const matched = list.filter((c) => c.specialization_id && categoryIds.includes(c.specialization_id as string))
-      const unlinked = list.filter((c) => !c.specialization_id)
-      list = matched.length > 0 ? [...matched, ...unlinked] : [...unlinked, ...list]
-    }
-
-    if (city) {
-      const byCity = list.filter((c) => !c.city || String(c.city).toLowerCase() === city)
-      if (byCity.length > 0) list = byCity
-    }
-
-    // Максимум 3 профчата (по числу специализаций)
-    list = list.slice(0, 3)
-
+    const list = (chats || []).slice(0, 3)
     if (list.length === 0) {
-      return NextResponse.json({ chats: [], isPro: true, noSpecs: categoryIds.length === 0 })
+      return NextResponse.json({ chats: [], isPro: true, noSpecs: false, missingChats: true })
     }
 
     const chatIds = list.map((c) => c.id)
@@ -104,7 +90,6 @@ export async function GET(request: NextRequest) {
 
     const cooldownMap = new Map((cooldowns || []).map((c) => [c.chat_id, c.last_message_at as string]))
 
-    // Последнее живое сообщение для превью
     const { data: lastMsgs } = await supabase
       .from('group_messages')
       .select('chat_id, content, created_at, sender_id, profiles!group_messages_sender_id_fkey(full_name)')
@@ -128,19 +113,20 @@ export async function GET(request: NextRequest) {
     const now = Date.now()
     const chatsWithCooldown = list.map((chat) => {
       const lastMsg = cooldownMap.get(chat.id)
-      const canWrite = !lastMsg || new Date(lastMsg).getTime() + COOLDOWN_MS < now
-      const nextAvailable = lastMsg ? new Date(new Date(lastMsg).getTime() + COOLDOWN_MS).toISOString() : null
-      const preview = previewMap.get(chat.id) || null
+      const canWrite = !lastMsg || new Date(lastMsg).getTime() + GROUP_CHAT_COOLDOWN_MS < now
+      const nextAvailable = lastMsg
+        ? new Date(new Date(lastMsg).getTime() + GROUP_CHAT_COOLDOWN_MS).toISOString()
+        : null
       return {
         ...chat,
         canWrite,
         nextAvailable,
         lastMessageAt: lastMsg ?? null,
-        lastPreview: preview,
+        lastPreview: previewMap.get(chat.id) || null,
       }
     })
 
-    return NextResponse.json({ chats: chatsWithCooldown, isPro: true, noSpecs: categoryIds.length === 0 })
+    return NextResponse.json({ chats: chatsWithCooldown, isPro: true, noSpecs: false })
   } catch (e) {
     console.error('group-chats GET', e)
     return NextResponse.json({ chats: [], isPro: false }, { status: 500 })

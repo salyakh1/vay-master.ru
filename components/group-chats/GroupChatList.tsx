@@ -111,7 +111,7 @@ export default function GroupChatList() {
         </div>
         <p className="text-[11px] text-[#555] mb-3 leading-relaxed">
           Общайтесь с коллегами по специализации, делитесь опытом, берите субподряды. 1 сообщение в 12 часов.
-          Сообщения живут 72 часа.
+          Сообщения живут 48 часов.
         </p>
         <button
           type="button"

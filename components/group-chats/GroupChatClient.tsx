@@ -231,7 +231,7 @@ export default function GroupChatClient({ chatId }: { chatId: string }) {
       setText('')
       setReplyTo(null)
       setCanWrite(false)
-      setNextAvail(data.nextAvailable ? new Date(data.nextAvailable) : new Date(Date.now() + 12 * 60 * 60 * 1000))
+      setNextAvail(data.nextAvailable ? new Date(data.nextAvailable) : new Date(Date.now() + 12 * 60 * 60 * 1000)) // 12ч кулдаун
       if (data.message) {
         setMessages((prev) => (prev.some((m) => m.id === data.message.id) ? prev : [...prev, data.message]))
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
@@ -305,7 +305,7 @@ export default function GroupChatClient({ chatId }: { chatId: string }) {
         <div className="flex-1 min-w-0">
           <p className="text-[14px] font-bold text-[#1c1c1e] truncate">{chat?.name ?? 'Профчат'}</p>
           <p className="text-[10px] text-[#8e8e93]">
-            Только PRO · сообщения {expiresIn ? `обновятся через ${expiresIn}` : 'живут 72 ч'}
+            Только PRO · сообщения {expiresIn ? `обновятся через ${expiresIn}` : 'живут 48 ч'}
           </p>
         </div>
       </div>
@@ -316,7 +316,7 @@ export default function GroupChatClient({ chatId }: { chatId: string }) {
           ⏱️
         </span>
         <span className="text-[10px] text-[#8a6000] leading-tight">
-          PRO мастера · <strong>1 сообщение в 12 часов</strong> · Сообщения живут 72 ч
+          PRO мастера · <strong>1 сообщение в 12 часов</strong> · Сообщения живут 48 ч
         </span>
       </div>
 
@@ -533,7 +533,7 @@ export default function GroupChatClient({ chatId }: { chatId: string }) {
         </div>
         <div className="flex items-center gap-2 mt-1.5 px-1">
           <span className="text-[9px] bg-[#fff8e6] text-[#cc8800] px-1.5 py-0.5 rounded font-bold">PRO</span>
-          <span className="text-[10px] text-[#8e8e93]">1 сообщение в 12 часов · живут 72 ч</span>
+          <span className="text-[10px] text-[#8e8e93]">1 сообщение в 12 часов · живут 48 ч</span>
         </div>
       </div>
     </div>
