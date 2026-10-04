@@ -10,7 +10,6 @@ import ChatListItem from './ChatListItem'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { FiBriefcase, FiMessageSquare, FiClock } from 'react-icons/fi'
-import GroupChatList from '@/components/group-chats/GroupChatList'
 
 type TabType = 'chats' | 'responses'
 
@@ -364,7 +363,6 @@ export default function ChatsClient() {
 
       {activeTab === 'chats' && (
         <>
-          <GroupChatList />
           {loading && chats.length === 0 ? (
             <div className="bg-white">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -375,7 +373,7 @@ export default function ChatsClient() {
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
               <div className="text-5xl mb-4">💬</div>
               <p className="text-[15px] font-extrabold text-[#111] mb-2">
-                {searchQuery ? 'Ничего не найдено' : 'Нет личных чатов'}
+                {searchQuery ? 'Ничего не найдено' : 'Нет чатов'}
               </p>
               <p className="text-[12px] text-[#aaa] leading-relaxed mb-6 max-w-[260px]">
                 {searchQuery

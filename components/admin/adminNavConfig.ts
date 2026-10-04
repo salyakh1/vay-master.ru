@@ -86,7 +86,6 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
     items: [
       { title: 'Админ-роли', href: '/admin/security', icon: FiShield, roles: ['super_admin', 'moderator'], emoji: '🛡' },
       { title: 'Сообщения', href: '/admin/messages', icon: FiMessageSquare, roles: ['super_admin', 'moderator'], emoji: '📜' },
-      { title: 'Профчаты', href: '/admin/group-chats', icon: FiMessageSquare, roles: ['super_admin', 'moderator'], emoji: '💬' },
       { title: 'Модерация', href: '/admin/moderation', icon: FiShield, roles: ['super_admin', 'moderator'], alertCountKey: 'moderation', emoji: '⏳' },
       { title: 'Оплата', href: '/admin/payments', icon: FiCreditCard, roles: ['super_admin'], emoji: '💳' },
       { title: 'Настройки', href: '/admin/settings', icon: FiSettings, roles: ['super_admin'], emoji: '⚙️' },
@@ -118,7 +117,6 @@ export function getAdminPageMeta(pathname: string): AdminPageMeta {
     '/admin/complaints': { title: 'Жалобы', subtitle: 'Обработка обращений пользователей' },
     '/admin/reviews': { title: 'Отзывы', subtitle: 'Модерация отзывов' },
     '/admin/messages': { title: 'Сообщения', subtitle: 'Коммуникация с пользователями' },
-    '/admin/group-chats': { title: 'Профчаты', subtitle: 'Покрытие категорий профессиональными чатами' },
     '/admin/moderation': { title: 'Модерация', subtitle: 'Контент на проверке' },
     '/admin/banners': { title: 'Баннеры', subtitle: 'Рекламные материалы', action: { label: '+ Создать баннер', href: '/admin/banners' } },
     '/admin/images': { title: 'Категории', subtitle: 'Изображения категорий и специализаций' },
