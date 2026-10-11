@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getProPaymentSettings } from '@/lib/payment-settings-server'
 import { getClientIp, rateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { isStoreNativePlatform, platformFromRequest } from '@/lib/platformPolicy'
 
 const supabaseAnon = () =>
   createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -32,6 +33,18 @@ export async function POST(request: Request) {
     const role = (user.user_metadata?.role || 'client') as string
     if (role !== 'master' && role !== 'seller') {
       return NextResponse.json({ error: 'PRO доступен только мастерам и продавцам' }, { status: 403 })
+    }
+
+    const platform = platformFromRequest(request)
+    if (isStoreNativePlatform(platform)) {
+      return NextResponse.json(
+        {
+          error:
+            'Оплата PRO в приложении недоступна. Откройте https://vay-master.ru/pro в браузере.',
+          code: 'NATIVE_EXTERNAL_PRO_BLOCKED',
+        },
+        { status: 403 }
+      )
     }
 
     const settings = await getProPaymentSettings()

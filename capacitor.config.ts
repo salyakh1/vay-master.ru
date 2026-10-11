@@ -21,13 +21,17 @@ const config: CapacitorConfig = {
       'www.vay-master.ru',
       '*.supabase.co',
       '*.supabase.in',
+      // Платежи заказов (не PRO) могут открываться в WebView
+      '*.tinkoff.ru',
+      'securepay.tinkoff.ru',
+      '*.tbank.ru',
     ],
   },
   plugins: {
     SplashScreen: {
       launchShowDuration: 1200,
       launchAutoHide: true,
-      backgroundColor: '#F4F4F4',
+      backgroundColor: '#C94133',
       showSpinner: false,
     },
     StatusBar: {
@@ -41,12 +45,12 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: false,
-    backgroundColor: '#F4F4F4',
+    backgroundColor: '#C94133',
   },
   ios: {
     contentInset: 'automatic',
     preferredContentMode: 'mobile',
-    backgroundColor: '#F4F4F4',
+    backgroundColor: '#C94133',
   },
 }
 

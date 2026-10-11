@@ -8,6 +8,7 @@ import { isNativeApp } from '@/lib/nativeApp'
  * - статус-бар
  * - кнопка «Назад» Android → history.back / закрытие
  * - класс на html для safe-area CSS
+ * - регистрация push (после google-services.json / APNs)
  */
 export default function NativeAppShell() {
   useEffect(() => {
@@ -16,6 +17,7 @@ export default function NativeAppShell() {
     document.documentElement.classList.add('native-app')
 
     let removeBack: (() => void) | undefined
+    let removePush: (() => void) | undefined
 
     const boot = async () => {
       try {
@@ -48,6 +50,27 @@ export default function NativeAppShell() {
       } catch {
         /* ignore */
       }
+
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications')
+        const perm = await PushNotifications.requestPermissions()
+        if (perm.receive === 'granted') {
+          await PushNotifications.register()
+        }
+        const reg = await PushNotifications.addListener('registration', (token) => {
+          // Токен устройства: подключите сохранение в API после Firebase/APNs
+          console.info('[push] device token', token.value)
+        })
+        const err = await PushNotifications.addListener('registrationError', (e) => {
+          console.warn('[push] registration error', e)
+        })
+        removePush = () => {
+          reg.remove()
+          err.remove()
+        }
+      } catch {
+        /* plugin not installed / not configured yet */
+      }
     }
 
     void boot()
@@ -55,6 +78,7 @@ export default function NativeAppShell() {
     return () => {
       document.documentElement.classList.remove('native-app')
       removeBack?.()
+      removePush?.()
     }
   }, [])
 

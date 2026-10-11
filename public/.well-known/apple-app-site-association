@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.ru.vaymaster.app",
+        "paths": ["*", "NOT /admin/*", "NOT /api/*"]
+      }
+    ]
+  }
+}

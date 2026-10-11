@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { formatRemaining, getMasterAccess } from '@/lib/masterAccess'
 import { supabase } from '@/lib/supabase'
+import { isNativeApp } from '@/lib/nativeApp'
+import { vayPlatformHeaders } from '@/lib/clientPlatform'
 
 type ProSettings = {
   paymentProPurchaseEnabled: boolean
@@ -26,6 +28,11 @@ function ProPageInner() {
   const [proSettings, setProSettings] = useState<ProSettings | null>(null)
   const [payLoading, setPayLoading] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
+  const [nativeApp, setNativeApp] = useState(false)
+
+  useEffect(() => {
+    setNativeApp(isNativeApp())
+  }, [])
 
   useEffect(() => {
     if (!user || !access) {
@@ -78,6 +85,7 @@ function ProPageInner() {
   }, [])
 
   const canPayPro =
+    !nativeApp &&
     user &&
     (user.role === 'master' || user.role === 'seller') &&
     proSettings?.paymentProPurchaseEnabled &&
@@ -86,6 +94,10 @@ function ProPageInner() {
 
   const startProCheckout = async () => {
     setPayError(null)
+    if (isNativeApp()) {
+      setPayError('В приложении оплата PRO недоступна. Оформите на сайте vay-master.ru в браузере.')
+      return
+    }
     setPayLoading(true)
     try {
       const {
@@ -96,11 +108,13 @@ function ProPageInner() {
         router.push('/auth/login')
         return
       }
+      const platformHeaders = vayPlatformHeaders()
       const createRes = await fetch('/api/payments/tinkoff/create-pro-session', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          ...platformHeaders,
         },
         body: '{}',
       })
@@ -115,6 +129,7 @@ function ProPageInner() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          ...platformHeaders,
         },
         body: JSON.stringify({ sessionId }),
       })
@@ -158,8 +173,18 @@ function ProPageInner() {
             )}
 
             <p className="text-text-secondary leading-relaxed mb-6">
-              PRO снимает ограничения и даёт больше возможностей мастерам и продавцам. Оплатите период через Тинькофф — статус обновится сразу после подтверждения банка.
+              PRO снимает ограничения и даёт больше возможностей мастерам и продавцам.
+              {nativeApp
+                ? ' В мобильном приложении оплата цифрового PRO недоступна — оформите подписку на сайте vay-master.ru в браузере.'
+                : ' Оплатите период через Тинькофф — статус обновится сразу после подтверждения банка.'}
             </p>
+
+            {nativeApp && (
+              <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+                Откройте <strong>vay-master.ru</strong> в Safari/Chrome, войдите в аккаунт и оплатите PRO там.
+                После оплаты статус появится и в приложении.
+              </div>
+            )}
 
             {proSettings && (
               <div className="mb-6 rounded-lg border border-border-light/60 bg-bg-secondary/40 px-4 py-3 text-sm text-text-secondary">
@@ -209,14 +234,25 @@ function ProPageInner() {
 
             <div className="mt-6 flex flex-wrap gap-3">
               {user && (user.role === 'master' || user.role === 'seller') ? (
-                <button
-                  type="button"
-                  className="btn btn-primary disabled:opacity-60"
-                  disabled={!canPayPro || payLoading}
-                  onClick={() => void startProCheckout()}
-                >
-                  {payLoading ? 'Переход к оплате…' : 'Оплатить PRO'}
-                </button>
+                nativeApp ? (
+                  <a
+                    href="https://vay-master.ru/pro"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-primary"
+                  >
+                    Оплатить на сайте
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary disabled:opacity-60"
+                    disabled={!canPayPro || payLoading}
+                    onClick={() => void startProCheckout()}
+                  >
+                    {payLoading ? 'Переход к оплате…' : 'Оплатить PRO'}
+                  </button>
+                )
               ) : (
                 <button type="button" className="btn btn-primary" onClick={() => router.push('/auth/login')}>
                   Войти как мастер или продавец

@@ -27,6 +27,14 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/.well-known/apple-app-site-association',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+      },
+      {
+        source: '/.well-known/assetlinks.json',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+      },
+      {
         source: '/(.*)',
         headers: [
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
@@ -34,7 +42,7 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(self)',
+            value: 'camera=(self), microphone=(), geolocation=(self)',
           },
           {
             key: 'Content-Security-Policy',
@@ -43,7 +51,8 @@ const nextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vay-master.ru",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vay-master.ru capacitor://localhost ionic://localhost",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://vay-master.ru https://*.tinkoff.ru https://*.tbank.ru capacitor://localhost ionic://localhost",
+              "form-action 'self' https://*.tinkoff.ru https://*.tbank.ru",
               "font-src 'self'",
               "frame-ancestors 'self'",
             ].join('; '),

@@ -504,17 +504,15 @@ export default function SettingsClient() {
             <SettingsRow icon="🛡" title="Двухфакторная аутентификация" right={<SettingsBadge variant="gray">Скоро</SettingsBadge>} />
           </SettingsSection>
 
-          <SettingsSection title={role === 'seller' ? undefined : 'Прочее'}>
-            {role === 'master' && (
-              <>
-                <SettingsRow icon="🌐" title="Язык" right={<span className="text-xs text-[#8e8e93]">Русский</span>} />
-                <SettingsRow icon="❓" title="Поддержка" href="mailto:support@vay-master.ru" right={<SettingsArrow />} />
-                <SettingsRow icon="📄" title="Пользовательское соглашение" href="/rules" right={<SettingsArrow />} />
-              </>
-            )}
-            {role === 'client' && <SettingsRow icon="❓" title="Поддержка" href="mailto:support@vay-master.ru" right={<SettingsArrow />} />}
+          <SettingsSection title="Прочее">
+            <SettingsRow icon="🌐" title="Язык" right={<span className="text-xs text-[#8e8e93]">Русский</span>} />
+            <SettingsRow icon="❓" title="Поддержка" href="mailto:support@vay-master.ru" right={<SettingsArrow />} />
+            <SettingsRow icon="📄" title="Пользовательское соглашение" href="/terms" right={<SettingsArrow />} />
+            <SettingsRow icon="🔏" title="Конфиденциальность" href="/privacy" right={<SettingsArrow />} />
+            <SettingsRow icon="💳" title="Оферта" href="/offer" right={<SettingsArrow />} />
+            <SettingsRow icon="📘" title="Правила платформы" href="/rules" right={<SettingsArrow />} />
             <SettingsRow icon="🚪" iconBg="#fff0f0" title="Выйти из аккаунта" onClick={handleLogout} danger />
-            {(role === 'master' || role === 'client') && (
+            {(role === 'master' || role === 'client' || role === 'seller') && (
               <SettingsRow icon="🗑" iconBg="#fff0f0" title="Удалить аккаунт" subtitle="Необратимо" onClick={() => setShowDeleteModal(true)} danger />
             )}
           </SettingsSection>

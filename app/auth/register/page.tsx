@@ -31,6 +31,7 @@ function RegisterForm() {
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [acceptedLegal, setAcceptedLegal] = useState(false)
 
   const roleParam = searchParams.get('role')
   const role: UserRole | null = isUserRole(roleParam) ? roleParam : null
@@ -44,6 +45,10 @@ function RegisterForm() {
     setError('')
     if (!role) {
       router.replace('/auth/start')
+      return
+    }
+    if (!acceptedLegal) {
+      setError('Нужно принять условия соглашения и политику конфиденциальности')
       return
     }
     setLoading(true)
@@ -226,6 +231,31 @@ function RegisterForm() {
               />
             </div>
 
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={acceptedLegal}
+                onChange={(e) => setAcceptedLegal(e.target.checked)}
+                className="mt-1 shrink-0"
+                required
+              />
+              <span className="text-[12px] text-[#8e8e93] leading-snug">
+                Я принимаю{' '}
+                <Link href="/terms" className="text-brand-accent font-semibold" target="_blank">
+                  Пользовательское соглашение
+                </Link>
+                ,{' '}
+                <Link href="/offer" className="text-brand-accent font-semibold" target="_blank">
+                  Оферту
+                </Link>{' '}
+                и даю согласие на обработку персональных данных согласно{' '}
+                <Link href="/privacy" className="text-brand-accent font-semibold" target="_blank">
+                  Политике конфиденциальности
+                </Link>
+                .
+              </span>
+            </label>
+
             {error && (
               <div
                 className="bg-[#fdf0f0] border border-[#f5c6cb] text-brand-accent px-3 py-2.5 rounded-xl text-sm"
@@ -237,7 +267,7 @@ function RegisterForm() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !acceptedLegal}
               className="w-full btn btn-primary py-3.5 font-bold text-[15px]"
             >
               {loading ? 'Регистрация…' : 'Создать аккаунт'}
