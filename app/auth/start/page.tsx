@@ -17,6 +17,9 @@ const ROLES: Array<{ value: UserRole; title: string; desc: string; icon: IconTyp
 export default function AuthStartPage() {
   const router = useRouter()
   const [role, setRole] = useState<UserRole | null>(null)
+  const [acceptedLegal, setAcceptedLegal] = useState(false)
+
+  const canContinue = Boolean(role) && acceptedLegal
 
   return (
     <div className="min-h-screen bg-[#f4f4f4] max-w-lg mx-auto w-full flex flex-col">
@@ -79,14 +82,49 @@ export default function AuthStartPage() {
             )
           })}
         </div>
+
+        <label
+          className={[
+            'mt-5 flex items-start gap-3 cursor-pointer select-none rounded-2xl border-2 bg-white p-4 transition-colors',
+            acceptedLegal ? 'border-brand-accent bg-[#fdf2f1]' : 'border-transparent shadow-sm',
+          ].join(' ')}
+        >
+          <input
+            type="checkbox"
+            checked={acceptedLegal}
+            onChange={(e) => setAcceptedLegal(e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand-accent,#C7362F)]"
+            aria-required="true"
+          />
+          <span className="text-[13px] text-[#3a3a3c] leading-snug">
+            Я принимаю{' '}
+            <Link href="/terms" className="text-brand-accent font-semibold" target="_blank">
+              Пользовательское соглашение
+            </Link>
+            ,{' '}
+            <Link href="/offer" className="text-brand-accent font-semibold" target="_blank">
+              Оферту
+            </Link>{' '}
+            и даю согласие на обработку персональных данных по{' '}
+            <Link href="/privacy" className="text-brand-accent font-semibold" target="_blank">
+              Политике конфиденциальности
+            </Link>
+            .
+          </span>
+        </label>
       </div>
 
       <div className="sticky bottom-0 px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-[#f4f4f4] via-[#f4f4f4] to-transparent">
+        {!canContinue && (
+          <p className="mb-2 text-center text-[12px] text-[#8e8e93]">
+            {!role ? 'Выберите роль' : 'Поставьте галочку согласия, чтобы продолжить'}
+          </p>
+        )}
         <button
           type="button"
-          disabled={!role}
-          onClick={() => role && router.push(`/auth/register?role=${role}`)}
-          className="w-full h-[52px] rounded-2xl bg-brand-accent text-white font-bold text-[16px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40"
+          disabled={!canContinue}
+          onClick={() => canContinue && role && router.push(`/auth/register?role=${role}`)}
+          className="w-full h-[52px] rounded-2xl bg-brand-accent text-white font-bold text-[16px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Продолжить
           <FiArrowRight size={18} />

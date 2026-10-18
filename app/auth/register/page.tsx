@@ -231,30 +231,45 @@ function RegisterForm() {
               />
             </div>
 
-            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <label
+              className={[
+                'flex items-start gap-3 cursor-pointer select-none rounded-xl border p-3.5 transition-colors',
+                acceptedLegal ? 'border-brand-accent/40 bg-[#fdf2f1]' : 'border-[#e5e5ea] bg-[#fafafa]',
+              ].join(' ')}
+            >
               <input
                 type="checkbox"
                 checked={acceptedLegal}
-                onChange={(e) => setAcceptedLegal(e.target.checked)}
-                className="mt-1 shrink-0"
+                onChange={(e) => {
+                  setAcceptedLegal(e.target.checked)
+                  if (e.target.checked) setError('')
+                }}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand-accent,#C7362F)]"
                 required
+                aria-required="true"
               />
-              <span className="text-[12px] text-[#8e8e93] leading-snug">
+              <span className="text-[13px] text-[#3a3a3c] leading-snug">
                 Я принимаю{' '}
-                <Link href="/terms" className="text-brand-accent font-semibold" target="_blank">
+                <Link href="/terms" className="text-brand-accent font-semibold underline-offset-2 hover:underline" target="_blank">
                   Пользовательское соглашение
                 </Link>
                 ,{' '}
-                <Link href="/offer" className="text-brand-accent font-semibold" target="_blank">
+                <Link href="/offer" className="text-brand-accent font-semibold underline-offset-2 hover:underline" target="_blank">
                   Оферту
                 </Link>{' '}
-                и даю согласие на обработку персональных данных согласно{' '}
-                <Link href="/privacy" className="text-brand-accent font-semibold" target="_blank">
+                и даю согласие на обработку персональных данных по{' '}
+                <Link href="/privacy" className="text-brand-accent font-semibold underline-offset-2 hover:underline" target="_blank">
                   Политике конфиденциальности
                 </Link>
                 .
               </span>
             </label>
+
+            {!acceptedLegal && (
+              <p className="text-[12px] text-[#8e8e93] -mt-1 px-0.5">
+                Поставьте галочку, чтобы продолжить регистрацию
+              </p>
+            )}
 
             {error && (
               <div
@@ -268,7 +283,7 @@ function RegisterForm() {
             <button
               type="submit"
               disabled={loading || !acceptedLegal}
-              className="w-full btn btn-primary py-3.5 font-bold text-[15px]"
+              className="w-full btn btn-primary py-3.5 font-bold text-[15px] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading ? 'Регистрация…' : 'Создать аккаунт'}
             </button>
