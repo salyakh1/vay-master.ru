@@ -1,8 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { FiChevronLeft } from 'react-icons/fi'
-
+import { ChevronLeft } from '@/components/icons'
 type OnboardingShellProps = {
   total: number
   current: number
@@ -35,7 +34,7 @@ export default function OnboardingShell({
             aria-label="Назад"
             className="w-10 h-10 -ml-1 rounded-full flex items-center justify-center text-[#1c1c1e] active:bg-black/5 disabled:opacity-0 transition-opacity"
           >
-            <FiChevronLeft size={24} />
+            <ChevronLeft size={24} />
           </button>
           <div className="flex-1 flex gap-1.5" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={current + 1}>
             {Array.from({ length: total }, (_, i) => (

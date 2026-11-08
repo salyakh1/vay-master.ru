@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import { useAuth } from '@/app/providers'
 import { supabase, Order, OrderResponse } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiMessageCircle, FiMapPin, FiCheckCircle } from 'react-icons/fi'
+import { CheckCircle, MapPin, MessageCircle } from '@/components/icons'
 import Link from 'next/link'
 import { formatRemaining, getCooldownRemainingMs, getMasterAccess } from '@/lib/masterAccess'
 import OrderResponseCard from '@/components/orders/OrderResponseCard'
@@ -466,7 +466,7 @@ export default function OrderPage() {
           onClick={() => hasCoords && setShowOrderMapModal(true)}
           className="w-full bg-white rounded-[14px] p-3.5 mb-3.5 flex items-center gap-2.5 text-left"
         >
-          <FiMapPin size={18} className="text-brand-accent flex-shrink-0" />
+          <MapPin size={18} className="text-brand-accent flex-shrink-0" />
           <div className="min-w-0">
             <p className="text-[11px] text-[#9ca3af] mb-0.5">Место выполнения</p>
             <p className="text-[12px] text-[#111] font-medium truncate">{locationLabel}</p>
@@ -477,7 +477,7 @@ export default function OrderPage() {
           <div className="bg-white rounded-[14px] p-3.5 mb-3.5">
             {userResponse ? (
               <div className="flex items-center gap-2">
-                <FiCheckCircle size={18} className="text-[#22a85e]" />
+                <CheckCircle size={18} className="text-[#22a85e]" />
                 <div>
                   <p className="text-[12px] font-medium text-[#111]">Вы уже откликнулись</p>
                   <p className="text-[10px] text-[#9ca3af]">
@@ -537,7 +537,7 @@ export default function OrderPage() {
             onClick={handleContact}
             className="w-full mb-3.5 bg-brand-accent text-white text-[13px] font-medium py-2.5 rounded-[10px] flex items-center justify-center gap-1.5"
           >
-            <FiMessageCircle size={16} />
+            <MessageCircle size={16} />
             Чат с клиентом
           </button>
         )}

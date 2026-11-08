@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import type { ReactNode } from 'react'
+import { ArrowLeft, ChevronRight, Crown } from '@/components/icons'
 
 export function SettingsHeader({ onBack }: { onBack: () => void }) {
   return (
@@ -11,10 +12,10 @@ export function SettingsHeader({ onBack }: { onBack: () => void }) {
         <button
           type="button"
           onClick={onBack}
-          className="w-[30px] h-[30px] rounded-lg bg-[#f2f2f7] flex items-center justify-center text-brand-accent text-[15px]"
+          className="w-[30px] h-[30px] rounded-lg bg-[#f2f2f7] flex items-center justify-center text-brand-accent"
           aria-label="Назад"
         >
-          ←
+          <ArrowLeft size={18} />
         </button>
         <h1 className="text-[17px] font-bold text-[#1c1c1e] flex-1">Настройки</h1>
       </div>
@@ -55,7 +56,8 @@ export function SettingsProfilePreview({
           initials
         )}
         {isPro && (
-          <span className="absolute -bottom-0.5 -right-0.5 bg-brand-accent border-2 border-[#f9f9fb] text-white text-[7px] font-extrabold px-1 rounded-[4px]">
+          <span className="absolute -bottom-0.5 -right-0.5 inline-flex items-center gap-px bg-brand-accent border-2 border-[#f9f9fb] text-white text-[7px] font-extrabold px-1 rounded-[4px]">
+            <Crown size={8} strokeWidth={2.5} aria-hidden />
             PRO
           </span>
         )}
@@ -141,7 +143,9 @@ export function SettingsRow({
   const inner = (
     <>
       <div
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-[15px] flex-shrink-0"
+        className={`w-8 h-8 rounded-lg flex items-center justify-center text-[15px] flex-shrink-0 ${
+          danger ? 'text-brand-accent' : 'text-slate-500'
+        }`}
         style={{ backgroundColor: iconBg }}
       >
         {icon}
@@ -197,7 +201,7 @@ export function SettingsToggle({ checked, onChange }: { checked: boolean; onChan
 }
 
 export function SettingsArrow() {
-  return <span className="text-[#c7c7cc] text-sm">›</span>
+  return <ChevronRight size={16} className="text-[#c7c7cc]" aria-hidden />
 }
 
 export function SettingsBadge({
@@ -249,7 +253,9 @@ export function SettingsAccordionItem({
         className="flex items-center gap-3 px-3.5 py-3 w-full text-left transition-colors active:bg-[#fafafa]"
       >
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-[15px] flex-shrink-0"
+          className={`w-8 h-8 rounded-lg flex items-center justify-center text-[15px] flex-shrink-0 ${
+            danger ? 'text-brand-accent' : 'text-slate-500'
+          }`}
           style={{ backgroundColor: iconBg }}
         >
           {icon}
@@ -260,12 +266,11 @@ export function SettingsAccordionItem({
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {right}
-          <span
-            className={`text-[#c7c7cc] text-sm transition-transform ${expanded ? 'rotate-90' : ''}`}
+          <ChevronRight
+            size={16}
+            className={`text-[#c7c7cc] transition-transform ${expanded ? 'rotate-90' : ''}`}
             aria-hidden
-          >
-            ›
-          </span>
+          />
         </div>
       </button>
       {expanded && children && (

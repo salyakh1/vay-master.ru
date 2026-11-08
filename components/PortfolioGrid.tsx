@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { PortfolioItem } from '@/lib/supabase'
-import { FiImage, FiVideo, FiPlay } from 'react-icons/fi'
+import { Camera, Image as ImageIcon, Play, Video } from '@/components/icons'
 
 interface PortfolioGridProps {
   items: PortfolioItem[]
@@ -13,7 +13,9 @@ export default function PortfolioGrid({ items, onItemClick }: PortfolioGridProps
   if (items.length === 0) {
     return (
       <div className="card text-center py-12">
-        <div className="text-4xl mb-4">📷</div>
+        <div className="w-16 h-16 mx-auto rounded-2xl bg-[#fff1f2] text-brand-accent flex items-center justify-center mb-4">
+          <Camera size={32} strokeWidth={1.5} aria-hidden />
+        </div>
         <p className="text-base font-medium text-black mb-2">
           Портфолио пусто
         </p>
@@ -58,13 +60,13 @@ export default function PortfolioGrid({ items, onItemClick }: PortfolioGridProps
                     muted
                   />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                    <FiPlay size={32} className="text-white" />
+                    <Play size={32} className="text-white" />
                   </div>
                 </div>
               )
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-400">
-                <FiImage size={32} />
+                <ImageIcon size={32} />
               </div>
             )}
             {/* Overlay с информацией */}
@@ -75,13 +77,13 @@ export default function PortfolioGrid({ items, onItemClick }: PortfolioGridProps
                   <div className="flex items-center justify-center gap-2 mt-1 text-xs">
                     {item.images.length > 0 && (
                       <span className="flex items-center gap-1">
-                        <FiImage size={12} />
+                        <ImageIcon size={12} />
                         {item.images.length}
                       </span>
                     )}
                     {item.videos.length > 0 && (
                       <span className="flex items-center gap-1">
-                        <FiVideo size={12} />
+                        <Video size={12} />
                         {item.videos.length}
                       </span>
                     )}

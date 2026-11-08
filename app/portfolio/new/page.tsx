@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiX, FiImage, FiVideo } from 'react-icons/fi'
+import { Image as ImageIcon, Video as VideoIcon, X } from '@/components/icons'
 import { getMasterAccess } from '@/lib/masterAccess'
 import { getProFeatureFlags, restrictionsDisabledForRole } from '@/lib/proSettings'
 
@@ -317,7 +317,7 @@ export default function NewPortfolioPage() {
                           onClick={() => removeImage(idx)}
                           className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                         >
-                          <FiX size={16} />
+                          <X size={16} />
                         </button>
                       </div>
                     ))}
@@ -355,7 +355,7 @@ export default function NewPortfolioPage() {
                           onClick={() => removeVideo(idx)}
                           className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                         >
-                          <FiX size={16} />
+                          <X size={16} />
                         </button>
                       </div>
                     ))}

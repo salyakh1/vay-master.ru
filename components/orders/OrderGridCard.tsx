@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import type { Order } from '@/lib/supabase'
 import { STATUS_CONFIG, getCategoryIcon, formatOrderDate, pluralResponse } from './order-utils'
+import { Star } from '@/components/icons'
 
 type OrderGridCardProps = {
   order: Order
@@ -16,6 +17,7 @@ export default function OrderGridCard({ order, isClient, responseCount = 0 }: Or
   const isNew = order.status === 'open' || order.status === 'new'
   const isDone = order.status === 'completed'
   const cover = order.images?.[0]
+  const CategoryIcon = getCategoryIcon(order.category)
 
   return (
     <Link
@@ -27,7 +29,7 @@ export default function OrderGridCard({ order, isClient, responseCount = 0 }: Or
           <Image src={cover} alt={order.title} fill className="object-cover" sizes="50vw" />
         ) : (
           <div className="flex h-full items-center justify-center">
-            <span className="text-[22px] leading-none">{getCategoryIcon(order.category)}</span>
+            <CategoryIcon size={24} strokeWidth={1.5} className="text-slate-400" aria-hidden />
           </div>
         )}
         <span
@@ -57,7 +59,12 @@ export default function OrderGridCard({ order, isClient, responseCount = 0 }: Or
               {responseCount > 0 ? `${responseCount} ${pluralResponse(responseCount)}` : 'Нет откликов'}
             </span>
           )}
-          {isDone && isClient && <span className="text-[9px] font-semibold text-[#22a85e]">★ Оценить</span>}
+          {isDone && isClient && (
+            <span className="text-[9px] font-semibold text-[#22a85e] inline-flex items-center gap-0.5">
+              <Star size={10} className="fill-[#22a85e]" aria-hidden />
+              Оценить
+            </span>
+          )}
           {!isClient && isNew && (
             <span className="text-[9px] font-semibold text-[#e63946]">Откликнуться →</span>
           )}

@@ -4,8 +4,7 @@ import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { Story, User } from '@/lib/supabase'
-import { FiPlus } from 'react-icons/fi'
-
+import { Plus } from '@/components/icons'
 const StoryViewer = dynamic(() => import('./StoryViewer'), {
   ssr: false,
 })
@@ -96,11 +95,11 @@ export default function StoriesCircle({
                     unoptimized={!String(currentUser.avatar_url).includes('supabase')}
                   />
                   <span className="relative z-10 w-6 h-6 rounded-full bg-brand-accent text-white flex items-center justify-center">
-                    <FiPlus size={14} />
+                    <Plus size={14} />
                   </span>
                 </>
               ) : (
-                <FiPlus size={24} className="text-text-secondary" />
+                <Plus size={24} className="text-text-secondary" />
               )}
             </div>
             <span className="text-xs text-text-secondary">Ваша</span>

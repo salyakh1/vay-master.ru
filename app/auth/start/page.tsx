@@ -4,14 +4,20 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { FiTool, FiShoppingBag, FiUser, FiCheck, FiArrowRight } from 'react-icons/fi'
-import type { IconType } from 'react-icons'
+import {
+  ArrowRight,
+  Check,
+  HardHat,
+  Store,
+  User,
+  type LucideIcon,
+} from '@/components/icons'
 import type { UserRole } from '@/types/db'
 
-const ROLES: Array<{ value: UserRole; title: string; desc: string; icon: IconType }> = [
-  { value: 'master', title: 'Я мастер', desc: 'Беру заказы рядом, показываю работы', icon: FiTool },
-  { value: 'seller', title: 'Я продавец', desc: 'Продаю инструменты и материалы', icon: FiShoppingBag },
-  { value: 'client', title: 'Мне нужен мастер', desc: 'Найду специалиста или материалы', icon: FiUser },
+const ROLES: Array<{ value: UserRole; title: string; desc: string; icon: LucideIcon }> = [
+  { value: 'master', title: 'Я мастер', desc: 'Беру заказы рядом, показываю работы', icon: HardHat },
+  { value: 'seller', title: 'Я продавец', desc: 'Продаю инструменты и материалы', icon: Store },
+  { value: 'client', title: 'Мне нужен мастер', desc: 'Найду специалиста или материалы', icon: User },
 ]
 
 export default function AuthStartPage() {
@@ -76,7 +82,7 @@ export default function AuthStartPage() {
                     selected ? 'bg-brand-accent border-brand-accent text-white' : 'border-[#d1d1d6]',
                   ].join(' ')}
                 >
-                  {selected && <FiCheck size={14} strokeWidth={3} />}
+                  {selected && <Check size={14} strokeWidth={3} />}
                 </span>
               </button>
             )
@@ -127,7 +133,7 @@ export default function AuthStartPage() {
           className="w-full h-[52px] rounded-2xl bg-brand-accent text-white font-bold text-[16px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Продолжить
-          <FiArrowRight size={18} />
+          <ArrowRight size={18} />
         </button>
         <p className="mt-4 text-center text-[14px] text-[#6e6e73]">
           Уже есть аккаунт?{' '}

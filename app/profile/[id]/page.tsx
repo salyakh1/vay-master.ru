@@ -14,7 +14,29 @@ import PortfolioGrid from '@/components/PortfolioGrid'
 const PortfolioGallery = dynamic(() => import('@/components/PortfolioGallery'), {
   ssr: false,
 })
-import { FiMapPin, FiPhone, FiMail, FiPlus, FiBriefcase, FiClock, FiHome, FiMessageCircle, FiCamera, FiX, FiLock, FiArrowLeft, FiLogOut, FiUser, FiShield, FiHeart, FiShoppingBag, FiChevronDown, FiChevronUp, FiSend, FiTarget } from 'react-icons/fi'
+import {
+  ArrowLeft,
+  Briefcase,
+  Camera,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Heart,
+  Home,
+  Lock,
+  LogOut,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Phone,
+  Plus,
+  Send,
+  ShieldCheck,
+  ShoppingBag,
+  Target,
+  User as UserIcon,
+  X,
+} from '@/components/icons'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
@@ -927,7 +949,7 @@ export default function ProfilePage() {
                 onClick={() => router.push(returnTo)}
                 className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors font-medium"
               >
-                <FiArrowLeft size={18} />
+                <ArrowLeft size={18} />
                 <span>Назад к откликам</span>
               </button>
             </div>
@@ -1336,7 +1358,7 @@ export default function ProfilePage() {
                                         {sendingQuickReview ? (
                                           <span className="text-xs">Отправка...</span>
                                         ) : (
-                                          <FiSend size={18} />
+                                          <Send size={18} />
                                         )}
                                       </button>
                                     </div>
@@ -1532,7 +1554,7 @@ export default function ProfilePage() {
                 className="p-2 hover:bg-bg-secondary rounded-lg transition-colors"
                 aria-label="Закрыть"
               >
-                <FiX className="w-5 h-5 text-graphite-secondary" />
+                <X className="w-5 h-5 text-graphite-secondary" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
@@ -1610,7 +1632,7 @@ export default function ProfilePage() {
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="Закрыть"
             >
-              <FiX className="w-6 h-6" />
+              <X className="w-6 h-6" />
             </button>
           </div>
           <div className="flex-1 overflow-hidden">

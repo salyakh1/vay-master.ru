@@ -7,6 +7,7 @@ import { getInitials, getMasterAvatarAlt, getMasterSpecs } from '@/lib/master-di
 import { pickMatchedServicePrice } from '@/lib/service-price'
 import { isProActive } from '@/lib/masterAccess'
 import { trackFunnel } from '@/lib/track-funnel'
+import { Crown, MapPin, Star } from '@/components/icons'
 
 const AVATAR_COLORS = ['#c0392b', '#555', '#8B4513', '#1d5fa6', '#22a85e', '#6c3483']
 
@@ -72,7 +73,8 @@ export function MasterListCard({
           </div>
         )}
         {isPro && (
-          <span className="absolute -bottom-0.5 -right-0.5 bg-brand-accent border-2 border-white text-white text-[7px] font-bold px-1 py-0.5 rounded-[3px]">
+          <span className="absolute -bottom-0.5 -right-0.5 inline-flex items-center gap-px bg-brand-accent border-2 border-white text-white text-[7px] font-bold px-1 py-0.5 rounded-[3px]">
+            <Crown size={8} strokeWidth={2.5} aria-hidden />
             PRO
           </span>
         )}
@@ -82,13 +84,14 @@ export function MasterListCard({
 
       <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
         <span className="inline-flex items-center gap-0.5 bg-[#fff8e6] px-1.5 py-0.5 rounded-md">
-          <span className="text-[#f4a228] text-[11px] leading-none">★</span>
+          <Star size={11} className="text-[#f4a228] fill-[#f4a228]" aria-hidden />
           <span className="text-[11px] font-medium text-[#1c1c1e]">
             {rating > 0 ? rating.toFixed(1) : '—'}
           </span>
         </span>
         {master.city && (
-          <span className="bg-[#f2f2f7] text-[#666] text-[9px] font-medium px-2 py-0.5 rounded-md truncate max-w-full">
+          <span className="inline-flex items-center gap-0.5 bg-[#f2f2f7] text-[#666] text-[9px] font-medium px-2 py-0.5 rounded-md truncate max-w-full">
+            <MapPin size={10} className="shrink-0 text-slate-500" aria-hidden />
             {master.city}
           </span>
         )}

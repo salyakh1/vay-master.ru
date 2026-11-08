@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Order } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { FiMapPin, FiClock, FiBriefcase } from 'react-icons/fi'
-
+import { Briefcase, Clock, MapPin } from '@/components/icons'
 interface OrderCardProps {
   order: Order
   variant?: 'list' | 'grid' | 'product-grid'
@@ -80,7 +79,7 @@ export default function OrderCard({ order, variant = 'list', hideClientIdentity 
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-red-600 bg-gradient-to-br from-red-50 to-red-100">
-                <FiBriefcase size={36} strokeWidth={1.5} />
+                <Briefcase size={36} strokeWidth={1.5} />
               </div>
             )}
             
@@ -142,12 +141,12 @@ export default function OrderCard({ order, variant = 'list', hideClientIdentity 
             {/* Meta row */}
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-secondary">
               <div className="flex items-center gap-2">
-                <FiClock size={14} className="text-brand-accent/60" />
+                <Clock size={14} className="text-brand-accent/60" />
                 <span>{timeDisplay}</span>
               </div>
               {fullAddress && (
                 <div className="flex items-center gap-2">
-                  <FiMapPin size={14} className="text-text-muted" />
+                  <MapPin size={14} className="text-text-muted" />
                   <span className="truncate">{fullAddress}</span>
                 </div>
               )}
@@ -167,7 +166,7 @@ export default function OrderCard({ order, variant = 'list', hideClientIdentity 
                     className="flex-shrink-0 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-brand-accent hover:text-brand-accent-hover border border-brand-accent/30 hover:border-brand-accent rounded-lg bg-brand-accent/5 hover:bg-brand-accent/10 transition-colors"
                     title="Открыть на карте"
                   >
-                    <FiMapPin size={14} />
+                    <MapPin size={14} />
                     <span>На карте</span>
                   </button>
                 )}
@@ -190,7 +189,7 @@ export default function OrderCard({ order, variant = 'list', hideClientIdentity 
                   {order.title}
                 </h3>
                 <div className="flex items-center gap-2 text-xs text-text-secondary">
-                  <FiClock size={14} className="text-brand-accent/60" />
+                  <Clock size={14} className="text-brand-accent/60" />
                   <span className="truncate">{timeDisplay}</span>
                 </div>
               </div>
@@ -206,7 +205,7 @@ export default function OrderCard({ order, variant = 'list', hideClientIdentity 
             {/* Адрес в grid варианте */}
             {fullAddress && (
               <div className="mb-3 flex items-center gap-2 text-xs text-text-secondary">
-                <FiMapPin size={12} className="text-text-muted flex-shrink-0" />
+                <MapPin size={12} className="text-text-muted flex-shrink-0" />
                 <span className="truncate">{fullAddress}</span>
                 {hasCoordinates && (
                   <button
@@ -214,7 +213,7 @@ export default function OrderCard({ order, variant = 'list', hideClientIdentity 
                     className="ml-auto flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-brand-accent hover:text-brand-accent-hover border border-brand-accent/30 hover:border-brand-accent rounded-md bg-brand-accent/5 hover:bg-brand-accent/10 transition-colors"
                     title="Открыть на карте"
                   >
-                    <FiMapPin size={12} />
+                    <MapPin size={12} />
                     <span>Карта</span>
                   </button>
                 )}

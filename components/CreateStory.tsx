@@ -3,7 +3,13 @@
 import { useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
-import { FiX, FiUpload, FiVideo, FiImage, FiPlus } from 'react-icons/fi'
+import {
+  Image as ImageIcon,
+  Plus,
+  Upload,
+  Video,
+  X,
+} from '@/components/icons'
 import { getMasterAccess } from '@/lib/masterAccess'
 import { getProFeatureFlags, restrictionsDisabledForRole } from '@/lib/proSettings'
 
@@ -184,7 +190,7 @@ export default function CreateStory({ userId, onClose, onSuccess }: CreateStoryP
             onClick={onClose}
             className="text-text-secondary hover:text-text-primary transition-colors"
           >
-            <FiX size={24} />
+            <X size={24} />
           </button>
         </div>
 
@@ -196,14 +202,14 @@ export default function CreateStory({ userId, onClose, onSuccess }: CreateStoryP
                 onClick={() => fileInputRef.current?.click()}
                 className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-border-light rounded-lg hover:border-brand-accent transition-colors"
               >
-                <FiImage size={48} className="text-text-secondary" />
+                <ImageIcon size={48} className="text-text-secondary" />
                 <span className="text-graphite-secondary font-medium">Фото (до 4 шт)</span>
               </button>
               <button
                 onClick={() => videoInputRef.current?.click()}
                 className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-border-light rounded-lg hover:border-brand-accent transition-colors"
               >
-                <FiVideo size={48} className="text-text-secondary" />
+                <Video size={48} className="text-text-secondary" />
                 <span className="text-graphite-secondary font-medium">Видео (до 30 сек)</span>
               </button>
             </div>
@@ -223,7 +229,7 @@ export default function CreateStory({ userId, onClose, onSuccess }: CreateStoryP
                         onClick={() => handleRemovePhoto(index)}
                         className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        <FiX size={16} />
+                        <X size={16} />
                       </button>
                     </div>
                   ))}
@@ -232,7 +238,7 @@ export default function CreateStory({ userId, onClose, onSuccess }: CreateStoryP
                       onClick={() => fileInputRef.current?.click()}
                       className="flex items-center justify-center h-48 border-2 border-dashed border-border-light rounded-lg hover:border-brand-accent transition-colors"
                     >
-                      <FiPlus size={32} className="text-text-secondary" />
+                      <Plus size={32} className="text-text-secondary" />
                     </button>
                   )}
                 </div>

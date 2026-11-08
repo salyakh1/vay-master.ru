@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FiStar } from 'react-icons/fi'
-
+import { Star } from '@/components/icons'
 interface RatingStarsProps {
   rating: number // Текущий рейтинг (0-5)
   onRatingChange?: (rating: number) => void
@@ -55,8 +54,8 @@ export default function RatingStars({
                 readonly ? 'cursor-default' : 'cursor-pointer hover:scale-125 active:scale-110'
               } ${sizeClasses[size]} p-0.5`}
             >
-              <FiStar
-                className={`transition-all duration-200 ${
+              <Star
+                className={`w-full h-full transition-all duration-200 ${
                   isFilled
                     ? 'fill-brand-accent text-brand-accent drop-shadow-md'
                     : 'fill-transparent text-graphite-tertiary/70 stroke-2'

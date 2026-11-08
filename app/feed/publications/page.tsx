@@ -8,7 +8,15 @@ import { supabase, PortfolioItem, Product, PortfolioComment } from '@/lib/supaba
 import Navbar from '@/components/Navbar'
 import PostImageSlider from '@/components/PostImageSlider'
 import ProductCard from '@/components/ProductCard'
-import { FiHeart, FiMessageCircle, FiSend, FiFilter, FiX } from 'react-icons/fi'
+import {
+  Camera,
+  Heart,
+  MessageCircle,
+  Send,
+  ShoppingBag,
+  SlidersHorizontal,
+  X,
+} from '@/components/icons'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
@@ -529,7 +537,7 @@ export default function PublicationsPage() {
                 onClick={() => setShowFilters(!showFilters)}
                 className="flex items-center gap-2 px-4 py-2 border border-border-light/40 rounded-lg hover:bg-bg-secondary transition-colors"
               >
-                <FiFilter size={18} />
+                <SlidersHorizontal size={18} />
                 <span className="text-sm">Фильтры</span>
               </button>
               {cityFilter && (
@@ -538,7 +546,7 @@ export default function PublicationsPage() {
                   className="flex items-center gap-1 px-3 py-1 text-sm bg-brand-accent/10 text-brand-accent rounded-lg hover:bg-brand-accent/20 transition-colors"
                 >
                   <span>Город: {cityFilter}</span>
-                  <FiX size={14} />
+                  <X size={14} />
                 </button>
               )}
             </div>
@@ -638,13 +646,17 @@ export default function PublicationsPage() {
                           </div>
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-text-muted">
-                            {item.type === 'portfolio' ? '📷' : '🛍️'}
+                            {item.type === 'portfolio' ? (
+                              <Camera size={28} strokeWidth={1.5} aria-hidden />
+                            ) : (
+                              <ShoppingBag size={28} strokeWidth={1.5} aria-hidden />
+                            )}
                           </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                           <div className="absolute bottom-0 left-0 right-0 p-2 text-white text-xs">
                             {item.type === 'portfolio' && item.portfolioItem?.likes_count ? (
-                              <span className="flex items-center gap-1"><FiHeart size={12} className="fill-current" />{item.portfolioItem.likes_count}</span>
+                              <span className="flex items-center gap-1"><Heart size={12} className="fill-current" />{item.portfolioItem.likes_count}</span>
                             ) : item.type === 'product' && item.product?.price ? (
                               <span className="font-semibold">{item.product.price.toLocaleString('ru-RU')} ₽</span>
                             ) : null}
@@ -717,10 +729,10 @@ export default function PublicationsPage() {
                           <div className="px-4 sm:px-5 pt-3 pb-2">
                             <div className="flex items-center gap-4 mb-2">
                               <button onClick={(e) => { e.stopPropagation(); handleLike(item.id) }} className={portfolioItem.liked ? 'text-brand-accent' : 'text-graphite-secondary'}>
-                                <FiHeart size={24} className={portfolioItem.liked ? 'fill-current' : ''} />
+                                <Heart size={24} className={portfolioItem.liked ? 'fill-current' : ''} />
                               </button>
                               <button onClick={(e) => { e.stopPropagation(); const nextOpen = !portfolioItem.showComments; setCommentsOpen(item.id, nextOpen); if (nextOpen) fetchAllComments(item.id) }} className="text-graphite-secondary">
-                                <FiMessageCircle size={24} />
+                                <MessageCircle size={24} />
                               </button>
                             </div>
                             {portfolioItem.likes_count > 0 && (
@@ -776,7 +788,7 @@ export default function PublicationsPage() {
                                   onClick={(e) => e.stopPropagation()}
                                 />
                                 <button type="submit" disabled={!commentTexts[item.id]?.trim() || submittingComments[item.id]} className={commentTexts[item.id]?.trim() && !submittingComments[item.id] ? 'text-brand-accent' : 'text-text-muted'} onClick={(e) => e.stopPropagation()}>
-                                  <FiSend size={18} />
+                                  <Send size={18} />
                                 </button>
                               </form>
                             )}

@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { MapContainer, TileLayer, Marker } from '@/components/maps/leaflet'
-import { FiX, FiNavigation, FiMapPin, FiCheck, FiEdit2 } from 'react-icons/fi'
+import {
+  Check,
+  MapPin,
+  Navigation,
+  Pencil,
+  X,
+} from '@/components/icons'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/app/providers'
 import { configureLeafletIcons } from '@/lib/leaflet'
@@ -204,7 +210,7 @@ export default function SellerAddressPicker({ onSave }: Props) {
       <>
         <div className="card p-4">
           <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-            <FiMapPin className="text-brand-accent" />
+            <MapPin size={16} className="text-brand-accent" />
             Адрес магазина/склада
           </h3>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -232,7 +238,7 @@ export default function SellerAddressPicker({ onSave }: Props) {
               onClick={() => setShowForm(true)}
               className="btn btn-secondary shrink-0 inline-flex items-center justify-center gap-2"
             >
-              <FiEdit2 className="w-4 h-4" />
+              <Pencil className="w-4 h-4" />
               Изменить
             </button>
           </div>
@@ -254,7 +260,7 @@ export default function SellerAddressPicker({ onSave }: Props) {
   return (
     <div className="card p-4">
       <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-        <FiMapPin className="text-brand-accent" />
+        <MapPin size={16} className="text-brand-accent" />
         Адрес магазина/склада
       </h3>
       <p className="text-sm text-text-secondary mb-4">
@@ -333,7 +339,7 @@ export default function SellerAddressPicker({ onSave }: Props) {
           'Сохранение...'
         ) : saved ? (
           <>
-            <FiCheck className="mr-2" />
+            <Check size={16} className="mr-2" />
             Сохранено
           </>
         ) : (
@@ -351,7 +357,7 @@ export default function SellerAddressPicker({ onSave }: Props) {
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="Закрыть"
             >
-              <FiX className="w-6 h-6" />
+              <X className="w-6 h-6" />
             </button>
           </div>
 
@@ -364,7 +370,7 @@ export default function SellerAddressPicker({ onSave }: Props) {
                 className="absolute bottom-24 right-4 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-[1000]"
                 aria-label="Центрировать карту"
               >
-                <FiNavigation className="w-5 h-5 text-gray-700" />
+                <Navigation className="w-5 h-5 text-gray-700" />
               </button>
             )}
           </div>

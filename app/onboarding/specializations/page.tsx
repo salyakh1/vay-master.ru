@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiBriefcase, FiCheck } from 'react-icons/fi'
-
+import { Briefcase, Check } from '@/components/icons'
 type TreeCategory = {
   id: string
   name: string
@@ -182,7 +181,7 @@ export default function SpecializationsOnboardingPage() {
         <div className="fixed inset-0 z-[90] flex items-center justify-center px-6 bg-black/30">
           <div className="bg-[#1c1c1e]/95 text-white rounded-2xl px-5 py-4 shadow-xl max-w-xs w-full text-center">
             <div className="mx-auto mb-2 w-10 h-10 rounded-full bg-[#22a85e] flex items-center justify-center">
-              <FiCheck size={22} strokeWidth={3} />
+              <Check size={22} strokeWidth={3} />
             </div>
             <p className="text-[14px] font-bold">Специализации сохранены</p>
             <p className="text-[11px] text-white/70 mt-1">Переходим дальше…</p>
@@ -229,7 +228,7 @@ export default function SpecializationsOnboardingPage() {
                           onError={() => setFilterImageFailed((prev) => new Set(prev).add(cat.id))}
                         />
                       ) : (
-                        <FiBriefcase size={32} className="text-text-muted" />
+                        <Briefcase size={32} className="text-text-muted" />
                       )}
                     </div>
                     <span className="text-sm font-medium text-center leading-tight line-clamp-2 px-1 py-2 block">

@@ -2,7 +2,7 @@
 
 import { memo } from 'react'
 import { Product, User } from '@/lib/supabase'
-import { FiShoppingBag, FiStar } from 'react-icons/fi'
+import { ShoppingBag, Star } from '@/components/icons'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -32,7 +32,7 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
             <div className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/20 to-transparent opacity-0 group-hover/image:opacity-100 transition-opacity duration-500 pointer-events-none" />
           </>
         ) : (
-          <FiShoppingBag size={48} strokeWidth={1.5} className="text-white/80" />
+          <ShoppingBag size={48} strokeWidth={1.5} className="text-white/80" />
         )}
         {!product.in_stock && (
           <div className="absolute top-2 left-2 bg-black/80 text-white px-2 py-1 text-[11px] font-semibold rounded-md z-20">
@@ -51,7 +51,7 @@ function ProductCard({ product, currentUser }: ProductCardProps) {
           <div className="flex items-center gap-1 text-[9px] text-text-muted mb-0.5">
             {product.rating && product.rating > 0 ? (
               <>
-                <FiStar size={8} className="fill-brand-accent text-brand-accent flex-shrink-0" strokeWidth={0} />
+                <Star size={10} className="fill-brand-accent text-brand-accent flex-shrink-0" strokeWidth={0} />
                 <span>{product.rating.toFixed(1)} · {product.reviews_count} {product.reviews_count === 1 ? 'отзыв' : product.reviews_count < 5 ? 'отзыва' : 'отзывов'}</span>
               </>
             ) : (

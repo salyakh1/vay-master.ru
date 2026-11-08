@@ -8,6 +8,16 @@ import { supabase, Order } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import OrderGridCard from './OrderGridCard'
 import { getCategoryIcon, countByStatus } from './order-utils'
+import {
+  Check,
+  ClipboardList,
+  Lock,
+  MessageCircle,
+  Search,
+  SlidersHorizontal,
+  Wrench,
+  type LucideIcon,
+} from '@/components/icons'
 import { getMasterAccess } from '@/lib/masterAccess'
 import { getProFeatureFlags, restrictionsDisabledForRole } from '@/lib/proSettings'
 
@@ -40,11 +50,11 @@ function OrdersEmptyState({
   const isAuthorEmpty =
     role === 'client' || role === 'seller' || activeTab === 'mine'
 
-  let config: { icon: string; title: string; desc: string; btnText: string; btnHref: string }
+  let config: { icon: LucideIcon; title: string; desc: string; btnText: string; btnHref: string }
 
   if (isAuthorEmpty) {
     config = {
-      icon: '📋',
+      icon: ClipboardList,
       title: 'Нет заказов',
       desc: 'Создайте заказ — мастера откликнутся с предложениями',
       btnText: 'Создать заказ',
@@ -52,7 +62,7 @@ function OrdersEmptyState({
     }
   } else if (activeTab === 'my_response') {
     config = {
-      icon: '🔍',
+      icon: Search,
       title: 'Вы ещё не откликались',
       desc: 'Найдите заказ и откликнитесь — клиент выберет вас',
       btnText: 'Смотреть заказы',
@@ -60,7 +70,7 @@ function OrdersEmptyState({
     }
   } else if (activeTab === 'in_progress') {
     config = {
-      icon: '🛠',
+      icon: Wrench,
       title: 'Нет заказов в работе',
       desc: 'Когда вас выберут — заказ появится здесь',
       btnText: 'Смотреть доступные',
@@ -68,7 +78,7 @@ function OrdersEmptyState({
     }
   } else {
     config = {
-      icon: '🔍',
+      icon: Search,
       title: 'Нет доступных заказов',
       desc: 'Новые заказы появляются каждый день. Или создайте свой.',
       btnText: 'Создать заказ',
@@ -76,9 +86,13 @@ function OrdersEmptyState({
     }
   }
 
+  const EmptyIcon = config.icon
+
   return (
     <div className="flex flex-col items-center justify-center px-8 py-16 text-center">
-      <span className="text-5xl mb-4">{config.icon}</span>
+      <div className="w-16 h-16 rounded-2xl bg-[#fff1f2] text-brand-accent flex items-center justify-center mb-4">
+        <EmptyIcon size={32} strokeWidth={1.5} aria-hidden />
+      </div>
       <p className="text-[15px] font-bold text-[#111] mb-2">{config.title}</p>
       <p className="text-[12px] text-[#aaa] leading-relaxed mb-6">{config.desc}</p>
       <Link href={config.btnHref} className="bg-[#e63946] text-white text-[13px] font-bold px-6 py-3 rounded-2xl">
@@ -446,7 +460,8 @@ export default function OrdersClient() {
                 onClick={() => setShowFilters(true)}
                 className="flex items-center gap-1 bg-[#f5f5f7] border border-[#eee] rounded-xl px-3 py-2 text-xs font-semibold text-[#555]"
               >
-                ⚙ Фильтр
+                <SlidersHorizontal size={16} className="text-slate-500" aria-hidden />
+                Фильтр
               </button>
             )}
             <Link
@@ -513,7 +528,8 @@ export default function OrdersClient() {
       {isMaster && activeTab === 'available' && hasEarlyAccess === false && hiddenFreshCount > 0 && (
         <div className="mx-4 mt-3 rounded-2xl border border-[#f4a228]/40 bg-[#fffaf0] px-3.5 py-3">
           <p className="text-[12px] font-bold text-[#111] leading-snug">
-            🔒 Ещё {hiddenFreshCount}{' '}
+            <Lock size={14} className="inline -mt-0.5 mr-1 text-[#cc8800]" aria-hidden />
+            Ещё {hiddenFreshCount}{' '}
             {hiddenFreshCount === 1 ? 'новый заказ доступен' : 'новых заказов доступны'} PRO-мастерам прямо сейчас
           </p>
           <p className="mt-1 text-[11px] text-[#888] leading-relaxed">
@@ -533,7 +549,10 @@ export default function OrdersClient() {
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-lg">{getCategoryIcon(activeOrder.category)}</span>
+                {(() => {
+                  const ActiveIcon = getCategoryIcon(activeOrder.category)
+                  return <ActiveIcon size={20} className="text-[#cc8800] flex-shrink-0" aria-hidden />
+                })()}
                 <span className="text-[13px] font-bold text-[#111] truncate">{activeOrder.title}</span>
               </div>
               <span className="text-[8px] font-bold bg-[#fff8e6] text-[#cc8800] px-2 py-1 rounded-full flex-shrink-0">
@@ -542,11 +561,13 @@ export default function OrdersClient() {
             </div>
             <p className="text-[11px] text-[#888] mb-3">Мастер принят · Выполняется прямо сейчас</p>
             <div className="flex gap-2">
-              <span className="flex-1 bg-white border border-[#f0f0f0] rounded-xl py-2 text-center text-[10px] font-bold text-[#111]">
-                💬 Чат с мастером
+              <span className="flex-1 inline-flex items-center justify-center gap-1 bg-white border border-[#f0f0f0] rounded-xl py-2 text-[10px] font-bold text-[#111]">
+                <MessageCircle size={14} className="text-slate-500" aria-hidden />
+                Чат с мастером
               </span>
-              <span className="flex-1 bg-[#e63946] rounded-xl py-2 text-center text-[10px] font-bold text-white">
-                ✓ Завершить заказ
+              <span className="flex-1 inline-flex items-center justify-center gap-1 bg-[#e63946] rounded-xl py-2 text-[10px] font-bold text-white">
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Завершить заказ
               </span>
             </div>
           </Link>

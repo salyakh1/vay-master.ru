@@ -6,7 +6,15 @@ import Image from 'next/image'
 import { useAuth } from '@/app/providers'
 import { supabase, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiChevronLeft, FiChevronRight, FiArrowLeft, FiPhone, FiEdit2, FiX } from 'react-icons/fi'
+import {
+  ArrowLeft as ArrowLeftIcon,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Phone,
+  Star,
+  X,
+} from '@/components/icons'
 import Link from 'next/link'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
@@ -327,7 +335,7 @@ export default function ProductPage() {
           className="absolute top-2.5 left-2.5 z-10 w-[30px] h-[30px] rounded-full bg-white/85 flex items-center justify-center text-[#111]"
           aria-label="Назад"
         >
-          <FiArrowLeft size={16} />
+          <ArrowLeftIcon size={16} />
         </button>
         {images.length > 1 && (
           <>
@@ -340,7 +348,7 @@ export default function ProductPage() {
               className="absolute left-2 top-1/2 z-10 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center"
               aria-label="Предыдущее"
             >
-              <FiChevronLeft size={18} />
+              <ChevronLeft size={18} />
             </button>
             <button
               type="button"
@@ -351,7 +359,7 @@ export default function ProductPage() {
               className="absolute right-2 top-1/2 z-10 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center"
               aria-label="Следующее"
             >
-              <FiChevronRight size={18} />
+              <ChevronRight size={18} />
             </button>
             <div className="absolute bottom-2.5 left-1/2 z-10 -translate-x-1/2 flex gap-1">
               {images.map((_, idx) => (
@@ -400,7 +408,7 @@ export default function ProductPage() {
               className="w-10 h-10 rounded-full bg-white/15 text-white flex items-center justify-center"
               aria-label="Закрыть"
             >
-              <FiX size={22} />
+              <X size={22} />
             </button>
           </div>
 
@@ -421,7 +429,7 @@ export default function ProductPage() {
                   className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center"
                   aria-label="Предыдущее"
                 >
-                  <FiChevronLeft size={22} />
+                  <ChevronLeft size={22} />
                 </button>
                 <button
                   type="button"
@@ -429,7 +437,7 @@ export default function ProductPage() {
                   className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center"
                   aria-label="Следующее"
                 >
-                  <FiChevronRight size={22} />
+                  <ChevronRight size={22} />
                 </button>
               </>
             )}
@@ -487,7 +495,7 @@ export default function ProductPage() {
             <p className="text-[10px] text-[#6b7280] flex items-center gap-1">
               {seller.seller_rating != null && seller.seller_rating > 0 && (
                 <>
-                  <span className="text-[#EAB308]">★</span>
+                  <Star size={12} className="text-[#EAB308] fill-[#EAB308]" aria-hidden />
                   <span>{seller.seller_rating.toFixed(1)}</span>
                   <span>·</span>
                 </>
@@ -513,7 +521,7 @@ export default function ProductPage() {
                 className="w-[42px] bg-[#F4F4F4] border border-[#E5E7EB] rounded-[10px] flex items-center justify-center text-[#111]"
                 aria-label="Позвонить"
               >
-                <FiPhone size={16} />
+                <Phone size={16} />
               </a>
             ) : (
               <button
@@ -524,7 +532,7 @@ export default function ProductPage() {
                 className="w-[42px] bg-[#F4F4F4] border border-[#E5E7EB] rounded-[10px] flex items-center justify-center text-[#111]"
                 aria-label="Телефон"
               >
-                <FiPhone size={16} />
+                <Phone size={16} />
               </button>
             )}
           </div>
@@ -533,7 +541,7 @@ export default function ProductPage() {
             href={`/products/${product.id}/edit`}
             className="mb-4 flex items-center justify-center gap-1.5 w-full bg-[#F4F4F4] border border-[#E5E7EB] text-[#111] text-[12px] font-medium py-2.5 rounded-[10px]"
           >
-            <FiEdit2 size={14} />
+            <Pencil size={14} />
             Редактировать товар
           </Link>
         )}
@@ -570,7 +578,7 @@ export default function ProductPage() {
           <p className="text-[11px] text-[#9ca3af] mb-3">Загрузка…</p>
         ) : firstReview ? (
           <div className="flex items-start gap-1.5 mb-3">
-            <span className="text-[#EAB308] text-[12px]">★</span>
+            <Star size={13} className="text-[#EAB308] fill-[#EAB308] mt-0.5 flex-shrink-0" aria-hidden />
             <span className="text-[12px] font-medium text-[#111]">
               {(product.rating ?? firstReview.rating)?.toFixed?.(1) ?? firstReview.rating}
             </span>

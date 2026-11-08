@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
-import { FiUser, FiBriefcase } from 'react-icons/fi'
-
+import { Briefcase, User } from '@/components/icons'
 export interface SpecializationWithCount {
   id: string
   name: string
@@ -142,10 +141,10 @@ export default function SpecializationCardsCarousel({
                   onError={() => markImageFailed(spec.id)}
                 />
               ) : (
-                <FiBriefcase size={28} className="text-text-muted/80" strokeWidth={2} aria-hidden />
+                <Briefcase size={28} className="text-text-muted/80" strokeWidth={2} aria-hidden />
               )}
               <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-bg-card/95 text-text-muted text-xs font-medium">
-                <FiUser size={11} strokeWidth={2} />
+                <User size={11} strokeWidth={2} />
                 <span>{formatCount(spec.masters_count)}</span>
               </div>
             </div>

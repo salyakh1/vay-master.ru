@@ -11,8 +11,32 @@ import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import { sanitizeProductsForGuest } from '@/lib/guest-access'
 import type { AdBanner } from '@/lib/supabase'
 import type { MasterCategoryWithCount } from '@/lib/server-data'
-import { FiSearch, FiStar, FiArrowRight, FiUser, FiShoppingBag, FiTag, FiX, FiMap } from 'react-icons/fi'
-import { getCategoryEmoji } from '@/lib/categoryEmoji'
+import {
+  ArrowRight,
+  BadgeCheck,
+  BrickWall,
+  Calculator,
+  ChevronRight,
+  Crown,
+  Droplets,
+  Hammer,
+  HardHat,
+  LayoutGrid,
+  MessageCircle,
+  Package,
+  Search,
+  ShieldCheck,
+  ShoppingBag,
+  Sparkles,
+  Star,
+  Store,
+  Tag,
+  User as UserIcon,
+  X,
+  Zap,
+  getMasterCategoryIcon,
+  type LucideIcon,
+} from '@/components/icons'
 import { isProActive } from '@/lib/masterAccess'
 import StoriesCircle from '@/components/StoriesCircle'
 import CompactPageBanner from '@/components/CompactPageBanner'
@@ -31,13 +55,13 @@ type HomeSuggestion = {
 }
 
 const SUGGESTION_ICON: Record<HomeSuggestion['type'], React.ReactNode> = {
-  master: <FiUser size={13} />,
-  product: <FiShoppingBag size={13} />,
-  service: <FiTag size={13} />,
-  category: <FiTag size={13} />,
-  subcategory: <FiTag size={13} />,
-  product_category: <FiShoppingBag size={13} />,
-  product_subcategory: <FiShoppingBag size={13} />,
+  master: <UserIcon size={14} />,
+  product: <ShoppingBag size={14} />,
+  service: <Tag size={14} />,
+  category: <Tag size={14} />,
+  subcategory: <Tag size={14} />,
+  product_category: <ShoppingBag size={14} />,
+  product_subcategory: <ShoppingBag size={14} />,
 }
 
 const SUGGESTION_LABEL: Record<HomeSuggestion['type'], string> = {
@@ -59,13 +83,13 @@ interface HomeClientProps {
 
 const DIVIDER = <div className="h-2 bg-[#f5f5f7]" aria-hidden />
 
-type HeroCat = { label: string; emoji: string; slug: string; id?: string }
+type HeroCat = { label: string; icon: LucideIcon; slug: string; id?: string }
 
 const FALLBACK_CATS: HeroCat[] = [
-  { label: 'Ремонт', emoji: '🔧', slug: '' },
-  { label: 'Электрика', emoji: '⚡', slug: '' },
-  { label: 'Сантехника', emoji: '🚿', slug: '' },
-  { label: 'Стройка', emoji: '🏗️', slug: '' },
+  { label: 'Ремонт', icon: Hammer, slug: '' },
+  { label: 'Электрика', icon: Zap, slug: '' },
+  { label: 'Сантехника', icon: Droplets, slug: '' },
+  { label: 'Стройка', icon: BrickWall, slug: '' },
 ]
 
 const STEPS = [
@@ -75,18 +99,18 @@ const STEPS = [
   { title: 'Оцените работу', desc: 'После выполнения заказа' },
 ]
 
-const TRUST = [
-  { icon: '✓', title: 'Модерация', desc: 'Жалобы разбирает администрация' },
-  { icon: '⭐', title: 'Отзывы', desc: 'После выполненного заказа' },
-  { icon: '🛡', title: 'Жалобы', desc: 'Пишите в чат администрации' },
-  { icon: '💬', title: 'Поддержка', desc: 'Администрация на связи' },
+const TRUST: Array<{ icon: LucideIcon; title: string; desc: string }> = [
+  { icon: BadgeCheck, title: 'Модерация', desc: 'Жалобы разбирает администрация' },
+  { icon: Star, title: 'Отзывы', desc: 'После выполненного заказа' },
+  { icon: ShieldCheck, title: 'Жалобы', desc: 'Пишите в чат администрации' },
+  { icon: MessageCircle, title: 'Поддержка', desc: 'Администрация на связи' },
 ]
 
-const ROLES = [
-  { icon: '🔨', title: 'Мастерам', desc: 'Заказы без комиссий, портфолио, PRO', href: '/auth/register?role=master', active: true },
-  { icon: '🛒', title: 'Продавцам', desc: 'Продавайте инструменты и материалы', href: '/auth/register?role=seller' },
-  { icon: '👤', title: 'Клиентам', desc: 'Мастера и материалы рядом', href: '/auth/register?role=client' },
-  { icon: '🆓', title: 'Бесплатно', desc: 'Регистрация без скрытых платежей', href: '/auth/start' },
+const ROLES: Array<{ icon: LucideIcon; title: string; desc: string; href: string; active?: boolean }> = [
+  { icon: HardHat, title: 'Мастерам', desc: 'Заказы без комиссий, портфолио, PRO', href: '/auth/register?role=master', active: true },
+  { icon: Store, title: 'Продавцам', desc: 'Продавайте инструменты и материалы', href: '/auth/register?role=seller' },
+  { icon: UserIcon, title: 'Клиентам', desc: 'Мастера и материалы рядом', href: '/auth/register?role=client' },
+  { icon: Sparkles, title: 'Бесплатно', desc: 'Регистрация без скрытых платежей', href: '/auth/start' },
 ]
 
 function SectionHeader({ title, linkLabel, href }: { title: string; linkLabel?: string; href?: string }) {
@@ -141,13 +165,14 @@ function MasterCard({ master }: { master: User }) {
               )}
             </div>
             {master.is_pro && isProActive(master) && (
-              <span className="absolute -bottom-0.5 -right-0.5 bg-brand-accent text-white text-[8px] font-extrabold px-1 py-0.5 rounded-[3px] border-2 border-white">
+              <span className="absolute -bottom-0.5 -right-0.5 inline-flex items-center gap-px bg-brand-accent text-white text-[8px] font-extrabold px-1 py-0.5 rounded-[3px] border-2 border-white">
+                <Crown size={8} strokeWidth={2.5} aria-hidden />
                 PRO
               </span>
             )}
           </div>
           <div className="inline-flex items-center gap-0.5 bg-[#fff8e6] px-1.5 py-0.5 rounded-md text-[11px] flex-shrink-0">
-            <FiStar className="text-[#f4a228] fill-[#f4a228]" size={11} />
+            <Star className="text-[#f4a228] fill-[#f4a228]" size={11} />
             <span className="font-bold text-[#1c1c1e]">{rating > 0 ? rating.toFixed(1) : '—'}</span>
             {reviews > 0 && <span className="text-[#8e8e93] font-medium">({reviews})</span>}
           </div>
@@ -172,7 +197,7 @@ function ProductCardHome({ product }: { product: Product }) {
           {img ? (
             <Image src={img} alt="" fill className="object-cover" sizes="110px" />
           ) : (
-            <span className="text-2xl">📦</span>
+            <Package size={26} className="text-slate-400" aria-hidden />
           )}
         </div>
         <div className="p-2">
@@ -275,7 +300,7 @@ export default function HomeClient({
   const heroCats = useMemo((): HeroCat[] => {
     const fromDb = (initialCategories ?? []).slice(0, 4).map((c) => ({
       label: c.name,
-      emoji: getCategoryEmoji(c.slug, c.name),
+      icon: getMasterCategoryIcon(c.slug, c.name),
       slug: c.slug,
       id: c.id,
     }))
@@ -367,7 +392,7 @@ export default function HomeClient({
             }}
             className="flex items-center gap-2.5 bg-[#f5f5f7] rounded-2xl px-3.5 py-3 border border-[#f0f0f0]"
           >
-            <FiSearch className="text-brand-accent flex-shrink-0" size={18} />
+            <Search className="text-brand-accent flex-shrink-0" size={18} />
             <input
               type="text"
               value={searchQ}
@@ -388,7 +413,7 @@ export default function HomeClient({
                 aria-label="Очистить"
                 className="text-[#bbb] flex-shrink-0 p-0.5"
               >
-                <FiX size={15} />
+                <X size={16} />
               </button>
             )}
             <button
@@ -441,16 +466,26 @@ export default function HomeClient({
         </div>
 
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-          {heroCats.map((cat) => (
-            <Link
-              key={cat.label}
-              href={cat.id ? `/search?category=${cat.id}` : '/search'}
-              className="flex items-center gap-1.5 bg-[#f5f5f7] border border-[#eee] rounded-full px-3.5 py-1.5 flex-shrink-0"
-            >
-              <span className="text-sm">{cat.emoji}</span>
-              <span className="text-xs text-[#444] font-medium">{cat.label}</span>
-            </Link>
-          ))}
+          <Link
+            href="/search"
+            className="flex items-center gap-1.5 bg-[#fff1f2] border border-brand-accent/30 rounded-full px-3.5 py-1.5 flex-shrink-0 text-brand-accent"
+          >
+            <LayoutGrid size={16} aria-hidden />
+            <span className="text-xs font-semibold">Все</span>
+          </Link>
+          {heroCats.map((cat) => {
+            const CatIcon = cat.icon
+            return (
+              <Link
+                key={cat.label}
+                href={cat.id ? `/search?category=${cat.id}` : '/search'}
+                className="flex items-center gap-1.5 bg-[#f5f5f7] border border-[#eee] rounded-full px-3.5 py-1.5 flex-shrink-0"
+              >
+                <CatIcon size={16} className="text-slate-500" aria-hidden />
+                <span className="text-xs text-[#444] font-medium">{cat.label}</span>
+              </Link>
+            )
+          })}
         </div>
       </section>
 
@@ -485,13 +520,13 @@ export default function HomeClient({
         className="mx-4 mb-1 flex items-center gap-3 rounded-[18px] bg-white border border-[#f0f0f0] p-3.5 active:bg-[#fafafa]"
       >
         <div className="w-11 h-11 rounded-2xl bg-[#fff8f8] text-brand-accent flex items-center justify-center flex-shrink-0">
-          <FiMap size={20} />
+          <Calculator size={22} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-bold text-[#111]">Смета за 2 минуты</p>
           <p className="text-[11px] text-[#888] leading-snug">Размеры комнаты → материалы → мастера рядом</p>
         </div>
-        <FiArrowRight className="text-[#c7362f] flex-shrink-0" size={18} />
+        <ChevronRight className="text-brand-accent flex-shrink-0" size={20} />
       </Link>
 
       {DIVIDER}
@@ -520,7 +555,7 @@ export default function HomeClient({
             href="/search"
             className="w-[100px] flex-shrink-0 rounded-[18px] border border-dashed border-[#e0e0e0] bg-[#f5f5f7] flex flex-col items-center justify-center gap-1.5 p-3"
           >
-            <FiArrowRight className="text-brand-accent" size={20} />
+            <ArrowRight className="text-brand-accent" size={20} />
             <span className="text-[11px] text-[#888] text-center">Все мастера</span>
           </Link>
         </div>
@@ -556,19 +591,28 @@ export default function HomeClient({
       {/* Roles */}
       <SectionHeader title="Для кого платформа" />
       <div className="grid grid-cols-2 gap-2.5 px-4 pb-4">
-        {ROLES.map((r) => (
-          <Link
-            key={r.title}
-            href={r.href}
-            className={`rounded-[18px] p-3.5 border bg-white ${
-              r.active ? 'border-brand-accent bg-[#fff8f8]' : 'border-[#f0f0f0]'
-            }`}
-          >
-            <div className="text-[22px] mb-2">{r.icon}</div>
-            <p className="text-[13px] font-bold text-[#111] mb-0.5">{r.title}</p>
-            <p className="text-[11px] text-[#888] leading-snug">{r.desc}</p>
-          </Link>
-        ))}
+        {ROLES.map((r) => {
+          const RoleIcon = r.icon
+          return (
+            <Link
+              key={r.title}
+              href={r.href}
+              className={`rounded-[18px] p-3.5 border bg-white ${
+                r.active ? 'border-brand-accent bg-[#fff8f8]' : 'border-[#f0f0f0]'
+              }`}
+            >
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 ${
+                  r.active ? 'bg-brand-accent/10 text-brand-accent' : 'bg-[#f5f5f7] text-slate-500'
+                }`}
+              >
+                <RoleIcon size={22} aria-hidden />
+              </div>
+              <p className="text-[13px] font-bold text-[#111] mb-0.5">{r.title}</p>
+              <p className="text-[11px] text-[#888] leading-snug">{r.desc}</p>
+            </Link>
+          )
+        })}
       </div>
 
       {DIVIDER}
@@ -595,13 +639,16 @@ export default function HomeClient({
       {/* Trust */}
       <SectionHeader title="Безопасность" />
       <div className="grid grid-cols-2 gap-2.5 px-4 pb-4">
-        {TRUST.map((t) => (
-          <div key={t.title} className="bg-white rounded-2xl p-3 border border-[#f0f0f0]">
-            <div className="text-lg text-brand-accent mb-1.5">{t.icon}</div>
-            <p className="text-xs font-bold text-[#111] mb-0.5">{t.title}</p>
-            <p className="text-[10px] text-[#888] leading-snug">{t.desc}</p>
-          </div>
-        ))}
+        {TRUST.map((t) => {
+          const TrustIcon = t.icon
+          return (
+            <div key={t.title} className="bg-white rounded-2xl p-3 border border-[#f0f0f0]">
+              <TrustIcon size={20} className="text-brand-accent mb-1.5" aria-hidden />
+              <p className="text-xs font-bold text-[#111] mb-0.5">{t.title}</p>
+              <p className="text-[10px] text-[#888] leading-snug">{t.desc}</p>
+            </div>
+          )
+        })}
       </div>
 
       {/* CTA */}

@@ -6,7 +6,7 @@ import { useAuth } from '@/app/providers'
 import { supabase, User, Service } from '@/lib/supabase'
 import { fetchMasterCategoriesTree, type CategoryNode } from '@/lib/masterCategoriesTree'
 import SpecializationsEditor from '@/components/settings/SpecializationsEditor'
-import { FiCamera, FiImage, FiTrash2 } from 'react-icons/fi'
+import { Camera, Image as ImageIcon, Trash2 } from '@/components/icons'
 import Image from 'next/image'
 
 const MasterRadiusPicker = dynamic(() => import('@/components/MasterRadiusPicker'), { ssr: false })
@@ -418,7 +418,7 @@ export function ProfileEditPanel({ forms }: { forms: ReturnType<typeof useSettin
           )}
         </div>
         <label className="text-xs font-semibold text-brand-accent cursor-pointer">
-          <FiCamera className="inline mr-1" size={14} />
+          <Camera className="inline mr-1" size={14} />
           {forms.uploadingAvatar ? 'Загрузка…' : 'Сменить фото'}
           <input
             type="file"
@@ -447,7 +447,7 @@ export function ProfileEditPanel({ forms }: { forms: ReturnType<typeof useSettin
         </div>
         <div className="flex items-center gap-3 mt-2">
           <label className="text-xs font-semibold text-brand-accent cursor-pointer inline-flex items-center gap-1">
-            <FiImage size={14} />
+            <ImageIcon size={14} />
             {forms.uploadingCover ? 'Загрузка…' : user.cover_photo_url ? 'Сменить обложку' : 'Загрузить обложку'}
             <input
               type="file"
@@ -468,7 +468,7 @@ export function ProfileEditPanel({ forms }: { forms: ReturnType<typeof useSettin
               onClick={() => void forms.removeCover()}
               className="text-xs font-medium text-[#8e8e93] inline-flex items-center gap-1 disabled:opacity-50"
             >
-              <FiTrash2 size={13} />
+              <Trash2 size={13} />
               Убрать
             </button>
           )}

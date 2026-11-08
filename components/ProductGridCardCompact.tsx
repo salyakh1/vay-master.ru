@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { FiPlus, FiShoppingBag } from 'react-icons/fi'
+import { Plus, ShoppingBag } from '@/components/icons'
 import type { Product } from '@/lib/supabase'
 
 export default function ProductGridCardCompact({ product }: { product: Product }) {
@@ -19,7 +19,7 @@ export default function ProductGridCardCompact({ product }: { product: Product }
           {img ? (
             <Image src={img} alt={product.name} fill className="object-cover" sizes="50vw" />
           ) : (
-            <FiShoppingBag className="text-[#ccc]" size={28} />
+            <ShoppingBag className="text-slate-300" size={28} strokeWidth={1.5} />
           )}
           {isNew && (
             <span className="absolute top-1.5 left-1.5 bg-brand-accent text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-md">
@@ -37,7 +37,7 @@ export default function ProductGridCardCompact({ product }: { product: Product }
               {product.price.toLocaleString('ru-RU')} ₽
             </span>
             <span className="bg-brand-accent text-white w-[26px] h-[26px] rounded-[7px] flex items-center justify-center">
-              <FiPlus size={14} strokeWidth={3} />
+              <Plus size={16} strokeWidth={2.5} />
             </span>
           </div>
         </div>

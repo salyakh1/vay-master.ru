@@ -7,7 +7,7 @@ import { supabase, PortfolioItem, PortfolioComment, Product } from '@/lib/supaba
 import Navbar from '@/components/Navbar'
 import CompactPageBanner from '@/components/CompactPageBanner'
 import Link from 'next/link'
-import { FiArrowLeft } from 'react-icons/fi'
+import { ArrowLeft } from '@/components/icons'
 import StoriesCircle from '@/components/StoriesCircle'
 import { Story } from '@/lib/supabase'
 import InstagramGrid, { type InstagramGridItem } from '@/components/feed/InstagramGrid'
@@ -592,7 +592,7 @@ export default function FeedPage() {
             className="w-9 h-9 flex items-center justify-center text-[#262626]"
             aria-label="Назад к сетке"
           >
-            <FiArrowLeft size={22} />
+            <ArrowLeft size={22} />
           </button>
           <p className="text-[14px] font-semibold text-[#262626]">Рекомендации</p>
         </div>

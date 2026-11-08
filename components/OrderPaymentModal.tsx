@@ -1,7 +1,6 @@
 'use client'
 
-import { FiX, FiCreditCard } from 'react-icons/fi'
-
+import { CreditCard, X } from '@/components/icons'
 interface OrderPaymentModalProps {
   isOpen: boolean
   onClose: () => void
@@ -38,13 +37,13 @@ export default function OrderPaymentModal({
           className="absolute top-4 right-4 text-text-secondary hover:text-graphite-secondary transition-all p-2 rounded-lg hover:bg-white/10 z-30"
           aria-label="Закрыть"
         >
-          <FiX size={20} />
+          <X size={20} />
         </button>
 
         <div className="p-6 relative z-20">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-full bg-brand-accent/10 border border-brand-accent/20 flex items-center justify-center">
-              <FiCreditCard size={22} className="text-brand-accent" />
+              <CreditCard size={22} className="text-brand-accent" />
             </div>
             <div>
               <div className="text-lg font-semibold text-graphite-secondary">Публикация заказа платная</div>

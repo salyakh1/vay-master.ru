@@ -7,7 +7,16 @@ import SearchLoading from './loading'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import CompactPageBanner from '@/components/CompactPageBanner'
-import { FiSearch, FiSliders, FiBriefcase, FiArrowLeft, FiMapPin } from 'react-icons/fi'
+import {
+  ArrowLeft,
+  ChevronDown,
+  LayoutGrid,
+  MapPin,
+  Search,
+  SlidersHorizontal,
+  X,
+  getMasterCategoryIcon,
+} from '@/components/icons'
 import { MastersScrollerSection } from '@/components/scrollers/MastersScrollerSection'
 import { ProductsScrollerSection } from '@/components/scrollers/ProductsScrollerSection'
 import { MasterListCard, MasterListCardSkeleton } from '@/components/MasterListCard'
@@ -19,7 +28,6 @@ import type { AdBanner } from '@/lib/supabase'
 import StoriesCircle from '@/components/StoriesCircle'
 import RadiusSetupBanner from '@/components/RadiusSetupBanner'
 import { getProductCategoriesForSpecializations, getProductCategoriesForMasterSubcategorySlugs, getProductCategoriesForCategorySlugs } from '@/lib/specialization-product-mapping'
-import { getCategoryEmoji } from '@/lib/categoryEmoji'
 import { trackFunnel } from '@/lib/track-funnel'
 
 const RadiusPickerModal = dynamic(() => import('@/components/RadiusPickerModal'), { ssr: false })
@@ -477,11 +485,11 @@ function SearchContent({
             className="text-brand-accent flex-shrink-0 p-0.5"
             aria-label="Назад"
           >
-            <FiArrowLeft size={20} />
+            <ArrowLeft size={22} />
           </button>
           <div className="relative flex-1 min-w-0" ref={searchInputWrapperRef}>
             <div className="flex items-center gap-1.5 bg-[#f5f5f7] rounded-xl px-3 py-2 border border-[#ececec]">
-              <FiSearch className="text-brand-accent flex-shrink-0" size={14} />
+              <Search className="text-brand-accent flex-shrink-0" size={16} />
               <input
                 type="text"
                 value={query}
@@ -517,13 +525,13 @@ function SearchContent({
           <button
             type="button"
             onClick={() => setShowFiltersModal(true)}
-            className={`flex-shrink-0 rounded-[10px] px-2.5 py-2 text-[11px] font-semibold border ${
+            className={`flex-shrink-0 inline-flex items-center gap-1 rounded-[10px] px-2.5 py-2 text-[11px] font-semibold border ${
               hasActiveFilters
                 ? 'bg-[#fff1f2] border-brand-accent text-brand-accent'
-                : 'bg-[#f5f5f7] border-[#ececec] text-[#555]'
+                : 'bg-[#f5f5f7] border-[#ececec] text-slate-500'
             }`}
           >
-            <FiSliders size={14} className="inline mr-0.5" />
+            <SlidersHorizontal size={16} aria-hidden />
             Фильтр{hasActiveFilters ? ' •' : ''}
           </button>
         </form>
@@ -537,42 +545,52 @@ function SearchContent({
               setSelectedServiceIds([])
               setCityFilter('')
             }}
-            className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border ${
+            className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[10px] font-medium border ${
               !selectedCategory && !activeCity
                 ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
                 : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
             }`}
           >
+            <LayoutGrid
+              size={16}
+              className={!selectedCategory && !activeCity ? 'text-brand-accent' : 'text-slate-500'}
+              aria-hidden
+            />
             Все
           </button>
           {activeCity && (
             <button
               type="button"
               onClick={() => setShowFiltersModal(true)}
-              className="flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap bg-[#fff1f2] border-brand-accent text-brand-accent font-bold"
+              className="flex-shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap bg-[#fff1f2] border-brand-accent text-brand-accent font-bold"
             >
-              <FiMapPin size={10} className="inline mr-0.5" />
+              <MapPin size={16} aria-hidden />
               {activeCity}
             </button>
           )}
-          {chipCategories.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => {
-                setSelectedCategory(cat.id)
-                setSelectedSubcategory('')
-                setSelectedServiceIds([])
-              }}
-              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap ${
-                selectedCategory === cat.id
-                  ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
-                  : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
-              }`}
-            >
-              {getCategoryEmoji(cat.slug, cat.name)} {cat.name}
-            </button>
-          ))}
+          {chipCategories.map((cat) => {
+            const CatIcon = getMasterCategoryIcon(cat.slug, cat.name)
+            const isSelected = selectedCategory === cat.id
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => {
+                  setSelectedCategory(cat.id)
+                  setSelectedSubcategory('')
+                  setSelectedServiceIds([])
+                }}
+                className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap ${
+                  isSelected
+                    ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
+                    : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
+                }`}
+              >
+                <CatIcon size={16} className={isSelected ? 'text-brand-accent' : 'text-slate-500'} aria-hidden />
+                {cat.name}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -596,7 +614,7 @@ function SearchContent({
       <div className="flex items-center gap-2 px-3.5 py-2">
         {activeCity ? (
           <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium max-w-[45%]">
-            <FiMapPin size={10} className="shrink-0 text-brand-accent" />
+            <MapPin size={12} className="shrink-0 text-brand-accent" />
             <strong className="text-[#1c1c1e] font-bold truncate">{activeCity}</strong>
           </div>
         ) : (
@@ -605,9 +623,9 @@ function SearchContent({
             onClick={() => setShowRadiusModal(true)}
             className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium active:scale-95 transition-transform"
           >
-            <span aria-hidden>📍</span>
+            <MapPin size={12} className="shrink-0 text-brand-accent" aria-hidden />
             <strong className="text-[#1c1c1e] font-bold">{radiusConfigured && radiusKm != null ? `${radiusKm} км` : 'Все'}</strong>
-            <span aria-hidden className="text-[8px] text-[#8e8e93]">▾</span>
+            <ChevronDown size={12} className="text-slate-500" aria-hidden />
           </button>
         )}
         <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
@@ -720,10 +738,10 @@ function SearchContent({
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border-light">
                   <button
                     onClick={() => setShowFiltersModal(false)}
-                    className="text-text-secondary hover:text-graphite-secondary text-xl font-light w-8 h-8 flex items-center justify-center"
+                    className="text-slate-500 hover:text-graphite-secondary w-8 h-8 flex items-center justify-center"
                     aria-label="Закрыть"
                   >
-                    ×
+                    <X size={22} />
                   </button>
                   <div className="text-base font-semibold text-graphite-secondary">
                     {filterStepMasters === 'category' && 'Фильтры'}
@@ -747,7 +765,7 @@ function SearchContent({
                 <div className="flex-1 overflow-y-auto px-4 py-4">
                   <div className="mb-5" ref={cityInputWrapperRef}>
                     <label className="block text-sm font-semibold text-graphite-secondary mb-2">
-                      <FiMapPin className="inline mr-1 text-brand-accent" size={14} />
+                      <MapPin className="inline mr-1 -mt-0.5 text-brand-accent" size={16} />
                       Город
                     </label>
                     <p className="text-xs text-text-secondary mb-2">
@@ -774,7 +792,7 @@ function SearchContent({
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-graphite-secondary w-7 h-7 flex items-center justify-center"
                           aria-label="Очистить город"
                         >
-                          ×
+                          <X size={16} />
                         </button>
                       )}
                       {showCitySuggestions && citySuggestions.length > 0 && (
@@ -843,7 +861,10 @@ function SearchContent({
                                   onError={() => setFilterImageFailed((prev) => new Set(prev).add(cat.id))}
                                 />
                               ) : (
-                                <FiBriefcase size={32} className="text-text-muted" />
+                                (() => {
+                                  const CatIcon = getMasterCategoryIcon(cat.slug, cat.name)
+                                  return <CatIcon size={32} strokeWidth={1.5} className="text-slate-400" />
+                                })()
                               )}
                             </div>
                             <span className="text-sm font-medium text-center leading-tight line-clamp-2 px-1 py-2 block">

@@ -1,8 +1,8 @@
 import type { Order, OrderStatus } from '@/lib/supabase'
-import { getCategoryEmoji } from '@/lib/categoryEmoji'
+import { getMasterCategoryIcon, type LucideIcon } from '@/components/icons'
 
-export function getCategoryIcon(category?: string | null): string {
-  return getCategoryEmoji(null, category)
+export function getCategoryIcon(category?: string | null): LucideIcon {
+  return getMasterCategoryIcon(null, category)
 }
 
 export const STATUS_CONFIG: Record<

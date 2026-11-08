@@ -2,21 +2,20 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { FiStar, FiMessageCircle, FiShield } from 'react-icons/fi'
-
+import { MessageCircle, ShieldCheck, Star } from '@/components/icons'
 const BENEFITS = [
   {
-    icon: FiStar,
+    icon: Star,
     title: 'Мастера рядом',
     desc: 'Профили, услуги и цены в одном месте',
   },
   {
-    icon: FiMessageCircle,
+    icon: MessageCircle,
     title: 'Прямой чат',
     desc: 'Договоритесь без посредников',
   },
   {
-    icon: FiShield,
+    icon: ShieldCheck,
     title: 'Модерация',
     desc: 'Жалобы разбирает администрация',
   },

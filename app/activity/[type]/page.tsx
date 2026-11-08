@@ -7,8 +7,16 @@ import { FixedSizeList as List } from 'react-window'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiArrowLeft, FiMessageCircle, FiHeart, FiBriefcase, FiStar, FiUsers, FiCornerDownRight } from 'react-icons/fi'
-
+import {
+  ArrowLeft,
+  Briefcase,
+  CornerDownRight,
+  Heart,
+  MessageCircle,
+  Star,
+  Users,
+  type LucideIcon,
+} from '@/components/icons'
 const ROW_HEIGHT = 88
 const LIST_HEIGHT = typeof window !== 'undefined' ? Math.min(window.innerHeight * 0.6, 600) : 500
 
@@ -134,15 +142,15 @@ export default function ActivityTypePage() {
   if (!user) return null
   if (type !== 'replies' && user.role !== 'master' && user.role !== 'seller') return null
 
-  const icons: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-    comments: FiMessageCircle,
-    likes: FiHeart,
-    responses: FiBriefcase,
-    reviews: FiStar,
-    followers: FiUsers,
-    replies: FiCornerDownRight,
+  const icons: Record<string, LucideIcon> = {
+    comments: MessageCircle,
+    likes: Heart,
+    responses: Briefcase,
+    reviews: Star,
+    followers: Users,
+    replies: CornerDownRight,
   }
-  const Icon = icons[type] || FiMessageCircle
+  const Icon = icons[type] || MessageCircle
 
   return (
     <>
@@ -157,7 +165,7 @@ export default function ActivityTypePage() {
               className="p-2 rounded-lg hover:bg-white/80 transition-colors text-graphite-secondary disabled:opacity-60"
               aria-label="Назад"
             >
-              <FiArrowLeft size={20} />
+              <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg border border-border-light bg-white">
@@ -229,7 +237,7 @@ export default function ActivityTypePage() {
                               href={(it as any).replyLink}
                               className="inline-flex items-center gap-1.5 text-xs text-brand-accent hover:underline mt-2"
                             >
-                              <FiMessageCircle size={12} />
+                              <MessageCircle size={12} />
                               Ответить
                             </Link>
                           )}

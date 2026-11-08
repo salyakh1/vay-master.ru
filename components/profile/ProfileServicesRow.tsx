@@ -1,6 +1,6 @@
 'use client'
 
-import { FiChevronUp } from 'react-icons/fi'
+import { ChevronUp } from '@/components/icons'
 import { buildServicesSummary } from './ProfileServicesSheet'
 
 type ProfileServicesRowProps = {
@@ -21,7 +21,7 @@ export default function ProfileServicesRow({ serviceNames, onClick }: ProfileSer
         <p className="text-[13px] font-medium text-[#111111] mb-0.5">Услуги</p>
         <p className="text-[11px] text-[#9ca3af] truncate">{buildServicesSummary(serviceNames)}</p>
       </div>
-      <FiChevronUp size={16} className="text-[#9ca3af] flex-shrink-0" aria-hidden />
+      <ChevronUp size={16} className="text-[#9ca3af] flex-shrink-0" aria-hidden />
     </button>
   )
 }

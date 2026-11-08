@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import type { IconType } from 'react-icons'
-import { FiCheck, FiClipboard, FiShoppingBag, FiStar, FiChevronRight, FiBell, FiPlus } from 'react-icons/fi'
+import {
+  Bell,
+  Check,
+  ChevronRight,
+  ClipboardList,
+  Plus,
+  ShoppingBag,
+  Star,
+  type LucideIcon,
+} from '@/components/icons'
 import { supabase } from '@/lib/supabase'
 import { getMasterAccess } from '@/lib/masterAccess'
 import { distanceKm } from '@/lib/onboarding'
@@ -19,7 +27,7 @@ function ActionCard({
   href,
   accent,
 }: {
-  icon: IconType
+  icon: LucideIcon
   title: string
   desc: string
   href?: string
@@ -39,7 +47,7 @@ function ActionCard({
         <span className="block text-[15px] font-bold text-[#1c1c1e]">{title}</span>
         <span className="block text-[13px] text-[#6e6e73] leading-snug">{desc}</span>
       </span>
-      {href && <FiChevronRight className="text-[#c7c7cc] shrink-0" size={20} />}
+      {href && <ChevronRight className="text-[#c7c7cc] shrink-0" size={20} />}
     </>
   )
   const cls = 'w-full rounded-2xl bg-white p-4 shadow-sm flex items-center gap-3 text-left'
@@ -130,7 +138,7 @@ export default function StepDone({ user, index, total, onBack, onFinish }: Onboa
         isSeller ? (
           <>
             <OnbPrimaryButton tone="success" onClick={() => onFinish('/products/new')}>
-              <FiPlus size={18} /> Добавить первый товар
+              <Plus size={18} /> Добавить первый товар
             </OnbPrimaryButton>
             <OnbSkipButton onClick={() => onFinish('/products')}>Позже, открыть каталог</OnbSkipButton>
           </>
@@ -146,7 +154,7 @@ export default function StepDone({ user, index, total, onBack, onFinish }: Onboa
     >
       <div className="flex justify-center my-4">
         <span className="w-20 h-20 rounded-full bg-[#1f9d55] text-white flex items-center justify-center shadow-[0_12px_32px_rgba(31,157,85,0.35)] animate-slide-in-up">
-          <FiCheck size={40} strokeWidth={3} />
+          <Check size={40} strokeWidth={3} />
         </span>
       </div>
 
@@ -159,7 +167,7 @@ export default function StepDone({ user, index, total, onBack, onFinish }: Onboa
                 c.done ? 'bg-[#1f9d55] text-white' : 'border-2 border-[#d1d1d6]',
               ].join(' ')}
             >
-              {c.done && <FiCheck size={14} strokeWidth={3} />}
+              {c.done && <Check size={14} strokeWidth={3} />}
             </span>
             <span className={`flex-1 text-[14px] ${c.done ? 'text-[#1c1c1e]' : 'text-[#6e6e73]'}`}>{c.label}</span>
             {!c.done && c.fixHref && catalogCount != null && (
@@ -175,7 +183,7 @@ export default function StepDone({ user, index, total, onBack, onFinish }: Onboa
         {!isSeller &&
           (ordersNearby == null ? null : ordersNearby > 0 ? (
             <ActionCard
-              icon={FiClipboard}
+              icon={ClipboardList}
               accent
               title={`Заказы в вашей зоне: ${ordersNearby}`}
               desc="Откликнитесь первым — клиенты чаще выбирают быстрых"
@@ -183,14 +191,14 @@ export default function StepDone({ user, index, total, onBack, onFinish }: Onboa
             />
           ) : (
             <ActionCard
-              icon={FiBell}
+              icon={Bell}
               title="Новых заказов рядом пока нет"
               desc="Пришлём уведомление, как только появится заказ в вашей зоне"
             />
           ))}
         {!isSeller && (
           <ActionCard
-            icon={FiShoppingBag}
+            icon={ShoppingBag}
             title="Материалы и инструменты"
             desc="Товары от продавцов рядом с вами"
             href="/products"
@@ -198,7 +206,7 @@ export default function StepDone({ user, index, total, onBack, onFinish }: Onboa
         )}
         {showTrial && (
           <ActionCard
-            icon={FiStar}
+            icon={Star}
             title={`PRO бесплатно ещё ${trialDaysLeft} дн.`}
             desc={isSeller ? 'Приоритет в каталоге и расширенная витрина' : 'Новые заказы сразу и отклики без ограничений'}
             href="/pro"

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { FiSearch, FiCheck, FiX } from 'react-icons/fi'
+import { Check, Search, X } from '@/components/icons'
 import { supabase } from '@/lib/supabase'
 import { PRODUCT_CATEGORY_SECTIONS, type ProductCategory } from '@/types/db'
 import { useAuth } from '@/app/providers'
@@ -106,7 +106,7 @@ export default function StepSellerCategories({ user, index, total, onBack, onNex
       }
     >
       <div className="relative mb-4">
-        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93]" size={18} />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93]" size={18} />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -120,7 +120,7 @@ export default function StepSellerCategories({ user, index, total, onBack, onNex
             aria-label="Очистить"
             className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-[#8e8e93]"
           >
-            <FiX size={16} />
+            <X size={16} />
           </button>
         )}
       </div>
@@ -152,7 +152,7 @@ export default function StepSellerCategories({ user, index, total, onBack, onNex
                         on ? 'border-brand-accent bg-[#fdf2f1] text-brand-accent' : 'border-[#e5e5ea] bg-white text-[#1c1c1e]',
                       ].join(' ')}
                     >
-                      {on && <FiCheck size={14} strokeWidth={3} />}
+                      {on && <Check size={14} strokeWidth={3} />}
                       {c.name}
                     </button>
                   )

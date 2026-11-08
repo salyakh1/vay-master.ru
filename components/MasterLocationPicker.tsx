@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Circle } from '@/components/maps/leaflet'
-import { FiX, FiNavigation } from 'react-icons/fi'
+import { Lightbulb, Navigation, X } from '@/components/icons'
 import { configureLeafletIcons } from '@/lib/leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -218,8 +218,9 @@ export default function MasterLocationPicker({ value, onChange, city }: Props) {
           </div>
 
           {!position && (
-            <p className="text-xs text-text-secondary mt-2">
-              💡 Откройте карту и выберите ваше местоположение
+            <p className="text-xs text-text-secondary mt-2 flex items-center gap-1.5">
+              <Lightbulb size={14} className="text-[#f4a228] flex-shrink-0" aria-hidden />
+              Откройте карту и выберите ваше местоположение
             </p>
           )}
         </div>
@@ -236,7 +237,7 @@ export default function MasterLocationPicker({ value, onChange, city }: Props) {
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="Закрыть"
             >
-              <FiX className="w-6 h-6" />
+              <X className="w-6 h-6" />
             </button>
           </div>
 
@@ -260,7 +261,7 @@ export default function MasterLocationPicker({ value, onChange, city }: Props) {
                     className="absolute bottom-24 right-4 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-[1000]"
                     aria-label="Центрировать карту"
                   >
-                    <FiNavigation className="w-5 h-5 text-gray-700" />
+                    <Navigation className="w-5 h-5 text-gray-700" />
                   </button>
                 )}
               </>

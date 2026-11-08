@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FiX, FiDollarSign } from 'react-icons/fi'
-
+import { Banknote, X } from '@/components/icons'
 interface OrderResponseModalProps {
   isOpen: boolean
   onClose: () => void
@@ -68,7 +67,7 @@ export default function OrderResponseModal({
             disabled={submitting}
             className="p-2 hover:bg-bg-secondary rounded-md transition-colors disabled:opacity-50"
           >
-            <FiX size={20} className="text-text-secondary" />
+            <X size={20} className="text-text-secondary" />
           </button>
         </div>
 
@@ -87,7 +86,7 @@ export default function OrderResponseModal({
               <span className="text-text-secondary font-normal ml-1">(необязательно)</span>
             </label>
             <div className="relative">
-              <FiDollarSign 
+              <Banknote 
                 size={20} 
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" 
               />

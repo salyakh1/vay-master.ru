@@ -6,8 +6,16 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiMessageCircle, FiHeart, FiBriefcase, FiStar, FiUsers, FiArrowLeft, FiRefreshCw, FiCornerDownRight } from 'react-icons/fi'
-
+import {
+  ArrowLeft,
+  Briefcase,
+  CornerDownRight,
+  Heart,
+  MessageCircle,
+  RefreshCw,
+  Star,
+  Users,
+} from '@/components/icons'
 interface ActivityStats {
   comments: number
   comments_new: number
@@ -110,14 +118,14 @@ export default function ActivityPage() {
       id: 'comments',
       title: 'Комментарии',
       value: stats.comments,
-      icon: FiMessageCircle,
+      icon: MessageCircle,
       description: user.role === 'master' ? 'Комментарии к работам портфолио' : 'Комментарии к товарам',
     },
     {
       id: 'likes',
       title: 'Лайки',
       value: stats.likes,
-      icon: FiHeart,
+      icon: Heart,
       description: user.role === 'master' ? 'Лайки работ портфолио' : 'Лайки товаров',
       showOnlyFor: ['master', 'seller'],
     },
@@ -125,7 +133,7 @@ export default function ActivityPage() {
       id: 'responses',
       title: 'Отклики',
       value: stats.responses,
-      icon: FiBriefcase,
+      icon: Briefcase,
       description: 'Отклики на заказы',
       showOnly: 'master' as const,
     },
@@ -133,14 +141,14 @@ export default function ActivityPage() {
       id: 'reviews',
       title: 'Отзывы',
       value: stats.reviews,
-      icon: FiStar,
+      icon: Star,
       description: user.role === 'master' ? 'Отзывы о мастере' : 'Отзывы о продавце и товарах',
     },
     {
       id: 'followers',
       title: 'Подписки',
       value: stats.followers,
-      icon: FiUsers,
+      icon: Users,
       description: 'Количество подписчиков',
       showOnlyFor: ['master', 'seller'],
     },
@@ -148,7 +156,7 @@ export default function ActivityPage() {
       id: 'replies',
       title: 'Ответы',
       value: stats.replies,
-      icon: FiCornerDownRight,
+      icon: CornerDownRight,
       description: 'Ответы на ваши комментарии к товарам',
     },
   ]
@@ -171,7 +179,7 @@ export default function ActivityPage() {
                 onClick={() => router.back()}
                 className="p-2 rounded-lg hover:bg-bg-secondary transition-colors text-graphite-secondary"
               >
-                <FiArrowLeft size={20} />
+                <ArrowLeft size={20} />
               </button>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-graphite-secondary mb-1">
@@ -188,7 +196,7 @@ export default function ActivityPage() {
               className="p-2 rounded-lg hover:bg-bg-secondary transition-colors text-graphite-secondary disabled:opacity-50"
               title="Обновить"
             >
-              <FiRefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
+              <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
             </button>
           </div>
 

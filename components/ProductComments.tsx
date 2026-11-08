@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { FiSend } from 'react-icons/fi'
+import { Send } from '@/components/icons'
 import { supabase, ProductComment, User } from '@/lib/supabase'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import { loginUrl } from '@/lib/guest-access'
@@ -238,7 +238,7 @@ export default function ProductComments({
               disabled={!commentText.trim() || saving}
               className="h-10 px-3 rounded-xl bg-[#e63946] text-white text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-40 flex-shrink-0"
             >
-              <FiSend size={14} />
+              <Send size={14} />
               {saving && !replyingToId ? '…' : 'Отправить'}
             </button>
           </div>

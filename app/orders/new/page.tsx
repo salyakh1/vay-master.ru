@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { FiArrowLeft, FiImage, FiX } from 'react-icons/fi'
+import { ArrowLeft, Image as ImageIcon, X } from '@/components/icons'
 import Link from 'next/link'
 import OrderPaymentModal from '@/components/OrderPaymentModal'
 import OrderLocationPicker from '@/components/OrderLocationPicker'
@@ -336,7 +336,7 @@ function NewOrderForm() {
               href="/orders"
               className="p-2 hover:bg-bg-secondary rounded-md transition-colors"
             >
-              <FiArrowLeft size={24} className="text-text-secondary" />
+              <ArrowLeft size={24} className="text-text-secondary" />
             </Link>
             <h1 className="text-2xl font-semibold text-graphite-secondary tracking-tight">
               Создать заказ
@@ -486,7 +486,7 @@ function NewOrderForm() {
                           onClick={() => removeFile(index)}
                           className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          <FiX size={16} />
+                          <X size={16} />
                         </button>
                       </div>
                     ))}
@@ -497,7 +497,7 @@ function NewOrderForm() {
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full py-4 border-2 border-dashed border-border-color rounded-md hover:border-brand-accent hover:text-brand-accent transition-colors flex items-center justify-center gap-2"
                 >
-                  <FiImage size={20} />
+                  <ImageIcon size={20} />
                   <span>Добавить фотографии</span>
                 </button>
                 <input

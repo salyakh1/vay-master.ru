@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
-import { FiShoppingBag } from 'react-icons/fi'
-
+import { ShoppingBag } from '@/components/icons'
 export interface CategoryWithCount {
   id: string
   name: string
@@ -89,7 +88,7 @@ export default function CatalogCardsCarousel() {
             >
               <div className={`relative flex-1 min-h-[100px] flex items-center justify-center ${pastel}`}>
                 <div className="w-14 h-14 rounded-full bg-white/80 flex items-center justify-center shadow-sm">
-                  <FiShoppingBag size={24} className="text-graphite-secondary" />
+                  <ShoppingBag size={24} className="text-graphite-secondary" />
                 </div>
                 <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/90 text-text-secondary text-xs font-medium">
                   <span>{formatCount(cat.products_count)} товаров</span>

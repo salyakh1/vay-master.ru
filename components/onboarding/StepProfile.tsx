@@ -1,7 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { FiCamera, FiImage, FiUser, FiShoppingBag, FiMapPin } from 'react-icons/fi'
+import {
+  Camera,
+  Image as ImageIcon,
+  MapPin,
+  ShoppingBag,
+  User,
+} from '@/components/icons'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/app/providers'
 import { hapticTap } from '@/lib/nativeApp'
@@ -93,7 +99,7 @@ export default function StepProfile({ user, index, total, onBack, onNext }: Onbo
     }
   }
 
-  const PlaceholderIcon = isSeller ? FiShoppingBag : FiUser
+  const PlaceholderIcon = isSeller ? ShoppingBag : User
   const previewSubtitle = isSeller
     ? [user.city, 'Магазин'].filter(Boolean).join(' · ')
     : [specNames.slice(0, 2).join(', '), user.service_radius_km ? `до ${user.service_radius_km} км` : '']
@@ -149,7 +155,7 @@ export default function StepProfile({ user, index, total, onBack, onNext }: Onbo
             disabled={uploading}
             className="h-11 rounded-xl bg-white shadow-sm text-[14px] font-semibold text-[#1c1c1e] flex items-center justify-center gap-2 active:scale-[0.98]"
           >
-            <FiCamera size={17} /> Камера
+            <Camera size={17} /> Камера
           </button>
           <button
             type="button"
@@ -157,7 +163,7 @@ export default function StepProfile({ user, index, total, onBack, onNext }: Onbo
             disabled={uploading}
             className="h-11 rounded-xl bg-white shadow-sm text-[14px] font-semibold text-[#1c1c1e] flex items-center justify-center gap-2 active:scale-[0.98]"
           >
-            <FiImage size={17} /> Галерея
+            <ImageIcon size={17} /> Галерея
           </button>
         </div>
         <input
@@ -212,7 +218,7 @@ export default function StepProfile({ user, index, total, onBack, onNext }: Onbo
             {name.trim() || (isSeller ? 'Название магазина' : 'Ваше имя')}
           </span>
           <span className="flex items-center gap-1 text-[13px] text-[#6e6e73] truncate">
-            {!isSeller && user.city && <FiMapPin size={12} className="shrink-0" />}
+            {!isSeller && user.city && <MapPin size={12} className="shrink-0" />}
             <span className="truncate">{isSeller ? previewSubtitle : [user.city, previewSubtitle].filter(Boolean).join(' · ')}</span>
           </span>
         </span>

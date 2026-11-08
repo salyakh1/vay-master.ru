@@ -1,8 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { FiX, FiLock, FiLogIn, FiUserPlus } from 'react-icons/fi'
-
+import { Lock, LogIn, UserPlus, X } from '@/components/icons'
 interface AuthRequiredModalProps {
   isOpen: boolean
   onClose: () => void
@@ -42,14 +41,14 @@ export default function AuthRequiredModal({ isOpen, onClose, type = 'master' }: 
           className="absolute top-4 right-4 text-text-secondary hover:text-graphite-secondary transition-all p-2 rounded-lg hover:bg-white/10 z-30"
           aria-label="Закрыть"
         >
-          <FiX size={20} />
+          <X size={20} />
         </button>
 
         {/* Content */}
         <div className="p-6 relative z-20">
           <div className="flex items-center justify-center mb-4">
             <div className="w-16 h-16 bg-gradient-to-br from-brand-accent/20 to-brand-accent/10 rounded-full flex items-center justify-center backdrop-blur-sm border border-brand-accent/30 shadow-glow">
-              <FiLock size={32} className="text-brand-accent" />
+              <Lock size={32} className="text-brand-accent" />
             </div>
           </div>
 
@@ -69,14 +68,14 @@ export default function AuthRequiredModal({ isOpen, onClose, type = 'master' }: 
               onClick={handleLogin}
               className="flex-1 btn btn-primary flex items-center justify-center gap-2"
             >
-              <FiLogIn size={18} />
+              <LogIn size={18} />
               <span>Войти</span>
             </button>
             <button
               onClick={handleRegister}
               className="flex-1 btn btn-secondary flex items-center justify-center gap-2"
             >
-              <FiUserPlus size={18} />
+              <UserPlus size={18} />
               <span>Зарегистрироваться</span>
             </button>
           </div>

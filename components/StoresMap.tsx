@@ -6,7 +6,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import { supabase, User, Product } from '@/lib/supabase'
-import { FiMapPin, FiShoppingBag, FiX, FiNavigation, FiFilter } from 'react-icons/fi'
+import {
+  MapPin,
+  Navigation,
+  ShoppingBag,
+  SlidersHorizontal,
+  X,
+} from '@/components/icons'
 import { configureLeafletIcons, leaflet as L } from '@/lib/leaflet'
 import { haversineKm } from '@/lib/geo'
 import 'leaflet/dist/leaflet.css'
@@ -285,7 +291,7 @@ export default function StoresMap({ masterLocation, onSellerClick, className = '
                           />
                         ) : (
                           <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                            <FiShoppingBag className="text-gray-400" />
+                            <ShoppingBag size={20} className="text-gray-400" />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
@@ -294,7 +300,7 @@ export default function StoresMap({ masterLocation, onSellerClick, className = '
                           </h3>
                           {(point.seller.store_address || point.seller.city) ? (
                             <p className="text-xs text-text-secondary flex items-center gap-1">
-                              <FiMapPin size={12} />
+                              <MapPin size={12} />
                               {point.seller.store_address || point.seller.city}
                             </p>
                           ) : (
@@ -338,7 +344,7 @@ export default function StoresMap({ masterLocation, onSellerClick, className = '
                                     />
                                   ) : (
                                     <div className="w-10 h-10 rounded bg-gray-200 flex items-center justify-center">
-                                      <FiShoppingBag size={16} className="text-gray-400" />
+                                      <ShoppingBag size={16} className="text-gray-400" />
                                     </div>
                                   )}
                                   <div className="flex-1 min-w-0">

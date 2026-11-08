@@ -9,7 +9,15 @@ import Navbar from '@/components/Navbar'
 import CompactPageBanner from '@/components/CompactPageBanner'
 import ProductGridCardCompact from '@/components/ProductGridCardCompact'
 import Link from 'next/link'
-import { FiSearch, FiSliders, FiX, FiPackage } from 'react-icons/fi'
+import {
+  ChevronDown,
+  LayoutGrid,
+  MapPin,
+  Search,
+  SlidersHorizontal,
+  X,
+  getProductCategoryIcon,
+} from '@/components/icons'
 import AuthRequiredModal from '@/components/AuthRequiredModal'
 import { sanitizeProductsForGuest } from '@/lib/guest-access'
 import { Story } from '@/lib/supabase'
@@ -21,8 +29,6 @@ import { MastersScrollerSection } from '@/components/scrollers/MastersScrollerSe
 import { useUserLocation } from '@/hooks/useUserLocation'
 import RadiusSetupBanner from '@/components/RadiusSetupBanner'
 import { LIST_PAGE_SIZE } from '@/lib/scrollerApi'
-import { getProductCategoryEmoji } from '@/lib/categoryEmoji'
-
 const StoresMap = dynamic(() => import('@/components/StoresMap'), { ssr: false })
 const RadiusPickerModal = dynamic(() => import('@/components/RadiusPickerModal'), { ssr: false })
 
@@ -494,7 +500,7 @@ function ProductsContent({
         <div className="flex gap-2 mb-2.5">
           <div className="relative flex-1 min-w-0" ref={productSearchWrapperRef}>
             <div className="flex items-center gap-1.5 bg-[#f5f5f7] rounded-xl px-3 py-2 border border-[#ececec]">
-              <FiSearch className="text-brand-accent flex-shrink-0" size={14} />
+              <Search className="text-brand-accent flex-shrink-0" size={16} />
               <input
                 type="text"
                 value={searchQuery}
@@ -542,10 +548,10 @@ function ProductsContent({
               setShowFilters(next)
               if (next) setFilterStep('categories')
             }}
-            className="flex-shrink-0 bg-[#f5f5f7] border border-[#ececec] rounded-[10px] px-2.5 py-2 text-[#555]"
+            className="flex-shrink-0 bg-[#f5f5f7] border border-[#ececec] rounded-[10px] px-2.5 py-2 text-slate-500"
             aria-label="Фильтры"
           >
-            <FiSliders size={16} />
+            <SlidersHorizontal size={18} />
           </button>
         </div>
 
@@ -556,31 +562,37 @@ function ProductsContent({
               setCategoryId('')
               setSubcategoryIds([])
             }}
-            className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap ${
+            className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap ${
               !categoryId
                 ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
                 : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
             }`}
           >
+            <LayoutGrid size={16} className={!categoryId ? 'text-brand-accent' : 'text-slate-500'} aria-hidden />
             Все
           </button>
-          {chipCategories.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => {
-                setCategoryId(cat.id)
-                setSubcategoryIds([])
-              }}
-              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap ${
-                categoryId === cat.id
-                  ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
-                  : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
-              }`}
-            >
-              {getProductCategoryEmoji(cat.slug, cat.name)} {cat.name}
-            </button>
-          ))}
+          {chipCategories.map((cat) => {
+            const CatIcon = getProductCategoryIcon(cat.slug, cat.name)
+            const isSelected = categoryId === cat.id
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => {
+                  setCategoryId(cat.id)
+                  setSubcategoryIds([])
+                }}
+                className={`flex-shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[10px] font-medium border whitespace-nowrap ${
+                  isSelected
+                    ? 'bg-[#fff1f2] border-brand-accent text-brand-accent font-bold'
+                    : 'bg-[#f5f5f7] border-[#eee] text-[#555]'
+                }`}
+              >
+                <CatIcon size={16} className={isSelected ? 'text-brand-accent' : 'text-slate-500'} aria-hidden />
+                {cat.name}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -606,11 +618,11 @@ function ProductsContent({
           onClick={() => setShowRadiusModal(true)}
           className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium active:scale-95 transition-transform"
         >
-          <span aria-hidden>📍</span>
+          <MapPin size={12} className="shrink-0 text-brand-accent" aria-hidden />
           <strong className="text-[#1c1c1e] font-bold">
             {radiusConfigured && userRadiusKm != null ? `${userRadiusKm} км` : 'Все'}
           </strong>
-          <span aria-hidden className="text-[8px] text-[#8e8e93]">▾</span>
+          <ChevronDown size={12} className="text-slate-500" aria-hidden />
         </button>
         <div className="flex items-center gap-1 bg-white border border-[#e5e5ea] rounded-full px-2.5 py-1 text-[10px] text-[#8e8e93] font-medium">
           Найдено: <strong className="text-[#1c1c1e] font-bold">{totalCount || products.length}</strong>
@@ -727,10 +739,10 @@ function ProductsContent({
               <div className="flex items-center justify-between px-4 py-3 border-b border-border-light">
                 <button
                   onClick={() => setShowFilters(false)}
-                  className="text-text-secondary hover:text-graphite-secondary text-xl font-light w-8 h-8 flex items-center justify-center"
+                  className="text-slate-500 hover:text-graphite-secondary w-8 h-8 flex items-center justify-center"
                   aria-label="Закрыть"
                 >
-                  ×
+                  <X size={22} />
                 </button>
                 <div className="text-base font-semibold text-graphite-secondary">
                   {filterStep === 'categories' ? 'Выберите категорию' : 'Выберите каталог'}
@@ -774,7 +786,7 @@ function ProductsContent({
                             </div>
                             <div className="grid grid-cols-3 gap-1">
                               {categories.map((cat) => {
-                                const Icon = FiPackage
+                                const Icon = getProductCategoryIcon(cat.slug, cat.name)
                                 const showImage = !categoryImageFailed.has(cat.id)
                                 const hasImage = cat.image_url && showImage
                                 const imgSize = 88
@@ -806,7 +818,7 @@ function ProductsContent({
                                           onError={() => markCategoryImageFailed(cat.id)}
                                         />
                                       ) : (
-                                        <Icon size={32} className="text-text-muted" />
+                                        <Icon size={32} strokeWidth={1.5} className="text-slate-400" />
                                       )}
                                     </div>
                                     <span className="text-sm font-medium text-center leading-tight line-clamp-2 px-1 py-2 block">
@@ -895,7 +907,7 @@ function ProductsContent({
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="Закрыть"
             >
-              <FiX className="w-6 h-6" />
+              <X size={24} />
             </button>
           </div>
           <div className="flex-1 overflow-hidden">

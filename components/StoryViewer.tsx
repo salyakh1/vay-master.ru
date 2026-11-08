@@ -4,8 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Story, User } from '@/lib/supabase'
-import { FiX, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-
+import { ChevronLeft, ChevronRight, X } from '@/components/icons'
 interface StoryViewerProps {
   stories: { user: User; stories: Story[] }[]
   initialIndex: number
@@ -307,7 +306,7 @@ export default function StoryViewer({
           onClick={onClose}
           className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
         >
-          <FiX size={24} />
+          <X size={24} />
         </button>
       </div>
 
@@ -357,7 +356,7 @@ export default function StoryViewer({
         }}
         className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white hover:bg-white/20 rounded-full p-2 transition-colors hidden md:block"
       >
-        <FiChevronLeft size={32} />
+        <ChevronLeft size={32} />
       </button>
       <button
         onClick={(e) => {
@@ -366,7 +365,7 @@ export default function StoryViewer({
         }}
         className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white hover:bg-white/20 rounded-full p-2 transition-colors hidden md:block"
       >
-        <FiChevronRight size={32} />
+        <ChevronRight size={32} />
       </button>
     </div>
   )

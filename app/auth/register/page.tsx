@@ -7,15 +7,13 @@ import Link from 'next/link'
 import AuthBrandHero from '@/components/auth/AuthBrandHero'
 import { localizeAuthError } from '@/components/auth/localizeAuthError'
 import { trackFunnel } from '@/lib/track-funnel'
-import { FiTool, FiShoppingBag, FiUser } from 'react-icons/fi'
-import type { IconType } from 'react-icons'
-
+import { HardHat, Store, User, type LucideIcon } from '@/components/icons'
 const VALID_ROLES: UserRole[] = ['master', 'seller', 'client']
 
-const ROLE_META: Record<UserRole, { label: string; icon: IconType }> = {
-  master: { label: 'Мастер', icon: FiTool },
-  seller: { label: 'Продавец', icon: FiShoppingBag },
-  client: { label: 'Клиент', icon: FiUser },
+const ROLE_META: Record<UserRole, { label: string; icon: LucideIcon }> = {
+  master: { label: 'Мастер', icon: HardHat },
+  seller: { label: 'Продавец', icon: Store },
+  client: { label: 'Клиент', icon: User },
 }
 
 function isUserRole(v: string | null): v is UserRole {

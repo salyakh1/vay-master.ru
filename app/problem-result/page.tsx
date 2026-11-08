@@ -6,7 +6,15 @@ import { useAuth } from '../providers'
 import { supabase, User, Service, Product } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
-import { FiUser, FiShoppingBag, FiCheck, FiX, FiMessageCircle, FiEdit2, FiSearch } from 'react-icons/fi'
+import {
+  Check,
+  MessageCircle,
+  Pencil,
+  Search,
+  ShoppingBag,
+  User as UserIcon,
+  X,
+} from '@/components/icons'
 import AutocompleteInput from '@/components/AutocompleteInput'
 import { findOrCreateChat } from '@/lib/chatHelpers'
 
@@ -208,7 +216,7 @@ function ProblemResultContent() {
                   onClick={handleEditClick}
                   className="flex items-center gap-2 text-sm text-gray-600 hover:text-black transition-colors px-3 py-1 border border-gray-200 hover:border-gray-300"
                 >
-                  <FiEdit2 size={14} />
+                  <Pencil size={14} />
                   Изменить
                 </button>
               </div>
@@ -236,7 +244,7 @@ function ProblemResultContent() {
                         : 'bg-black text-white border border-black hover:bg-gray-900'
                     }`}
                   >
-                    <FiSearch size={14} />
+                    <Search size={14} />
                     Найти снова
                   </button>
                   <button
@@ -320,7 +328,7 @@ function ProblemResultContent() {
           {filteredMasters.length > 0 ? (
             <div className="card mb-6">
               <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-2">
-                <FiUser />
+                <UserIcon size={18} />
                 Мастера ({filteredMasters.length})
               </h2>
               <div className="space-y-3">
@@ -361,7 +369,7 @@ function ProblemResultContent() {
                         onClick={() => handleStartChat(master.id)}
                         className="btn btn-outline text-sm px-4 py-2 flex items-center gap-2"
                       >
-                        <FiMessageCircle size={16} />
+                        <MessageCircle size={16} />
                         Написать
                       </button>
                     )}
@@ -379,7 +387,7 @@ function ProblemResultContent() {
           {result.products.length > 0 ? (
             <div className="card mb-6">
               <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-2">
-                <FiShoppingBag />
+                <ShoppingBag size={18} />
                 Подходящие товары ({result.products.length})
               </h2>
               <div className="overflow-x-auto scrollbar-hide">
@@ -398,7 +406,7 @@ function ProblemResultContent() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <span className="text-4xl">🛒</span>
+                          <ShoppingBag size={36} strokeWidth={1.5} className="text-slate-300" aria-hidden />
                         )}
                       </div>
                       <div className="p-4">

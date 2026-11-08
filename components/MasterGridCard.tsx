@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { FiMapPin, FiStar } from 'react-icons/fi'
+import { Crown, MapPin, Star } from '@/components/icons'
 import type { User } from '@/lib/supabase'
 import { getInitials, getMasterAvatarAlt, getMasterSpecs } from '@/lib/master-display'
 
@@ -28,7 +28,8 @@ export default function MasterGridCard({ master }: { master: User }) {
           </div>
         )}
         {master.is_pro && (
-          <span className="absolute top-1.5 right-1.5 bg-brand-accent text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-md shadow-sm">
+          <span className="absolute top-1.5 right-1.5 inline-flex items-center gap-0.5 bg-brand-accent text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-md shadow-sm">
+            <Crown size={9} strokeWidth={2.5} aria-hidden />
             PRO
           </span>
         )}
@@ -38,13 +39,13 @@ export default function MasterGridCard({ master }: { master: User }) {
         <p className="text-[10px] text-[#888] mb-1.5 line-clamp-2 leading-snug min-h-[2.5em]">{specs}</p>
         <div className="border-t border-[#f5f5f7] pt-1.5 flex items-center justify-between gap-1">
           <span className="text-[10px] text-[#111] font-semibold flex items-center gap-0.5">
-            <FiStar className="text-amber-400 fill-amber-400 shrink-0" size={9} />
+            <Star className="text-amber-400 fill-amber-400 shrink-0" size={10} />
             {rating > 0 ? rating.toFixed(1) : '—'}
             {reviews > 0 && <span className="text-[#aaa] font-normal">({reviews})</span>}
           </span>
           {master.city && (
             <span className="text-[9px] text-[#bbb] truncate max-w-[55%] flex items-center gap-0.5">
-              <FiMapPin size={8} className="text-brand-accent/70 shrink-0" />
+              <MapPin size={10} className="text-brand-accent/70 shrink-0" />
               {master.city}
             </span>
           )}

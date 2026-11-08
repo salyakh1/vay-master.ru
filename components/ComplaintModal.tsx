@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FiX, FiSend, FiAlertCircle } from 'react-icons/fi'
+import { AlertCircle, Send, X } from '@/components/icons'
 import { supabase } from '@/lib/supabase'
 
 interface ComplaintModalProps {
@@ -75,7 +75,7 @@ export default function ComplaintModal({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border-color">
           <div className="flex items-center gap-3">
-            <FiAlertCircle size={24} className="text-red-600" />
+            <AlertCircle size={24} className="text-red-600" />
             <h2 className="text-xl font-semibold text-graphite-secondary tracking-tight">Пожаловаться</h2>
           </div>
           <button
@@ -83,7 +83,7 @@ export default function ComplaintModal({
             onClick={onClose}
             className="text-text-secondary hover:text-graphite-secondary transition-colors"
           >
-            <FiX size={24} />
+            <X size={24} />
           </button>
         </div>
 
@@ -121,7 +121,7 @@ export default function ComplaintModal({
               className="btn flex-1 btn-primary flex items-center justify-center gap-2"
               disabled={submitting || !comment.trim()}
             >
-              <FiSend size={18} />
+              <Send size={18} />
               <span>{submitting ? 'Отправка...' : 'Отправить жалобу'}</span>
             </button>
           </div>

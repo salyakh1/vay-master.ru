@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation'
 import { AdBanner, AdContext, AdType } from '@/lib/supabase'
 import { useAuth } from '@/app/providers'
 import { profileLoginUrl } from '@/lib/guest-access'
-import { FiExternalLink, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-
+import { ChevronLeft, ChevronRight, ExternalLink } from '@/components/icons'
 interface AdSlotProps {
   type: AdType
   context?: AdContext
@@ -343,7 +342,7 @@ export default function AdSlot({
             className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full transition-colors z-20"
             aria-label="Предыдущая реклама"
           >
-            <FiChevronLeft size={18} />
+            <ChevronLeft size={18} />
           </button>
           <button
             onClick={(e) => {
@@ -353,7 +352,7 @@ export default function AdSlot({
             className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-full transition-colors z-20"
             aria-label="Следующая реклама"
           >
-            <FiChevronRight size={18} />
+            <ChevronRight size={18} />
           </button>
 
           {/* Индикаторы (точки) */}

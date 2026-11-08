@@ -6,15 +6,15 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import {
-  FiMenu,
-  FiBookOpen,
-  FiHelpCircle,
-  FiActivity,
-  FiMap,
-  FiUser,
-  FiSettings,
-  FiBriefcase,
-} from 'react-icons/fi'
+  Activity,
+  BookOpen,
+  Calculator,
+  ClipboardList,
+  HelpCircle,
+  Menu,
+  Settings,
+  User,
+} from '@/components/icons'
 
 export const APP_TOP_HEADER_HEIGHT = 52
 
@@ -91,7 +91,7 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                   aria-label="Планировщик сметы"
                   className="w-9 h-9 rounded-lg text-[#1c1c1e] flex items-center justify-center"
                 >
-                  <FiMap size={18} />
+                  <Calculator size={20} />
                 </Link>
                 <Link
                   href="/auth/login"
@@ -116,7 +116,7 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                   onClick={() => setIsMenuOpen((v) => !v)}
                   className="w-9 h-9 rounded-lg hover:bg-[#f2f2f7] transition-colors text-[#1c1c1e] flex items-center justify-center"
                 >
-                  <FiMenu size={20} strokeWidth={2.5} />
+                  <Menu size={22} strokeWidth={2} />
                 </button>
 
                 {isMenuOpen && (
@@ -129,7 +129,7 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f2f2f7] transition-colors text-left text-[#1c1c1e] font-medium text-sm"
                     >
-                      <FiUser size={18} />
+                      <User size={18} className="text-slate-500" />
                       <span>Профиль</span>
                     </button>
                     <button
@@ -140,7 +140,7 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f2f2f7] transition-colors text-left text-[#1c1c1e] font-medium text-sm"
                     >
-                      <FiSettings size={18} />
+                      <Settings size={18} className="text-slate-500" />
                       <span>Настройки</span>
                     </button>
                     <button
@@ -151,7 +151,7 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f2f2f7] transition-colors text-left text-[#1c1c1e] font-medium text-sm"
                     >
-                      <FiBriefcase size={18} />
+                      <ClipboardList size={18} className="text-slate-500" />
                       <span>Заказы</span>
                     </button>
                     <button
@@ -162,7 +162,7 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f2f2f7] transition-colors text-left text-[#1c1c1e] font-medium text-sm"
                     >
-                      <FiActivity size={18} />
+                      <Activity size={18} className="text-slate-500" />
                       <span>Активность</span>
                     </button>
                     <button
@@ -173,7 +173,7 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f2f2f7] transition-colors text-left text-[#1c1c1e] font-medium text-sm"
                     >
-                      <FiMap size={18} />
+                      <Calculator size={18} className="text-slate-500" />
                       <span>Планировщик</span>
                     </button>
                     <button
@@ -184,7 +184,7 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f2f2f7] transition-colors text-left text-[#1c1c1e] font-medium text-sm"
                     >
-                      <FiBookOpen size={18} />
+                      <BookOpen size={18} className="text-slate-500" />
                       <span>Правила</span>
                     </button>
                     <button
@@ -195,7 +195,7 @@ export default function AppTopHeader({ rightSlot, className = '' }: AppTopHeader
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f2f2f7] transition-colors text-left text-[#1c1c1e] font-medium text-sm"
                     >
-                      <FiHelpCircle size={18} />
+                      <HelpCircle size={18} className="text-slate-500" />
                       <span>Техподдержка</span>
                     </button>
                   </div>

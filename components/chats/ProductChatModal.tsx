@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { FiX, FiSend, FiExternalLink } from 'react-icons/fi'
+import { ExternalLink, Package, Send, X } from '@/components/icons'
 import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import { findOrCreateChat } from '@/lib/chatHelpers'
@@ -276,7 +276,9 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
             {cover ? (
               <Image src={cover} alt="" fill className="object-cover" sizes="48px" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-[16px]">📦</div>
+              <div className="w-full h-full flex items-center justify-center text-slate-400">
+                <Package size={20} aria-hidden />
+              </div>
             )}
           </div>
           <div className="flex-1 min-w-0 pt-0.5">
@@ -292,7 +294,7 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
             aria-label="Закрыть"
             className="p-1.5 text-[#888] flex-shrink-0"
           >
-            <FiX size={20} />
+            <X size={20} />
           </button>
         </div>
 
@@ -303,7 +305,7 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
               className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#e63946]"
             >
               Открыть в полном чате
-              <FiExternalLink size={12} />
+              <ExternalLink size={12} />
             </Link>
           </div>
         )}
@@ -384,7 +386,7 @@ export default function ProductChatModal({ isOpen, onClose, product, seller }: P
             className="w-10 h-10 rounded-xl bg-[#e63946] text-white flex items-center justify-center disabled:opacity-40 flex-shrink-0 mb-0.5"
             aria-label="Отправить"
           >
-            <FiSend size={16} />
+            <Send size={16} />
           </button>
         </form>
       </div>

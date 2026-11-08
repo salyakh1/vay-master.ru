@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FiX } from 'react-icons/fi'
+import { X } from '@/components/icons'
 import { MapContainer, TileLayer, Circle } from '@/components/maps/leaflet'
 import ChangeMapView from '@/components/ChangeMapView'
 import RadiusMapGestures from '@/components/maps/RadiusMapGestures'
@@ -94,7 +94,7 @@ export default function RadiusPickerModal({
         <div className="flex items-center justify-between mb-2.5">
           <p className="text-[14px] font-medium text-graphite-primary">Радиус поиска</p>
           <button type="button" onClick={onClose} aria-label="Закрыть" className="p-1 text-text-secondary">
-            <FiX size={18} />
+            <X size={18} />
           </button>
         </div>
 

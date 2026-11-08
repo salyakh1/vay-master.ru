@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FiX, FiSend } from 'react-icons/fi'
-
+import { Send as SendIcon, X } from '@/components/icons'
 type CalculatorMode = 'basic' | 'construction' | 'materials' | 'financial'
 
 interface CalculatorModalProps {
@@ -196,7 +195,7 @@ export default function CalculatorModal({ isOpen, onClose, onSendResult }: Calcu
             onClick={onClose}
             className="text-text-secondary hover:text-text-primary transition-colors"
           >
-            <FiX size={20} />
+            <X size={20} />
           </button>
         </div>
 
@@ -439,7 +438,7 @@ export default function CalculatorModal({ isOpen, onClose, onSendResult }: Calcu
             onClick={handleSendResult}
             className="btn btn-primary w-full mt-4 flex items-center justify-center gap-2"
           >
-            <FiSend size={16} />
+            <SendIcon size={16} />
             <span>Отправить результат</span>
           </button>
         </div>

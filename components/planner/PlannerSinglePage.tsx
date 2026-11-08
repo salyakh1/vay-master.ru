@@ -15,7 +15,7 @@ import {
 } from './planner-ui-data'
 import type { PlannerInputMode, PlannerStep, RecommendedMaster, RecommendedProduct } from './planner-types'
 import { SIZE_PRESETS, formatMeters, type PlannerRoom } from './planner-rooms'
-import { FiPlus, FiTrash2, FiMinus } from 'react-icons/fi'
+import { Minus, Plus, Star, Trash2 } from '@/components/icons'
 
 type PlannerSinglePageProps = {
   step: PlannerStep
@@ -121,7 +121,7 @@ function MeterField({
           onClick={() => onChange(Math.max(min, +(value - step).toFixed(2)))}
           className="w-11 h-11 flex-shrink-0 rounded-xl border border-[#e5e5ea] bg-[#f4f4f4] text-[#c7362f] flex items-center justify-center"
         >
-          <FiMinus size={16} />
+          <Minus size={16} />
         </button>
         <input
           type="text"
@@ -139,7 +139,7 @@ function MeterField({
           onClick={() => onChange(Math.min(max, +(value + step).toFixed(2)))}
           className="w-11 h-11 flex-shrink-0 rounded-xl border border-[#e5e5ea] bg-[#f4f4f4] text-[#c7362f] flex items-center justify-center"
         >
-          <FiPlus size={16} />
+          <Plus size={16} />
         </button>
       </div>
     </label>
@@ -454,7 +454,7 @@ export default function PlannerSinglePage(props: PlannerSinglePageProps) {
                             onClick={() => onRemoveRoom(room.id)}
                             className="w-10 h-10 rounded-lg border border-[#e5e5ea] text-[#c7362f] flex items-center justify-center"
                           >
-                            <FiTrash2 size={16} />
+                            <Trash2 size={16} />
                           </button>
                         )}
                       </div>
@@ -816,7 +816,8 @@ export default function PlannerSinglePage(props: PlannerSinglePageProps) {
                     <div className="p-2.5">
                       <p className="text-[13px] font-bold text-[#111] truncate">{m.full_name}</p>
                       <p className="text-[12px] text-[#6b7280] mt-0.5">
-                        ★ {m.master_rating?.toFixed(1) || '—'}
+                        <Star size={12} className="inline -mt-0.5 mr-0.5 text-[#f4a228] fill-[#f4a228]" aria-hidden />
+                        {m.master_rating?.toFixed(1) || '—'}
                         {m.city ? ` · ${m.city}` : ''}
                       </p>
                     </div>

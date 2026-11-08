@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import GuestAwareProfileLink from '@/components/GuestAwareProfileLink'
 import type { User } from '@/lib/supabase'
+import { Crown, Star } from '@/components/icons'
 
 function getSpecs(master: User): string {
   const withRelations = master as User & {
@@ -65,7 +66,8 @@ export default function MasterScrollerCard({ master }: MasterScrollerCardProps) 
             initials
           )}
           {isPro && (
-            <span className="absolute -bottom-0.5 -right-0.5 bg-brand-accent border-2 border-white text-white text-[7px] font-extrabold px-1 rounded-sm">
+            <span className="absolute -bottom-0.5 -right-0.5 inline-flex items-center gap-px bg-brand-accent border-2 border-white text-white text-[7px] font-extrabold px-1 rounded-sm">
+              <Crown size={8} strokeWidth={2.5} aria-hidden />
               PRO
             </span>
           )}
@@ -75,7 +77,7 @@ export default function MasterScrollerCard({ master }: MasterScrollerCardProps) 
       <p className="text-[10px] text-[#8e8e93] leading-snug line-clamp-2 min-h-[26px] mb-1">{getSpecs(master)}</p>
       <div className="flex items-center justify-between gap-1">
         <div className="inline-flex items-center gap-0.5 bg-[#fff8e6] px-1 py-0.5 rounded-md text-[10px]">
-          <span className="text-[#f4a228] leading-none">★</span>
+          <Star size={10} className="text-[#f4a228] fill-[#f4a228]" aria-hidden />
           <span className="text-[#1c1c1e] font-bold">{rating > 0 ? rating.toFixed(1) : '—'}</span>
           {reviews > 0 && <span className="text-[#8e8e93] font-medium">({reviews})</span>}
         </div>

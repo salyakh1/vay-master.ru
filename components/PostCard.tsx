@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { supabase, Post } from '@/lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { FiHeart, FiMessageCircle } from 'react-icons/fi'
+import { Heart, MessageCircle } from '@/components/icons'
 import Link from 'next/link'
 
 interface PostCardProps {
@@ -136,11 +136,11 @@ export default function PostCard({ post, currentUserId, onUpdate }: PostCardProp
               : 'text-text-secondary hover:text-graphite-secondary'
           }`}
         >
-          <FiHeart size={18} fill={liked ? 'currentColor' : 'none'} strokeWidth={liked ? 2.5 : 2} />
+          <Heart size={18} fill={liked ? 'currentColor' : 'none'} strokeWidth={liked ? 2.5 : 2} />
           <span className="text-sm font-medium">{likesCount}</span>
         </button>
         <div className="flex items-center gap-2 text-text-secondary hover:text-graphite-secondary px-3 py-1.5 transition-colors cursor-pointer">
-          <FiMessageCircle size={18} strokeWidth={2} />
+          <MessageCircle size={18} strokeWidth={2} />
           <span className="text-sm font-medium">Комментарии</span>
         </div>
       </div>

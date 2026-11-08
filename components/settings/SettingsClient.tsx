@@ -36,6 +36,38 @@ import {
   EmailPanel,
   type SettingsPanelId,
 } from './SettingsFormPanels'
+import {
+  Bell,
+  BookOpen,
+  ChartColumn,
+  ClipboardList,
+  CreditCard,
+  FileText,
+  Globe,
+  HardHat,
+  HelpCircle,
+  Image as ImageIcon,
+  KeyRound,
+  Lock,
+  LogOut,
+  Mail,
+  MapPin,
+  Megaphone,
+  MessageCircle,
+  Package,
+  Pencil,
+  Radio,
+  ShieldCheck,
+  Smartphone,
+  Star,
+  Store,
+  Trash2,
+  User as UserIcon,
+  Wrench,
+} from '@/components/icons'
+
+const ROW_ICON = 18
+const ACCENT = 'text-brand-accent'
 
 const ROLE_LABELS: Record<string, string> = {
   master: 'Мастер',
@@ -227,7 +259,7 @@ export default function SettingsClient() {
 
   const pushToggleRow = (
     <SettingsRow
-      icon="📱"
+      icon={<Smartphone size={ROW_ICON} />}
       title="Push на телефоне"
       subtitle={pushEnabled ? 'Включены' : 'Уведомления о заказах и сообщениях'}
       right={<SettingsToggle checked={pushEnabled} onChange={() => void togglePush()} />}
@@ -313,7 +345,7 @@ export default function SettingsClient() {
             <>
               <SettingsSection title="Профиль мастера">
                 <SettingsAccordionItem
-                  icon="✏️"
+                  icon={<Pencil size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Редактировать профиль"
                   subtitle="Имя, фото, описание, контакты"
@@ -323,7 +355,7 @@ export default function SettingsClient() {
                   <ProfileEditPanel forms={forms} />
                 </SettingsAccordionItem>
                 <SettingsAccordionItem
-                  icon="🔧"
+                  icon={<Wrench size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Специализации и услуги"
                   subtitle={specCountLabel(
@@ -337,7 +369,7 @@ export default function SettingsClient() {
                   <SpecializationsPanel forms={forms} />
                 </SettingsAccordionItem>
                 <SettingsAccordionItem
-                  icon="📍"
+                  icon={<MapPin size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Геолокация и радиус"
                   subtitle={locationSub}
@@ -346,15 +378,15 @@ export default function SettingsClient() {
                 >
                   <LocationPanel />
                 </SettingsAccordionItem>
-                <SettingsRow icon="🖼️" iconBg="#fff1f2" title="Портфолио" subtitle={portfolioLabel(portfolioCount)} href={`/profile/${user.id}`} right={<SettingsArrow />} />
+                <SettingsRow icon={<ImageIcon size={ROW_ICON} className={ACCENT} />} iconBg="#fff1f2" title="Портфолио" subtitle={portfolioLabel(portfolioCount)} href={`/profile/${user.id}`} right={<SettingsArrow />} />
               </SettingsSection>
 
               <SettingsSection title="Уведомления">
                 {pushToggleRow}
-                <SettingsRow icon="🔔" title="Новые заказы" subtitle="В чате и push" right={<SettingsToggle checked={!!notifPrefs.new_orders} onChange={() => toggleNotif('new_orders')} />} />
-                <SettingsRow icon="💬" title="Сообщения в чатах" right={<SettingsToggle checked={!!notifPrefs.chat_messages} onChange={() => toggleNotif('chat_messages')} />} />
-                <SettingsRow icon="⭐" title="Новые отзывы" right={<SettingsToggle checked={!!notifPrefs.new_reviews} onChange={() => toggleNotif('new_reviews')} />} />
-                <SettingsRow icon="📢" title="Акции и новости" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
+                <SettingsRow icon={<Bell size={ROW_ICON} />} title="Новые заказы" subtitle="В чате и push" right={<SettingsToggle checked={!!notifPrefs.new_orders} onChange={() => toggleNotif('new_orders')} />} />
+                <SettingsRow icon={<MessageCircle size={ROW_ICON} />} title="Сообщения в чатах" right={<SettingsToggle checked={!!notifPrefs.chat_messages} onChange={() => toggleNotif('chat_messages')} />} />
+                <SettingsRow icon={<Star size={ROW_ICON} />} title="Новые отзывы" right={<SettingsToggle checked={!!notifPrefs.new_reviews} onChange={() => toggleNotif('new_reviews')} />} />
+                <SettingsRow icon={<Megaphone size={ROW_ICON} />} title="Акции и новости" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
               </SettingsSection>
             </>
           )}
@@ -363,7 +395,7 @@ export default function SettingsClient() {
             <>
               <SettingsSection title="Мой магазин">
                 <SettingsRow
-                  icon="📦"
+                  icon={<Package size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Управление товарами"
                   subtitle={productsCount > 0 ? `${productsCount} в каталоге` : 'Добавьте первый товар'}
@@ -371,7 +403,7 @@ export default function SettingsClient() {
                   right={<SettingsArrow />}
                 />
                 <SettingsRow
-                  icon="📊"
+                  icon={<ChartColumn size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Аналитика продаж"
                   subtitle="Просмотры и конверсия"
@@ -384,7 +416,7 @@ export default function SettingsClient() {
                   }
                 />
                 <SettingsAccordionItem
-                  icon="📍"
+                  icon={<MapPin size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Адрес и зона доставки"
                   subtitle={user.delivery_zones || user.store_address || user.city || 'Не указано'}
@@ -394,7 +426,7 @@ export default function SettingsClient() {
                   <StoreAddressPanel onSaved={onSaved} />
                 </SettingsAccordionItem>
                 <SettingsAccordionItem
-                  icon="📡"
+                  icon={<Radio size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Радиус поиска"
                   subtitle={
@@ -408,7 +440,7 @@ export default function SettingsClient() {
                   <LocationPanel />
                 </SettingsAccordionItem>
                 <SettingsAccordionItem
-                  icon="🏪"
+                  icon={<Store size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Настройки магазина"
                   subtitle="Описание, режим работы"
@@ -421,9 +453,9 @@ export default function SettingsClient() {
 
               <SettingsSection title="Уведомления">
                 {pushToggleRow}
-                <SettingsRow icon="💬" title="Сообщения покупателей" right={<SettingsToggle checked={!!notifPrefs.buyer_messages} onChange={() => toggleNotif('buyer_messages')} />} />
-                <SettingsRow icon="⭐" title="Новые отзывы на товары" right={<SettingsToggle checked={!!notifPrefs.product_reviews} onChange={() => toggleNotif('product_reviews')} />} />
-                <SettingsRow icon="📢" title="Акции и маркетинг" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
+                <SettingsRow icon={<MessageCircle size={ROW_ICON} />} title="Сообщения покупателей" right={<SettingsToggle checked={!!notifPrefs.buyer_messages} onChange={() => toggleNotif('buyer_messages')} />} />
+                <SettingsRow icon={<Star size={ROW_ICON} />} title="Новые отзывы на товары" right={<SettingsToggle checked={!!notifPrefs.product_reviews} onChange={() => toggleNotif('product_reviews')} />} />
+                <SettingsRow icon={<Megaphone size={ROW_ICON} />} title="Акции и маркетинг" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
               </SettingsSection>
             </>
           )}
@@ -432,7 +464,7 @@ export default function SettingsClient() {
             <>
               <SettingsSection title="Личные данные">
                 <SettingsAccordionItem
-                  icon="👤"
+                  icon={<UserIcon size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Имя и фото профиля"
                   expanded={openPanel === 'profile'}
@@ -441,7 +473,7 @@ export default function SettingsClient() {
                   <ProfileEditPanel forms={forms} />
                 </SettingsAccordionItem>
                 <SettingsAccordionItem
-                  icon="📡"
+                  icon={<Radio size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Радиус поиска"
                   subtitle={
@@ -454,21 +486,21 @@ export default function SettingsClient() {
                 >
                   <LocationPanel />
                 </SettingsAccordionItem>
-                <SettingsAccordionItem icon="📧" iconBg="#fff1f2" title="Email" subtitle={user.email} expanded={openPanel === 'email'} onToggle={() => togglePanel('email')}>
+                <SettingsAccordionItem icon={<Mail size={ROW_ICON} className={ACCENT} />} iconBg="#fff1f2" title="Email" subtitle={user.email} expanded={openPanel === 'email'} onToggle={() => togglePanel('email')}>
                   <EmailPanel email={user.email} />
                 </SettingsAccordionItem>
               </SettingsSection>
 
               <SettingsSection title="Уведомления">
                 {pushToggleRow}
-                <SettingsRow icon="📋" title="Отклики на мои заказы" right={<SettingsToggle checked={!!notifPrefs.order_responses} onChange={() => toggleNotif('order_responses')} />} />
-                <SettingsRow icon="💬" title="Новые сообщения" right={<SettingsToggle checked={!!notifPrefs.chat_messages} onChange={() => toggleNotif('chat_messages')} />} />
-                <SettingsRow icon="📢" title="Акции и предложения" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
+                <SettingsRow icon={<ClipboardList size={ROW_ICON} />} title="Отклики на мои заказы" right={<SettingsToggle checked={!!notifPrefs.order_responses} onChange={() => toggleNotif('order_responses')} />} />
+                <SettingsRow icon={<MessageCircle size={ROW_ICON} />} title="Новые сообщения" right={<SettingsToggle checked={!!notifPrefs.chat_messages} onChange={() => toggleNotif('chat_messages')} />} />
+                <SettingsRow icon={<Megaphone size={ROW_ICON} />} title="Акции и предложения" right={<SettingsToggle checked={!!notifPrefs.promotions} onChange={() => toggleNotif('promotions')} />} />
               </SettingsSection>
 
               <SettingsSection title="Возможности">
                 <SettingsRow
-                  icon="🔨"
+                  icon={<HardHat size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Стать мастером"
                   subtitle="Начните получать заказы"
@@ -481,7 +513,7 @@ export default function SettingsClient() {
                   }
                 />
                 <SettingsRow
-                  icon="🛒"
+                  icon={<Store size={ROW_ICON} className={ACCENT} />}
                   iconBg="#fff1f2"
                   title="Открыть магазин"
                   subtitle="Продавайте на платформе"
@@ -494,26 +526,26 @@ export default function SettingsClient() {
 
           <SettingsSection title="Аккаунт и безопасность">
             {(role === 'master' || role === 'seller' || role === 'client') && (
-              <SettingsAccordionItem icon="📧" title="Email" subtitle={user.email} expanded={openPanel === 'email'} onToggle={() => togglePanel('email')}>
+              <SettingsAccordionItem icon={<Mail size={ROW_ICON} />} title="Email" subtitle={user.email} expanded={openPanel === 'email'} onToggle={() => togglePanel('email')}>
                 <EmailPanel email={user.email} />
               </SettingsAccordionItem>
             )}
-            <SettingsAccordionItem icon="🔒" title="Сменить пароль" subtitle="Обновить пароль входа" expanded={openPanel === 'password'} onToggle={() => togglePanel('password')}>
+            <SettingsAccordionItem icon={<KeyRound size={ROW_ICON} />} title="Сменить пароль" subtitle="Обновить пароль входа" expanded={openPanel === 'password'} onToggle={() => togglePanel('password')}>
               <PasswordPanel forms={forms} />
             </SettingsAccordionItem>
-            <SettingsRow icon="🛡" title="Двухфакторная аутентификация" right={<SettingsBadge variant="gray">Скоро</SettingsBadge>} />
+            <SettingsRow icon={<ShieldCheck size={ROW_ICON} />} title="Двухфакторная аутентификация" right={<SettingsBadge variant="gray">Скоро</SettingsBadge>} />
           </SettingsSection>
 
           <SettingsSection title="Прочее">
-            <SettingsRow icon="🌐" title="Язык" right={<span className="text-xs text-[#8e8e93]">Русский</span>} />
-            <SettingsRow icon="❓" title="Поддержка" href="mailto:support@vay-master.ru" right={<SettingsArrow />} />
-            <SettingsRow icon="📄" title="Пользовательское соглашение" href="/terms" right={<SettingsArrow />} />
-            <SettingsRow icon="🔏" title="Конфиденциальность" href="/privacy" right={<SettingsArrow />} />
-            <SettingsRow icon="💳" title="Оферта" href="/offer" right={<SettingsArrow />} />
-            <SettingsRow icon="📘" title="Правила платформы" href="/rules" right={<SettingsArrow />} />
-            <SettingsRow icon="🚪" iconBg="#fff0f0" title="Выйти из аккаунта" onClick={handleLogout} danger />
+            <SettingsRow icon={<Globe size={ROW_ICON} />} title="Язык" right={<span className="text-xs text-[#8e8e93]">Русский</span>} />
+            <SettingsRow icon={<HelpCircle size={ROW_ICON} />} title="Поддержка" href="mailto:support@vay-master.ru" right={<SettingsArrow />} />
+            <SettingsRow icon={<FileText size={ROW_ICON} />} title="Пользовательское соглашение" href="/terms" right={<SettingsArrow />} />
+            <SettingsRow icon={<Lock size={ROW_ICON} />} title="Конфиденциальность" href="/privacy" right={<SettingsArrow />} />
+            <SettingsRow icon={<CreditCard size={ROW_ICON} />} title="Оферта" href="/offer" right={<SettingsArrow />} />
+            <SettingsRow icon={<BookOpen size={ROW_ICON} />} title="Правила платформы" href="/rules" right={<SettingsArrow />} />
+            <SettingsRow icon={<LogOut size={ROW_ICON} />} iconBg="#fff0f0" title="Выйти из аккаунта" onClick={handleLogout} danger />
             {(role === 'master' || role === 'client' || role === 'seller') && (
-              <SettingsRow icon="🗑" iconBg="#fff0f0" title="Удалить аккаунт" subtitle="Необратимо" onClick={() => setShowDeleteModal(true)} danger />
+              <SettingsRow icon={<Trash2 size={ROW_ICON} />} iconBg="#fff0f0" title="Удалить аккаунт" subtitle="Необратимо" onClick={() => setShowDeleteModal(true)} danger />
             )}
           </SettingsSection>
 

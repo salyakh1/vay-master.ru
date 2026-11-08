@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { FiSearch, FiChevronDown, FiCheck, FiX } from 'react-icons/fi'
+import { Check, ChevronDown, Search, X } from '@/components/icons'
 import { supabase } from '@/lib/supabase'
 import { hapticTap } from '@/lib/nativeApp'
 import OnboardingShell, { OnbError, OnbPrimaryButton, OnbSkipButton } from './OnboardingShell'
@@ -115,7 +115,7 @@ export default function StepSpecializations({ user, index, total, onBack, onNext
           on ? 'border-brand-accent bg-[#fdf2f1] text-brand-accent' : 'border-[#e5e5ea] bg-white text-[#1c1c1e]',
         ].join(' ')}
       >
-        {on && <FiCheck size={14} strokeWidth={3} />}
+        {on && <Check size={14} strokeWidth={3} />}
         {s.name}
       </button>
     )
@@ -140,7 +140,7 @@ export default function StepSpecializations({ user, index, total, onBack, onNext
       }
     >
       <div className="relative mb-4">
-        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93]" size={18} />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93]" size={18} />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -154,7 +154,7 @@ export default function StepSpecializations({ user, index, total, onBack, onNext
             aria-label="Очистить"
             className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-[#8e8e93]"
           >
-            <FiX size={16} />
+            <X size={16} />
           </button>
         )}
       </div>
@@ -199,7 +199,7 @@ export default function StepSpecializations({ user, index, total, onBack, onNext
                       {count}
                     </span>
                   )}
-                  <FiChevronDown
+                  <ChevronDown
                     size={20}
                     className={`text-[#8e8e93] transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
                   />

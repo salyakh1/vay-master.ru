@@ -1,6 +1,6 @@
 'use client'
 
-import { FiHeart, FiImage, FiPlay, FiShoppingBag } from 'react-icons/fi'
+import { Heart, Image as ImageIcon, Play, ShoppingBag } from '@/components/icons'
 import { formatCompactCount } from '@/components/ExploreMasonryGrid'
 
 export type InstagramGridItem = {
@@ -50,12 +50,12 @@ export default function InstagramGrid({ items, onItemClick }: Props) {
                 preload="metadata"
               />
               <span className="absolute top-1.5 right-1.5 text-white drop-shadow">
-                <FiPlay size={14} fill="white" />
+                <Play size={14} fill="white" />
               </span>
             </>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-[#c7c7c7]">
-              {item.kind === 'product' ? <FiShoppingBag size={22} /> : <FiImage size={22} />}
+              {item.kind === 'product' ? <ShoppingBag size={22} /> : <ImageIcon size={22} />}
             </div>
           )}
 
@@ -67,7 +67,7 @@ export default function InstagramGrid({ items, onItemClick }: Props) {
 
           {item.kind === 'portfolio' && (item.likesCount ?? 0) > 0 && (
             <span className="absolute bottom-1 left-1 flex items-center gap-0.5 bg-black/45 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded">
-              <FiHeart size={9} className="fill-white" />
+              <Heart size={9} className="fill-white" />
               {formatCompactCount(item.likesCount ?? 0)}
             </span>
           )}

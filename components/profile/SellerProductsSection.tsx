@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { FiMapPin, FiPlus, FiShoppingBag } from 'react-icons/fi'
+import { MapPin, Plus, ShoppingBag } from '@/components/icons'
 import type { Product } from '@/lib/supabase'
 
 type SellerProductsSectionProps = {
@@ -30,7 +30,7 @@ function CompactSellerProductCard({ product }: { product: Product }) {
           <Image src={img} alt={product.name} fill className="object-cover" sizes="50vw" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[#ccc]">
-            <FiShoppingBag size={28} />
+            <ShoppingBag size={28} />
           </div>
         )}
       </div>
@@ -93,7 +93,7 @@ export default function SellerProductsSection({
                 onClick={onShowMap}
                 className="text-[10px] text-[#6b7280] flex items-center gap-0.5"
               >
-                <FiMapPin size={11} />
+                <MapPin size={11} />
                 Карта
               </button>
             )}
@@ -101,7 +101,7 @@ export default function SellerProductsSection({
               href="/products/new"
               className="text-[11px] font-medium text-brand-accent flex items-center gap-0.5"
             >
-              <FiPlus size={12} />
+              <Plus size={12} />
               Добавить
             </Link>
           </div>
@@ -110,7 +110,7 @@ export default function SellerProductsSection({
 
       {(storeAddress || city) && (
         <p className="text-[10px] text-[#9ca3af] mb-2.5 flex items-center gap-1">
-          <FiMapPin size={10} className="text-brand-accent shrink-0" />
+          <MapPin size={10} className="text-brand-accent shrink-0" />
           <span className="truncate">{storeAddress || city}</span>
         </p>
       )}

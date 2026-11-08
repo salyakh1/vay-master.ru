@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FiMessageCircle, FiShare2 } from 'react-icons/fi'
+import { MessageCircle, Share2 } from '@/components/icons'
 import type { User } from '@/lib/supabase'
 import { getInitials, yearsOnSite, yearsOnSiteLabel } from './profile-utils'
 
@@ -176,7 +176,7 @@ export default function ProfileStrictHeader({
                 onClick={onMessage}
                 className="flex-1 bg-brand-accent text-white text-[12px] font-medium py-2.5 rounded-[10px] flex items-center justify-center gap-1.5"
               >
-                <FiMessageCircle size={14} />
+                <MessageCircle size={14} />
                 Написать
               </button>
             )}
@@ -196,7 +196,7 @@ export default function ProfileStrictHeader({
               className="w-10 h-10 bg-[#f4f4f4] border border-[#e5e7eb] rounded-[10px] flex items-center justify-center flex-shrink-0 text-[#374151]"
               aria-label="Поделиться"
             >
-              <FiShare2 size={14} />
+              <Share2 size={14} />
             </button>
           </div>
         )}

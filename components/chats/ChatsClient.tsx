@@ -9,7 +9,13 @@ import Navbar from '@/components/Navbar'
 import ChatListItem from './ChatListItem'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { FiBriefcase, FiMessageSquare, FiClock } from 'react-icons/fi'
+import {
+  Briefcase,
+  ClipboardList,
+  Clock,
+  MessageCircle,
+  MessageSquare,
+} from '@/components/icons'
 
 type TabType = 'chats' | 'responses'
 
@@ -327,7 +333,7 @@ export default function ChatsClient() {
             }`}
           >
             <span className="inline-flex items-center gap-1 justify-center">
-              <FiMessageSquare size={14} />
+              <MessageSquare size={14} />
               Чаты
             </span>
           </button>
@@ -341,7 +347,7 @@ export default function ChatsClient() {
             }`}
           >
             <span className="inline-flex items-center gap-1 justify-center">
-              <FiBriefcase size={14} />
+              <Briefcase size={14} />
               Отклики
             </span>
           </button>
@@ -371,7 +377,9 @@ export default function ChatsClient() {
             </div>
           ) : filteredChats.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-              <div className="text-5xl mb-4">💬</div>
+              <div className="w-16 h-16 rounded-2xl bg-[#fff1f2] text-brand-accent flex items-center justify-center mb-4">
+                <MessageCircle size={32} strokeWidth={1.5} aria-hidden />
+              </div>
               <p className="text-[15px] font-extrabold text-[#111] mb-2">
                 {searchQuery ? 'Ничего не найдено' : 'Нет чатов'}
               </p>
@@ -418,7 +426,9 @@ export default function ChatsClient() {
             </div>
           ) : responses.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-              <div className="text-5xl mb-4">📋</div>
+              <div className="w-16 h-16 rounded-2xl bg-[#fff1f2] text-brand-accent flex items-center justify-center mb-4">
+                <ClipboardList size={32} strokeWidth={1.5} aria-hidden />
+              </div>
               <p className="text-[15px] font-extrabold text-[#111] mb-2">Пока нет откликов</p>
               <p className="text-[12px] text-[#aaa] leading-relaxed mb-6">
                 Создайте заказ — мастера начнут откликаться
@@ -466,7 +476,7 @@ export default function ChatsClient() {
                       )}
                       <p className="text-[11px] text-[#888] truncate">{response.message}</p>
                       <div className="flex items-center gap-1 mt-1 text-[10px] text-[#bbb]">
-                        <FiClock size={10} />
+                        <Clock size={10} />
                         {format(new Date(response.created_at), 'd MMM в HH:mm', { locale: ru })}
                       </div>
                     </div>

@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { FiSearch } from 'react-icons/fi'
-
+import { Search } from '@/components/icons'
 interface AutocompleteInputProps {
   value: string
   onChange: (value: string) => void
@@ -133,7 +132,7 @@ export default function AutocompleteInput({
   return (
     <div className="relative">
       <div className="relative">
-        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
         <input
           ref={inputRef}
           type="text"

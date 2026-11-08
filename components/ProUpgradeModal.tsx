@@ -1,8 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { FiX, FiLock, FiArrowRight } from 'react-icons/fi'
-
+import { ArrowRight, Lock, X } from '@/components/icons'
 interface ProUpgradeModalProps {
   isOpen: boolean
   onClose: () => void
@@ -41,13 +40,13 @@ export default function ProUpgradeModal({
           className="absolute top-4 right-4 text-text-secondary hover:text-graphite-secondary transition-all p-2 rounded-lg hover:bg-white/10 z-30"
           aria-label="Закрыть"
         >
-          <FiX size={20} />
+          <X size={20} />
         </button>
 
         <div className="p-6 relative z-20">
           <div className="flex items-center justify-center mb-4">
             <div className="w-14 h-14 bg-gradient-to-br from-brand-accent/15 to-brand-accent/5 rounded-full flex items-center justify-center border border-brand-accent/25 shadow-glow">
-              <FiLock size={28} className="text-brand-accent" />
+              <Lock size={28} className="text-brand-accent" />
             </div>
           </div>
 
@@ -82,7 +81,7 @@ export default function ProUpgradeModal({
               className="flex-1 btn btn-primary flex items-center justify-center gap-2"
             >
               <span>{ctaText}</span>
-              <FiArrowRight size={18} />
+              <ArrowRight size={18} />
             </button>
             <button
               onClick={onClose}

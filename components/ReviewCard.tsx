@@ -3,7 +3,13 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { User } from '@/lib/supabase'
-import { FiUser, FiCamera, FiMessageCircle, FiEdit2, FiTrash2 } from 'react-icons/fi'
+import {
+  Camera,
+  MessageCircle,
+  Pencil,
+  Trash2,
+  User as UserIcon,
+} from '@/components/icons'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import RatingStars from './RatingStars'
@@ -143,7 +149,7 @@ export default function ReviewCard({
                     className="p-1.5 text-text-secondary hover:text-brand-accent transition-colors"
                     title="Редактировать"
                   >
-                    <FiEdit2 size={16} />
+                    <Pencil size={16} />
                   </button>
                 )}
                 {onDelete && (
@@ -152,7 +158,7 @@ export default function ReviewCard({
                     className="p-1.5 text-text-secondary hover:text-red-500 transition-colors"
                     title="Удалить"
                   >
-                    <FiTrash2 size={16} />
+                    <Trash2 size={16} />
                   </button>
                 )}
               </div>
@@ -198,7 +204,7 @@ export default function ReviewCard({
               onClick={() => onReply(review.id)}
               className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-brand-accent transition-colors mt-2"
             >
-              <FiMessageCircle size={14} />
+              <MessageCircle size={14} />
               <span>Ответить</span>
             </button>
           )}

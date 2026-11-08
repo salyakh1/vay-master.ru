@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FiSearch, FiPlusCircle } from 'react-icons/fi'
+import { PlusCircle, Search } from '@/components/icons'
 import { hapticTap } from '@/lib/nativeApp'
 import OnboardingShell, { OnbPrimaryButton, OnbSkipButton } from './OnboardingShell'
 import type { OnboardingStepProps } from './types'
@@ -25,7 +25,7 @@ export default function StepClientTask({ index, total, onBack, onFinish }: Onboa
           <OnbPrimaryButton
             onClick={() => onFinish(trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : '/search')}
           >
-            <FiSearch size={18} />
+            <Search size={18} />
             {trimmed ? 'Найти мастера' : 'Смотреть мастеров рядом'}
           </OnbPrimaryButton>
           <OnbSkipButton onClick={() => onFinish('/feed')}>Просто посмотреть ленту</OnbSkipButton>
@@ -33,7 +33,7 @@ export default function StepClientTask({ index, total, onBack, onFinish }: Onboa
       }
     >
       <div className="relative">
-        <FiSearch className="absolute left-4 top-4 text-[#8e8e93]" size={18} />
+        <Search className="absolute left-4 top-4 text-[#8e8e93]" size={18} />
         <textarea
           value={task}
           onChange={(e) => setTask(e.target.value)}
@@ -74,7 +74,7 @@ export default function StepClientTask({ index, total, onBack, onFinish }: Onboa
         className="mt-6 w-full rounded-2xl bg-white p-4 shadow-sm flex items-center gap-3 text-left active:scale-[0.99]"
       >
         <span className="w-11 h-11 rounded-xl bg-[#fdf2f1] text-brand-accent flex items-center justify-center shrink-0">
-          <FiPlusCircle size={20} />
+          <PlusCircle size={20} />
         </span>
         <span className="flex-1 min-w-0">
           <span className="block text-[15px] font-bold text-[#1c1c1e]">Опубликовать заказ</span>

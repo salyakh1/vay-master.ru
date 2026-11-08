@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FiX, FiAlertCircle, FiCheckCircle } from 'react-icons/fi'
-
+import { AlertCircle, CheckCircle, X } from '@/components/icons'
 interface AcceptResponseModalProps {
   isOpen: boolean
   onClose: () => void
@@ -49,14 +48,14 @@ export default function AcceptResponseModal({
             disabled={confirming}
             className="p-2 hover:bg-bg-secondary rounded-md transition-colors disabled:opacity-50"
           >
-            <FiX size={20} className="text-text-secondary" />
+            <X size={20} className="text-text-secondary" />
           </button>
         </div>
 
         {/* Content */}
         <div className="p-6 space-y-4">
           <div className="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-            <FiAlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+            <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-yellow-800">
               <p className="font-medium mb-2">После принятия этого отклика:</p>
               <ul className="list-disc list-inside space-y-1 text-yellow-700">
@@ -82,7 +81,7 @@ export default function AcceptResponseModal({
           {/* Error */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm flex items-start gap-2">
-              <FiAlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -110,7 +109,7 @@ export default function AcceptResponseModal({
                 </>
               ) : (
                 <>
-                  <FiCheckCircle size={18} />
+                  <CheckCircle size={18} />
                   <span>Принять отклик</span>
                 </>
               )}

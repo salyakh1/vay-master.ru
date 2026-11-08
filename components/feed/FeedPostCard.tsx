@@ -2,7 +2,13 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { FiHeart, FiMapPin, FiMessageCircle, FiMessageSquare, FiShoppingBag } from 'react-icons/fi'
+import {
+  Heart,
+  MapPin,
+  MessageCircle,
+  MessageSquare,
+  ShoppingBag,
+} from '@/components/icons'
 import { formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import PostImageSlider from '@/components/PostImageSlider'
@@ -85,7 +91,7 @@ export default function FeedPostCard(props: Props) {
           </Link>
         ) : (
           <div className="w-full aspect-square bg-[#fafafa] flex items-center justify-center text-[#dbdbdb]">
-            <FiShoppingBag size={40} />
+            <ShoppingBag size={40} />
           </div>
         )}
 
@@ -142,7 +148,7 @@ export default function FeedPostCard(props: Props) {
           <div className="flex items-center gap-1 text-[11px] text-[#8e8e8e] truncate">
             {item.master?.city && (
               <>
-                <FiMapPin size={10} />
+                <MapPin size={10} />
                 <span className="truncate">{item.master.city}</span>
                 <span>·</span>
               </>
@@ -168,7 +174,7 @@ export default function FeedPostCard(props: Props) {
 
       <div className="flex items-center gap-4 px-3.5 pt-2.5">
         <button type="button" onClick={props.onLike} className="flex items-center gap-1.5" aria-label="Нравится">
-          <FiHeart
+          <Heart
             size={22}
             className={item.liked ? 'fill-[#e63946] text-[#e63946]' : 'text-[#262626]'}
           />
@@ -182,13 +188,13 @@ export default function FeedPostCard(props: Props) {
           className="flex items-center gap-1.5"
           aria-label="Комментарии"
         >
-          <FiMessageCircle size={22} className="text-[#262626]" />
+          <MessageCircle size={22} className="text-[#262626]" />
           {(item.comments_count ?? 0) > 0 && (
             <span className="text-[13px] font-semibold text-[#262626]">{item.comments_count}</span>
           )}
         </button>
         <Link href={`/profile/${item.master?.id}`} className="ml-auto text-[#262626]" aria-label="Написать">
-          <FiMessageSquare size={22} />
+          <MessageSquare size={22} />
         </Link>
       </div>
 

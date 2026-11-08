@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from '@/components/maps/leaflet'
-import { FiX } from 'react-icons/fi'
+import { X } from '@/components/icons'
 import { configureLeafletIcons } from '@/lib/leaflet'
 import ChangeMapView from '@/components/ChangeMapView'
 import 'leaflet/dist/leaflet.css'
@@ -37,7 +37,7 @@ export default function StoreLocationMapModal({ isOpen, onClose, lat, lng, addre
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
           aria-label="Закрыть"
         >
-          <FiX className="w-6 h-6" />
+          <X className="w-6 h-6" />
         </button>
       </div>
       <div className="flex-1 min-h-0 relative">

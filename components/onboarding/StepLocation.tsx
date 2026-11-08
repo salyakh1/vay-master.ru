@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { FiNavigation, FiSearch, FiMapPin, FiX } from 'react-icons/fi'
+import { MapPin, Navigation, Search, X } from '@/components/icons'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/app/providers'
 import { hapticTap } from '@/lib/nativeApp'
@@ -202,13 +202,13 @@ export default function StepLocation({ user, index, total, onBack, onNext }: Onb
         {locating ? (
           <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
         ) : (
-          <FiNavigation size={17} />
+          <Navigation size={17} />
         )}
         {locating ? 'Определяем…' : 'Определить моё место'}
       </button>
 
       <div className="relative mb-3">
-        <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93]" size={18} />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8e8e93]" size={18} />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -225,7 +225,7 @@ export default function StepLocation({ user, index, total, onBack, onNext }: Onb
             aria-label="Очистить"
             className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-[#8e8e93]"
           >
-            <FiX size={16} />
+            <X size={16} />
           </button>
         )}
         {suggestions.length > 0 && (
@@ -241,7 +241,7 @@ export default function StepLocation({ user, index, total, onBack, onNext }: Onb
                   }}
                   className="w-full flex items-start gap-3 px-4 py-3 text-left active:bg-[#f4f4f4]"
                 >
-                  <FiMapPin className="mt-0.5 text-brand-accent shrink-0" size={16} />
+                  <MapPin className="mt-0.5 text-brand-accent shrink-0" size={16} />
                   <span className="text-[14px] text-[#1c1c1e] leading-snug line-clamp-2">{s.display_name}</span>
                 </button>
               </li>
@@ -260,7 +260,7 @@ export default function StepLocation({ user, index, total, onBack, onNext }: Onb
         />
         {(city || label) && chosen && (
           <div className="absolute left-3 right-3 top-3 z-[400] rounded-xl bg-white/95 backdrop-blur px-3 py-2 shadow-md flex items-center gap-2 pointer-events-none">
-            <FiMapPin className="text-brand-accent shrink-0" size={15} />
+            <MapPin className="text-brand-accent shrink-0" size={15} />
             <span className="text-[13px] font-semibold text-[#1c1c1e] truncate">{label || city}</span>
           </div>
         )}

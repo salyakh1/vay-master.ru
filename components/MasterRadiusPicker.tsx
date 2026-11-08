@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, Circle } from '@/components/maps/leaflet'
 import { supabase } from '@/lib/supabase'
 import { configureLeafletIcons } from '@/lib/leaflet'
 import { useAuth } from '@/app/providers'
-import { FiCheck, FiMapPin, FiEdit2 } from 'react-icons/fi'
+import { Check, MapPin, Pencil } from '@/components/icons'
 import ChangeMapView from '@/components/ChangeMapView'
 import RadiusMapGestures from '@/components/maps/RadiusMapGestures'
 import 'leaflet/dist/leaflet.css'
@@ -133,7 +133,7 @@ export default function MasterRadiusPicker() {
     return (
       <div className="card p-4">
         <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-          <FiMapPin className="text-brand-accent" />
+          <MapPin size={16} className="text-brand-accent" />
           {title}
         </h3>
         <p className="text-sm text-text-secondary mb-3">
@@ -146,7 +146,7 @@ export default function MasterRadiusPicker() {
           onClick={() => setIsCollapsed(false)}
           className="btn btn-secondary w-full flex items-center justify-center gap-2"
         >
-          <FiEdit2 size={16} />
+          <Pencil size={16} />
           Изменить
         </button>
       </div>
@@ -156,7 +156,7 @@ export default function MasterRadiusPicker() {
   return (
     <div className="card p-4">
       <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-        <FiMapPin className="text-brand-accent" />
+        <MapPin size={16} className="text-brand-accent" />
         {title}
       </h3>
       <p className="text-sm text-text-secondary mb-4">
@@ -281,7 +281,7 @@ export default function MasterRadiusPicker() {
           'Сохранение...'
         ) : saved ? (
           <>
-            <FiCheck className="mr-2" />
+            <Check size={16} className="mr-2" />
             Сохранено
           </>
         ) : (

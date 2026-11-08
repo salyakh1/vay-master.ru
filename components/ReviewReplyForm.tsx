@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FiMessageCircle, FiX } from 'react-icons/fi'
+import { MessageCircle, X } from '@/components/icons'
 import { supabase } from '@/lib/supabase'
 
 interface ReviewReplyFormProps {

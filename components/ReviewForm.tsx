@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import Image from 'next/image'
-import { FiX, FiCamera, FiStar } from 'react-icons/fi'
+import { Camera, Star, X } from '@/components/icons'
 import RatingStars from './RatingStars'
 import { supabase } from '@/lib/supabase'
 
@@ -197,7 +197,7 @@ export default function ReviewForm({
                   onClick={() => removeImage(idx)}
                   className="absolute top-1 right-1 w-6 h-6 bg-black/70 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  <FiX size={14} />
+                  <X size={14} />
                 </button>
               </div>
             ))}
@@ -210,7 +210,7 @@ export default function ReviewForm({
             disabled={uploading}
             className="flex items-center gap-2 px-4 py-2 border border-border-light rounded-lg hover:bg-bg-secondary transition-colors text-sm text-text-secondary"
           >
-            <FiCamera size={16} />
+            <Camera size={16} />
             <span>{uploading ? 'Загрузка...' : 'Добавить фото'}</span>
           </button>
         )}

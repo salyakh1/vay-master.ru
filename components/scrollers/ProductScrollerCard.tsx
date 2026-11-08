@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { FiPlus, FiShoppingBag } from 'react-icons/fi'
+import { Plus, ShoppingBag } from '@/components/icons'
 import type { Product } from '@/lib/supabase'
 
 type ProductScrollerCardProps = {
@@ -40,7 +40,7 @@ export default function ProductScrollerCard({ product, badge }: ProductScrollerC
         {img ? (
           <Image src={img} alt={product.name} fill className="object-cover" sizes="126px" />
         ) : (
-          <FiShoppingBag className="text-[#c7c7cc]" size={26} />
+          <ShoppingBag className="text-slate-300" size={26} strokeWidth={1.5} />
         )}
         {autoBadge && (
           <span className="absolute top-1 left-1 bg-brand-accent text-white text-[7px] font-extrabold px-1 py-0.5 rounded">
@@ -60,7 +60,7 @@ export default function ProductScrollerCard({ product, badge }: ProductScrollerC
             {product.price.toLocaleString('ru-RU')} ₽
           </span>
           <span className="w-6 h-6 bg-brand-accent rounded-md flex items-center justify-center text-white shrink-0">
-            <FiPlus size={14} strokeWidth={3} />
+            <Plus size={16} strokeWidth={2.5} />
           </span>
         </div>
       </div>

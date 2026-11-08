@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-
+import { ChevronLeft, ChevronRight } from '@/components/icons'
 interface PostImageSliderProps {
   images: string[]
   alt?: string
@@ -91,7 +90,7 @@ export default function PostImageSlider({ images, alt = '', className = '' }: Po
               className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors hidden md:block"
               aria-label="Предыдущее фото"
             >
-              <FiChevronLeft size={20} />
+              <ChevronLeft size={20} />
             </button>
             <button
               onClick={(e) => {
@@ -101,7 +100,7 @@ export default function PostImageSlider({ images, alt = '', className = '' }: Po
               className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors hidden md:block"
               aria-label="Следующее фото"
             >
-              <FiChevronRight size={20} />
+              <ChevronRight size={20} />
             </button>
           </>
         )}

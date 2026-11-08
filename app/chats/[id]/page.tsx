@@ -9,9 +9,18 @@ import { supabase, Message, User } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import Link from 'next/link'
-import { FiPlus, FiImage, FiMoreVertical, FiTrash2, FiAlertCircle, FiSend } from 'react-icons/fi'
 import { formatDateDivider, getInitials, isSystemStyleMessage, stripProductPathFromContent } from '@/components/chats/chat-utils'
 import { getCategoryIcon } from '@/components/orders/order-utils'
+import {
+  AlertCircle,
+  Calculator,
+  CheckCheck,
+  Image as ImageIcon,
+  MoreVertical,
+  Plus,
+  Send,
+  Trash2,
+} from '@/components/icons'
 
 // Dynamic imports для модальных окон - загружаются только при открытии
 const CalculatorModal = dynamic(() => import('@/components/CalculatorModal'), {
@@ -565,7 +574,7 @@ export default function ChatPage() {
             className="w-8 h-8 rounded-full bg-[#f5f5f7] border border-[#eee] flex items-center justify-center text-[#555]"
             aria-label="Меню"
           >
-            <FiMoreVertical size={18} />
+            <MoreVertical size={18} />
           </button>
           {showChatMenu && (
             <div className="absolute right-0 top-full mt-2 bg-white border border-[#f0f0f0] rounded-xl shadow-lg min-w-[200px] z-50 overflow-hidden">
@@ -577,7 +586,7 @@ export default function ChatPage() {
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f5f5f7] text-left text-[#111] text-sm"
               >
-                <FiTrash2 size={16} />
+                <Trash2 size={16} />
                 Удалить чат у меня
               </button>
               <button
@@ -588,7 +597,7 @@ export default function ChatPage() {
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f5f5f7] text-left text-[#111] text-sm"
               >
-                <FiTrash2 size={16} />
+                <Trash2 size={16} />
                 Удалить чат у всех
               </button>
               <button
@@ -599,7 +608,7 @@ export default function ChatPage() {
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f5f5f7] text-left text-[#e63946] text-sm"
               >
-                <FiAlertCircle size={16} />
+                <AlertCircle size={16} />
                 Пожаловаться
               </button>
             </div>
@@ -612,7 +621,10 @@ export default function ChatPage() {
           href={`/orders/${relatedOrder.id}`}
           className="mx-3.5 mt-2 mb-1 bg-white border border-[#f0f0f0] rounded-[14px] px-3 py-2.5 flex items-center gap-2 flex-shrink-0"
         >
-          <span className="text-lg flex-shrink-0">{getCategoryIcon(relatedOrder.category)}</span>
+          {(() => {
+            const OrderIcon = getCategoryIcon(relatedOrder.category)
+            return <OrderIcon size={20} className="text-brand-accent flex-shrink-0" aria-hidden />
+          })()}
           <div className="flex-1 min-w-0">
             <p className="text-[9px] text-[#aaa] font-medium">Заказ</p>
             <p className="text-[12px] font-bold text-[#111] truncate">{relatedOrder.title}</p>
@@ -683,7 +695,7 @@ export default function ChatPage() {
                     >
                       {visibleText}
                       {isOwn && message.read && (
-                        <span className="text-[9px] text-white/70 ml-1">✓✓</span>
+                        <CheckCheck size={12} className="inline ml-1 -mt-0.5 text-white/70" aria-label="Прочитано" />
                       )}
                     </div>
                   ) : null}
@@ -706,7 +718,7 @@ export default function ChatPage() {
               onClick={() => fileInputRef.current?.click()}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-[#111] rounded-lg hover:bg-[#f5f5f7]"
             >
-              <FiImage size={18} />
+              <ImageIcon size={18} />
               Фото
             </button>
             <button
@@ -717,7 +729,7 @@ export default function ChatPage() {
               }}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-[#111] rounded-lg hover:bg-[#f5f5f7]"
             >
-              <span>🔢</span>
+              <Calculator size={18} className="text-slate-500" aria-hidden />
               Калькулятор
             </button>
           </div>
@@ -730,7 +742,7 @@ export default function ChatPage() {
           className="w-8 h-8 rounded-full bg-[#f5f5f7] border border-[#eee] flex items-center justify-center text-[#888] flex-shrink-0"
           aria-label="Вложения"
         >
-          <FiPlus size={18} />
+          <Plus size={18} />
         </button>
 
         <form onSubmit={sendMessage} className="flex-1 flex items-center gap-2 min-w-0">
@@ -750,7 +762,7 @@ export default function ChatPage() {
             className="w-9 h-9 rounded-full bg-[#e63946] flex items-center justify-center text-white flex-shrink-0 disabled:opacity-40"
             aria-label="Отправить"
           >
-            <FiSend size={16} />
+            <Send size={16} />
           </button>
         </form>
 

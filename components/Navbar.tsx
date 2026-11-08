@@ -7,13 +7,14 @@ import { useAuth } from '@/app/providers'
 import { supabase } from '@/lib/supabase'
 import AppTopHeader from '@/components/AppTopHeader'
 import {
-  FiHome,
-  FiShoppingBag,
-  FiMessageCircle,
-  FiUser,
-  FiSearch,
-  FiClipboard,
-} from 'react-icons/fi'
+  ClipboardList,
+  HardHat,
+  MessageCircle,
+  Newspaper,
+  Store,
+  User,
+  type LucideIcon,
+} from '@/components/icons'
 
 type NavbarProps = {
   /** Только нижняя панель (шапка VAY-MASTER рендерится отдельно) */
@@ -100,8 +101,12 @@ export default function Navbar({ bottomOnly = false, topOnly = false }: NavbarPr
   const profileActive = Boolean(pathname?.startsWith('/profile') || pathname?.startsWith('/settings'))
   const itemClass = (active: boolean) =>
     `flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 min-w-0 transition-colors ${
-      active ? 'text-brand-accent' : 'text-[#8e8e93] hover:text-[#1c1c1e]'
+      active ? 'text-brand-accent' : 'text-slate-500 hover:text-slate-800'
     }`
+
+  const tabIcon = (Icon: LucideIcon, active: boolean) => (
+    <Icon className="w-[22px] h-[22px] sm:w-6 sm:h-6" strokeWidth={active ? 2.25 : 1.75} aria-hidden />
+  )
 
   const bottomNav = user ? (
     <nav
@@ -111,28 +116,28 @@ export default function Navbar({ bottomOnly = false, topOnly = false }: NavbarPr
       <div className="max-w-lg mx-auto w-full">
         <div className="grid grid-cols-6 gap-0 min-h-[52px] sm:min-h-[56px] w-full">
           <Link href={feedHref} className={itemClass(feedActive)} prefetch={false}>
-            <FiHome className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={feedActive ? 2.5 : 2} />
+            {tabIcon(Newspaper, feedActive)}
             <span className={`text-[9px] sm:text-[10px] leading-tight truncate w-full text-center ${feedActive ? 'font-semibold' : 'font-medium'}`}>
               Лента
             </span>
           </Link>
 
           <Link href="/products" className={itemClass(sellersActive)} prefetch={false}>
-            <FiShoppingBag className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={sellersActive ? 2.5 : 2} />
+            {tabIcon(Store, sellersActive)}
             <span className={`text-[9px] sm:text-[10px] leading-tight truncate w-full text-center ${sellersActive ? 'font-semibold' : 'font-medium'}`}>
               Продавцы
             </span>
           </Link>
 
           <Link href="/search" className={itemClass(mastersActive)} prefetch={false}>
-            <FiSearch className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={mastersActive ? 2.5 : 2} />
+            {tabIcon(HardHat, mastersActive)}
             <span className={`text-[9px] sm:text-[10px] leading-tight truncate w-full text-center ${mastersActive ? 'font-semibold' : 'font-medium'}`}>
               Мастера
             </span>
           </Link>
 
           <Link href="/orders" className={itemClass(ordersActive)} prefetch={false}>
-            <FiClipboard className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={ordersActive ? 2.5 : 2} />
+            {tabIcon(ClipboardList, ordersActive)}
             <span className={`text-[9px] sm:text-[10px] leading-tight truncate w-full text-center ${ordersActive ? 'font-semibold' : 'font-medium'}`}>
               Заказы
             </span>
@@ -140,7 +145,7 @@ export default function Navbar({ bottomOnly = false, topOnly = false }: NavbarPr
 
           <Link href={chatsHref} className={`${itemClass(chatsActive)} relative`} prefetch={false}>
             <div className="relative flex-shrink-0">
-              <FiMessageCircle className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={chatsActive ? 2.5 : 2} />
+              {tabIcon(MessageCircle, chatsActive)}
               {!chatsActive && unreadChatsCount > 0 && (
                 <span className="absolute -top-0.5 -right-1.5 bg-brand-accent text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] h-3.5 flex items-center justify-center px-0.5">
                   {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
@@ -153,7 +158,7 @@ export default function Navbar({ bottomOnly = false, topOnly = false }: NavbarPr
           </Link>
 
           <Link href={profileHref} className={itemClass(profileActive)} prefetch={false}>
-            <FiUser className="w-[18px] h-[18px] sm:w-5 sm:h-5" strokeWidth={profileActive ? 2.5 : 2} />
+            {tabIcon(User, profileActive)}
             <span className={`text-[9px] sm:text-[10px] leading-tight truncate w-full text-center ${profileActive ? 'font-semibold' : 'font-medium'}`}>
               Профиль
             </span>

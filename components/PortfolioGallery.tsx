@@ -5,7 +5,14 @@ import Image from 'next/image'
 import { useAuth } from '@/app/providers'
 import { supabase, PortfolioItem, PortfolioLike, PortfolioComment, User } from '@/lib/supabase'
 import Link from 'next/link'
-import { FiX, FiChevronLeft, FiChevronRight, FiHeart, FiMessageCircle, FiSend } from 'react-icons/fi'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Heart,
+  MessageCircle,
+  Send,
+  X,
+} from '@/components/icons'
 import { formatDistanceToNow } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { loginUrl } from '@/lib/guest-access'
@@ -580,7 +587,7 @@ export default function PortfolioGallery({
                 onClick={() => handleReplyTo(comment.id, name)}
                 className="text-xs text-gray-500 hover:text-brand-accent transition-colors flex items-center gap-1"
               >
-                <FiMessageCircle size={10} />
+                <MessageCircle size={10} />
                 Ответить
               </button>
             )}
@@ -675,7 +682,7 @@ export default function PortfolioGallery({
             onClick={onClose}
             className="p-2 hover:bg-white/20 transition-all rounded-full pointer-events-auto backdrop-blur-sm border border-white/20"
           >
-            <FiX size={20} className="text-graphite-secondary" />
+            <X size={20} className="text-graphite-secondary" />
           </button>
         </div>
         {/* Индикатор текущей работы */}
@@ -749,7 +756,7 @@ export default function PortfolioGallery({
               aria-label="Предыдущее фото"
               className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 p-2 glass hover:bg-white/90 transition-all z-20 rounded-full backdrop-blur-md pointer-events-auto border border-white/30 shadow-glossy disabled:opacity-30"
             >
-              <FiChevronLeft size={20} className="text-graphite-secondary" />
+              <ChevronLeft size={20} className="text-graphite-secondary" />
             </button>
             <button
               type="button"
@@ -758,7 +765,7 @@ export default function PortfolioGallery({
               aria-label="Следующее фото"
               className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 p-2 glass hover:bg-white/90 transition-all z-20 rounded-full backdrop-blur-md pointer-events-auto border border-white/30 shadow-glossy disabled:opacity-30"
             >
-              <FiChevronRight size={20} className="text-graphite-secondary" />
+              <ChevronRight size={20} className="text-graphite-secondary" />
             </button>
           </>
         )}
@@ -788,7 +795,7 @@ export default function PortfolioGallery({
               liked ? 'text-brand-accent' : 'text-graphite-secondary hover:text-brand-accent'
             }`}
           >
-            <FiHeart size={24} fill={liked ? 'currentColor' : 'none'} className={liked ? 'drop-shadow-glow' : ''} />
+            <Heart size={24} fill={liked ? 'currentColor' : 'none'} className={liked ? 'drop-shadow-glow' : ''} />
           </button>
           <button
             onClick={() => {
@@ -798,7 +805,7 @@ export default function PortfolioGallery({
             }}
             className="flex items-center gap-2 text-graphite-secondary hover:text-brand-accent transition-all hover:scale-110"
           >
-            <FiMessageCircle size={24} />
+            <MessageCircle size={24} />
           </button>
           <div className="flex-1" />
           <span className="text-sm font-semibold text-gray-900">
@@ -941,7 +948,7 @@ export default function PortfolioGallery({
                   aria-label="Отправить комментарий"
                   className="shrink-0 p-2.5 rounded-full bg-brand-accent text-white disabled:opacity-40 active:scale-95 transition-transform"
                 >
-                  <FiSend size={18} />
+                  <Send size={18} />
                 </button>
               </div>
             </form>

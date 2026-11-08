@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { FiX } from 'react-icons/fi'
+import { X } from '@/components/icons'
 import { supabase } from '@/lib/supabase'
 import {
   SERVICE_PRICE_UNITS,
@@ -145,7 +145,7 @@ export default function ProfileServicesSheet({
             className="p-1.5 text-[#9ca3af] hover:text-[#111] rounded-lg"
             aria-label="Закрыть"
           >
-            <FiX size={18} />
+            <X size={18} />
           </button>
         </div>
         {services.length === 0 ? (

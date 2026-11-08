@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FiBriefcase, FiCheck } from 'react-icons/fi'
+import { Briefcase, Check } from '@/components/icons'
 import type { CategoryNode } from '@/lib/masterCategoriesTree'
 
 type Props = {
@@ -97,7 +97,7 @@ export default function SpecializationsEditor({
         <div className="fixed inset-0 z-[90] flex items-center justify-center pointer-events-none px-6">
           <div className="pointer-events-auto bg-[#1c1c1e]/92 text-white rounded-2xl px-5 py-4 shadow-xl max-w-xs w-full text-center animate-slide-up">
             <div className="mx-auto mb-2 w-10 h-10 rounded-full bg-[#22a85e] flex items-center justify-center">
-              <FiCheck size={22} strokeWidth={3} />
+              <Check size={22} strokeWidth={3} />
             </div>
             <p className="text-[14px] font-bold">Специализации сохранены</p>
             <p className="text-[11px] text-white/70 mt-1">
@@ -148,11 +148,11 @@ export default function SpecializationsEditor({
                         onError={() => setFilterImageFailed((prev) => new Set(prev).add(cat.id))}
                       />
                     ) : (
-                      <FiBriefcase size={24} className="text-[#c7c7cc]" />
+                      <Briefcase size={24} className="text-[#c7c7cc]" />
                     )}
                     {hasSelected && (
                       <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-brand-accent text-white flex items-center justify-center">
-                        <FiCheck size={12} strokeWidth={3} />
+                        <Check size={12} strokeWidth={3} />
                       </span>
                     )}
                   </div>
